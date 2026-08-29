@@ -1,37 +1,121 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ b['title'] }}</h1>
-<p class="muted">{{ b['author'] or 'Unknown author' }}{% if b['isbn'] %} · ISBN {{ b['isbn'] }}{% endif %}</p>
-{% if b['total_seconds'] %}
-<p>{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h read ·
-   {{ b['pages_read'] }} pages{% if b['total_pages'] %} of {{ b['total_pages'] }} ({{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%){% endif %} ·
-   last read {{ b['last_read_at'] | ts_date if b['last_read_at'] else '—' }}</p>
-{% endif %}
+{% set cover_url = "https://covers.openlibrary.org/b/isbn/" ~ b['isbn'] ~ "-L.jpg" if b['isbn'] else none %}
+
+<div style="display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:2rem">
+  <div style="flex:0 0 auto;width:12rem">
+    <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius);background:var(--bg);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center">
+      {% if cover_url %}
+      <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="width:100%;height:100%;object-fit:cover"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);padding:1rem;text-align:center;width:100%;height:100%">
+        <span style="font-size:3rem">📖</span>
+        <span style="font-size:.85rem">No cover available</span>
+      </div>
+      {% else %}
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);padding:1rem;text-align:center;width:100%;height:100%">
+        <span style="font-size:3rem">📖</span>
+        <span style="font-size:.85rem">No cover available</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="flex:1;min-width:14rem">
+    <h1>{{ b['title'] }}</h1>
+    <p class="muted" style="margin-bottom:1rem">
+      {{ b['author'] or 'Unknown author' }}
+      {% if b['isbn'] %} · ISBN {{ b['isbn'] }}{% endif %}
+    </p>
+
+    {% if b['rating'] %}
+    <div style="color:#e6a817;font-size:1.2rem;margin-bottom:.75rem">{{ '★' * b['rating'] }}{{ '☆' * (5 - b['rating']) }}</div>
+    {% endif %}
+
+    {% if b['total_seconds'] %}
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+        <div>
+          <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Time read</div>
+          <div style="font-size:1.3rem;font-weight:700">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h</div>
+        </div>
+        <div>
+          <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Pages</div>
+          <div style="font-size:1.3rem;font-weight:700">{{ b['pages_read'] }}{% if b['total_pages'] %} / {{ b['total_pages'] }}{% endif %}</div>
+        </div>
+        {% if b['total_pages'] and b['pages_read'] %}
+        <div style="flex:1;min-width:8rem;display:flex;flex-direction:column;justify-content:center">
+          <div class="muted" style="font-size:.75rem;margin-bottom:.25rem">{{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%</div>
+          <div style="background:var(--border);border-radius:3px;height:.5rem;overflow:hidden">
+            <div class="bar" style="width:{{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%"></div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% if b['last_read_at'] %}
+      <div class="muted" style="margin-top:.5rem;font-size:.8rem">Last read {{ b['last_read_at'] | ts_date }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if b['review'] %}
+    <div class="card" style="margin-bottom:1rem">
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.35rem">Review</div>
+      <div style="white-space:pre-wrap;line-height:1.6">{{ b['review'] }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
 {% if months %}
-<p class="muted">Monthly reading time (h):</p>
-<table>
-  {% for m in months %}
-  <tr><td>{{ m['month'] }}</td><td>{{ (m['seconds'] / 3600) | round(1) }}h</td></tr>
-  {% endfor %}
-</table>
+<div class="card" style="margin-bottom:1.5rem">
+  <h2 style="margin-top:0">Monthly reading</h2>
+  <div class="month-pills">
+    {% for m in months %}
+    <span class="month-pill">{{ m['month'] }} · {{ (m['seconds'] / 3600) | round(1) }}h</span>
+    {% endfor %}
+  </div>
+</div>
 {% endif %}
 
-<h2>Rating & review</h2>
-<form method="post" action="/books/{{ b['id'] }}/rate">
-  <p>Rating: <select name="rating">
-    <option value="0">–</option>
-    {% for i in range(1, 6) %}<option value="{{ i }}" {% if b['rating'] == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
-  </select></p>
-  <p><textarea name="review" rows="5" placeholder="Your review">{{ b['review'] or '' }}</textarea></p>
-  <p><button>Save</button></p>
-</form>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem">
+  <div class="card">
+    <h2 style="margin-top:0">Rating & review</h2>
+    <form method="post" action="/books/{{ b['id'] }}/rate">
+      <div class="form-group">
+        <label>Rating</label>
+        <select name="rating">
+          <option value="0">No rating</option>
+          {% for i in range(1, 6) %}<option value="{{ i }}" {% if b['rating'] == i %}selected{% endif %}>{{ i }} ★</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Review</label>
+        <textarea name="review" rows="4" placeholder="Your review">{{ b['review'] or '' }}</textarea>
+      </div>
+      <button>Save</button>
+    </form>
+  </div>
 
-<h2>Attach ISBN (fills metadata from OpenLibrary)</h2>
-{% if b['isbn'] and not b['author'] %}
-<p class="muted">No author set — set an ISBN to fetch title/author.</p>
-{% endif %}
-<form method="post" action="/books/{{ b['id'] }}/isbn">
-  <p><input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721"> <button>Fetch</button></p>
-</form>
+  <div class="card">
+    <h2 style="margin-top:0">ISBN & metadata</h2>
+    <form method="post" action="/books/{{ b['id'] }}/isbn">
+      <div class="form-group">
+        <label>ISBN</label>
+        <div class="form-row">
+          <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721" style="flex:1">
+          <button>Fetch</button>
+        </div>
+      </div>
+      <p class="muted" style="font-size:.8rem">Fills title, author & cover from OpenLibrary</p>
+    </form>
+  </div>
+</div>
+
+<div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)">
+  <form class="inline" method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book?')">
+    <button class="btn-danger" title="Delete book">🗑 Delete book</button>
+  </form>
+  <a href="/" class="btn btn-ghost" style="margin-left:.5rem">← Back to library</a>
+</div>
 {% endblock %}

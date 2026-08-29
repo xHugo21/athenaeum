@@ -3,47 +3,82 @@
 {% if error %}<p class="flash">{{ error }}</p>{% endif %}
 {% if imported is not none %}<p class="flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
 
-<h1>Reading tracker</h1>
+<h1>Your Library</h1>
 
-<h2>Import KOReader statistics</h2>
-<form method="post" action="/import" enctype="multipart/form-data">
-  <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="this.form.submit()">
-  <span class="muted">KOReader's statistics.sqlite3 (usually in koreader/settings): uploads replace stats totals for matching books, never your ratings/reviews.</span>
-</form>
-
-<h2>Add book manually</h2>
-<form method="post" action="/books">
-  <p><input name="title" placeholder="Title" required> <input name="author" placeholder="Author">
-     ISBN (optional, fills title/author): <input name="isbn" placeholder="e.g. 9780140328721" size="20"></p>
-  <p>Rating: <select name="rating">
-    <option value="0">–</option>{% for i in range(1, 6) %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
-  </select></p>
-  <p><textarea name="review" rows="3" placeholder="Review (optional)"></textarea></p>
-  <p><button>Add book</button></p>
-</form>
-
-<h2>Your books ({{ books | length }})</h2>
 {% if months %}
-<p class="muted">Last 12 months:
-  {% for m in months %}<span title="{{ m['month'] }}">{{ m['month'][2:] }}: {{ (m['s'] / 3600) | round(1) }}h</span>{% endfor %}
-</p>
-{% endif %}
-<table>
-  <tr><th>Book</th><th>Author</th><th>Time read</th><th>Progress</th><th>Last read</th><th>Rating</th><th></th></tr>
-  {% for b in books %}
-  <tr>
-    <td><a href="/books/{{ b['id'] }}">{{ b['title'] }}</a></td>
-    <td>{{ b['author'] or '' }}</td>
-    <td>{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h</td>
-    <td>{% if b['total_pages'] %}{{ b['pages_read'] }}/{{ b['total_pages'] }}p{% else %}—{% endif %}</td>
-    <td class="muted">{% if b['last_read_at'] %}{{ b['last_read_at'] | ts_date }}{% endif %}</td>
-    <td>{{ b['rating'] or '' }}</td>
-    <td>
-      <form class="inline" method="post" action="/books/{{ b['id'] }}/delete">
-        <button title="Delete">✕</button>
-      </form>
-    </td>
-  </tr>
+<div class="month-pills">
+  {% for m in months %}
+  <span class="month-pill" title="{{ m['month'] }}">{{ m['month'][2:] }} · {{ (m['s'] / 3600) | round(1) }}h</span>
   {% endfor %}
-</table>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem">
+  <h2 style="margin-top:0">Import KOReader stats</h2>
+  <form method="post" action="/import" enctype="multipart/form-data">
+    <label class="btn" style="cursor:pointer">
+      📂 Choose file
+      <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="this.form.submit()" style="display:none">
+    </label>
+    <span class="muted" style="margin-left:.5rem">statistics.sqlite3 from KOReader</span>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:2rem">
+  <h2 style="margin-top:0">Add a book</h2>
+  <form method="post" action="/books">
+    <div class="form-row">
+      <input name="title" placeholder="Title" required style="flex:2;min-width:12rem">
+      <input name="author" placeholder="Author" style="flex:1.5;min-width:10rem">
+      <input name="isbn" placeholder="ISBN" size="16" style="flex:1;min-width:8rem">
+    </div>
+    <div class="form-row">
+      <select name="rating">
+        <option value="0">No rating</option>
+        {% for i in range(1, 6) %}<option value="{{ i }}">{{ i }} ★</option>{% endfor %}
+      </select>
+      <button>Add book</button>
+    </div>
+    <textarea name="review" rows="2" placeholder="Review (optional)" style="margin-top:.25rem"></textarea>
+  </form>
+</div>
+
+<h2>Books ({{ books | length }})</h2>
+
+{% if books %}
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap:1rem;">
+  {% for b in books %}
+  {% set cover_url = "https://covers.openlibrary.org/b/isbn/" ~ b['isbn'] ~ "-M.jpg" if b['isbn'] else none %}
+  <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
+    <div class="card" style="padding:.75rem;text-align:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
+      <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius-sm);background:var(--bg);margin-bottom:.6rem;display:flex;align-items:center;justify-content:center">
+        {% if cover_url %}
+        <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="width:100%;height:100%;object-fit:cover"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;color:var(--muted);padding:.5rem;text-align:center;width:100%;height:100%">
+          <span style="font-size:2rem">📖</span>
+          <span style="font-size:.75rem">No cover</span>
+        </div>
+        {% else %}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;color:var(--muted);padding:.5rem;text-align:center;width:100%;height:100%">
+          <span style="font-size:2rem">📖</span>
+          <span style="font-size:.75rem">No cover</span>
+        </div>
+        {% endif %}
+      </div>
+      <div style="font-weight:600;font-size:.9rem;line-height:1.3;margin-bottom:.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b['title'] }}</div>
+      <div class="muted" style="font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b['author'] or '' }}</div>
+      {% if b['rating'] %}
+      <div style="margin-top:.25rem;color:#e6a817;font-size:.85rem">{{ '★' * b['rating'] }}{{ '☆' * (5 - b['rating']) }}</div>
+      {% endif %}
+      {% if b['total_seconds'] %}
+      <div class="muted" style="font-size:.75rem;margin-top:.2rem">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h read</div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted" style="margin-top:.5rem">No books yet. Add one above or import from KOReader.</p>
+{% endif %}
 {% endblock %}

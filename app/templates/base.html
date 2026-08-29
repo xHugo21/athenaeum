@@ -4,22 +4,128 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>athenaeum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-  table { border-collapse: collapse; width: 100%; }
-  td, th { padding: .4rem .5rem; border-bottom: 1px solid #8884; text-align: left; }
-  .muted { opacity: .6; font-size: .9em; }
+  :root {
+    color-scheme: light dark;
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent: #4a6741;
+    --accent-light: #e8f0e6;
+    --border: #e2e0db;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --surface: #252525;
+      --text: #e8e8e8;
+      --muted: #999;
+      --accent: #7aab6f;
+      --accent-light: #2a3a27;
+      --border: #3a3a3a;
+      --shadow: 0 1px 3px rgba(0,0,0,.2);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 4rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-family: 'Merriweather', Georgia, serif; font-weight: 700; font-size: 1.75rem; margin-bottom: .25rem; }
+  h2 { font-family: 'Merriweather', Georgia, serif; font-weight: 700; font-size: 1.2rem; margin: 2rem 0 .75rem; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  nav {
+    display: flex; align-items: center; gap: 1.5rem;
+    padding: .75rem 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  nav a { font-family: 'Merriweather', Georgia, serif; font-weight: 700; font-size: 1.15rem; color: var(--text); }
+  nav a:hover { color: var(--accent); text-decoration: none; }
+  .muted { color: var(--muted); font-size: .875rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+  }
+  input, textarea, select, button { font-family: inherit; font-size: .9rem; }
+  input[type="text"], input[type="file"], textarea, select {
+    padding: .5rem .75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+  }
+  textarea { width: 100%; resize: vertical; }
+  button, .btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .5rem 1rem;
+    border: none; border-radius: var(--radius-sm);
+    background: var(--accent); color: #fff;
+    font-weight: 600; font-size: .875rem;
+    cursor: pointer; transition: opacity .15s;
+  }
+  button:hover, .btn:hover { opacity: .85; text-decoration: none; }
+  .btn-ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text); opacity: 1; }
+  .btn-danger { background: #c0392b; }
+  .flash {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: .6rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: .9rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--accent);
+  }
+  .bar { background: var(--accent); height: .5rem; border-radius: 3px; }
   form.inline { display: inline; }
-  input, textarea, select { font: inherit; padding: .3rem; }
-  textarea { width: 100%; }
-  .flash { background: #3f63; padding: .5rem 1rem; border-radius: .4rem; }
-  .bar { background: #7af; height: .8rem; border-radius: .2rem; }
-  nav a { margin-right: 1rem; }
+  .form-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+  .form-group { margin-bottom: .75rem; }
+  .form-group label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: .25rem; text-transform: uppercase; letter-spacing: .03em; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: .5rem .6rem; border-bottom: 1px solid var(--border); text-align: left; }
+  th { font-size: .75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .month-pills { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+  .month-pill {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 500;
+  }
 </style>
 </head>
 <body>
-<nav><a href="/"><strong>athenaeum</strong></a></nav>
+<nav>
+  <a href="/">📚 athenaeum</a>
+</nav>
 {% block content %}{% endblock %}
 </body>
 </html>
