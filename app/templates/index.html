@@ -7,8 +7,7 @@
 
 <h2>Import KOReader statistics</h2>
 <form method="post" action="/import" enctype="multipart/form-data">
-  <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required>
-  <button>Import</button>
+  <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="this.form.submit()">
   <span class="muted">KOReader's statistics.sqlite3 (usually in koreader/settings): uploads replace stats totals for matching books, never your ratings/reviews.</span>
 </form>
 
