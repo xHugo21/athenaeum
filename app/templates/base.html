@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>athenaeum</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: .4rem .5rem; border-bottom: 1px solid #8884; text-align: left; }
+  .muted { opacity: .6; font-size: .9em; }
+  form.inline { display: inline; }
+  input, textarea, select { font: inherit; padding: .3rem; }
+  textarea { width: 100%; }
+  .flash { background: #3f63; padding: .5rem 1rem; border-radius: .4rem; }
+  .bar { background: #7af; height: .8rem; border-radius: .2rem; }
+  nav a { margin-right: 1rem; }
+</style>
+</head>
+<body>
+<nav><a href="/"><strong>athenaeum</strong></a></nav>
+{% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ b['title'] }}</h1>
+<p class="muted">{{ b['author'] or 'Unknown author' }}{% if b['isbn'] %} · ISBN {{ b['isbn'] }}{% endif %}</p>
+{% if b['total_seconds'] %}
+<p>{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h read ·
+   {{ b['pages_read'] }} pages{% if b['total_pages'] %} of {{ b['total_pages'] }} ({{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%){% endif %} ·
+   last read {{ b['last_read_at'] | ts_date if b['last_read_at'] else '—' }}</p>
+{% endif %}
+
+{% if months %}
+<p class="muted">Monthly reading time (h):</p>
+<table>
+  {% for m in months %}
+  <tr><td>{{ m['month'] }}</td><td>{{ (m['seconds'] / 3600) | round(1) }}h</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Rating & review</h2>
+<form method="post" action="/books/{{ b['id'] }}/rate">
+  <p>Rating: <select name="rating">
+    <option value="0">–</option>
+    {% for i in range(1, 6) %}<option value="{{ i }}" {% if b['rating'] == i %}selected{% endif %}>{{ i }}</option>{% endfor %}
+  </select></p>
+  <p><textarea name="review" rows="5" placeholder="Your review">{{ b['review'] or '' }}</textarea></p>
+  <p><button>Save</button></p>
+</form>
+
+<h2>Attach ISBN (fills metadata from OpenLibrary)</h2>
+{% if b['isbn'] and not b['author'] %}
+<p class="muted">No author set — set an ISBN to fetch title/author.</p>
+{% endif %}
+<form method="post" action="/books/{{ b['id'] }}/isbn">
+  <p><input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721"> <button>Fetch</button></p>
+</form>
+{% endblock %}
