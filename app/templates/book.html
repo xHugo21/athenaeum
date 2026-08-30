@@ -20,7 +20,7 @@
     <h1>{{ b['title'] }}</h1>
     <p class="muted" style="margin-bottom:1rem">
       {{ b['author'] or 'Unknown author' }}
-      {% if b['isbn'] %} · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">ISBN {{ b['isbn'] }}</a>{% endif %}
+      {% if b['isbn'] %} · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a>{% endif %}
     </p>
 
     {% if b['rating'] %}
