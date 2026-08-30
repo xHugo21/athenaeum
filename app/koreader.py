@@ -18,6 +18,7 @@ class BookStats:
     total_pages: int | None
     last_read_at: int | None
     months: dict[str, int] = field(default_factory=dict)
+    days: dict[str, tuple[int, int]] = field(default_factory=dict)
 
 
 def parse_koreader(data: bytes) -> list[BookStats]:
@@ -33,6 +34,10 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         ).fetchall()
         monthly = con.execute(
             "SELECT id_book, strftime('%Y-%m', start_time, 'unixepoch') m, SUM(duration) FROM page_stat GROUP BY 1, 2"
+        ).fetchall()
+        daily = con.execute(
+            "SELECT id_book, date(start_time, 'unixepoch', 'localtime') d, SUM(duration), COUNT(DISTINCT page) "
+            "FROM page_stat_data GROUP BY 1, 2"
         ).fetchall()
     except sqlite3.DatabaseError:
         raise ValueError("Not a KOReader statistics database (unexpected schema)")
@@ -60,4 +65,11 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         if key and month:
             months = merged[key].months
             months[month] = months.get(month, 0) + (secs or 0)
+
+    for bid, day, secs, pgs in daily:
+        key = id_to_key.get(bid)
+        if key and day:
+            days = merged[key].days
+            prev = days.get(day, (0, 0))
+            days[day] = (prev[0] + (secs or 0), prev[1] + (pgs or 0))
     return list(merged.values())

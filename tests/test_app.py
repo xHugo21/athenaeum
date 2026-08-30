@@ -13,14 +13,18 @@ def koreader_bytes(with_duplicate=False) -> bytes:
           id INTEGER PRIMARY KEY, title TEXT, authors TEXT, pages INTEGER,
           total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER);
         CREATE TABLE page_stat (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER);
+        CREATE TABLE page_stat_data (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER, total_pages INTEGER DEFAULT 0);
         INSERT INTO book VALUES (1, '  The   Hobbit ', 'J.R.R. Tolkien', 300, 180, 2, 1700086400);
         INSERT INTO page_stat VALUES (1, 1, 1700000000, 60);
         INSERT INTO page_stat VALUES (1, 2, 1700086400, 120);
+        INSERT INTO page_stat_data VALUES (1, 1, 1700000000, 60, 300);
+        INSERT INTO page_stat_data VALUES (1, 2, 1700086400, 120, 300);
         """
     )
     if with_duplicate:
         con.execute("INSERT INTO book VALUES (2, 'The Hobbit', 'J. r. r. Tolkien', 300, 30, 1, 1700172800)")
         con.execute("INSERT INTO page_stat VALUES (2, 1, 1700172800, 30)")
+        con.execute("INSERT INTO page_stat_data VALUES (2, 1, 1700172800, 30, 300)")
     return bytes(con.serialize())
 
 
@@ -107,6 +111,16 @@ def test_manual_add_with_isbn(tmp_path, monkeypatch):
         "SELECT total_pages FROM books WHERE title='My Book'"
     ).fetchone()
     assert pages == 250
+
+
+def test_stats_page(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+        r = client.get("/stats")
+        assert r.status_code == 200
+        assert "The Hobbit" in r.text
+        assert "0.1h" in r.text
 
 
 def test_reject_garbage(tmp_path, monkeypatch):

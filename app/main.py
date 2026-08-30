@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 import time
+from datetime import date, timedelta
 
 import httpx
 from fastapi import FastAPI, Form, Request, UploadFile
@@ -50,6 +51,11 @@ CREATE TABLE IF NOT EXISTS month_seconds (
     seconds INTEGER NOT NULL,
     PRIMARY KEY (book_id, month)
 );
+CREATE TABLE IF NOT EXISTS days (
+    day TEXT PRIMARY KEY,
+    seconds INTEGER NOT NULL,
+    pages INTEGER NOT NULL
+);
 """
 
 
@@ -78,6 +84,45 @@ def index(request: Request):
             "SELECT month, SUM(seconds) s FROM month_seconds GROUP BY month ORDER BY month DESC LIMIT 12"
         ).fetchall()
     return templates.TemplateResponse(request, "index.html", {"books": books, "months": months, "imported": request.query_params.get("imported"), "added": request.query_params.get("added"), "error": request.query_params.get("error")})
+
+
+@app.get("/stats")
+def stats(request: Request):
+    with db() as con:
+        totals = con.execute(
+            "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, COALESCE(SUM(pages_read),0) pages, AVG(rating) avg_rating FROM books"
+        ).fetchone()
+        days = con.execute("SELECT day, seconds, pages FROM days ORDER BY day").fetchall()
+        top = con.execute(
+            "SELECT id, title, author, total_seconds FROM books WHERE total_seconds > 0 ORDER BY total_seconds DESC LIMIT 5"
+        ).fetchall()
+    max_secs = max((d["seconds"] for d in days), default=0) or 1
+    best = max(days, key=lambda r: r["pages"], default=None)
+    longest = max(days, key=lambda r: r["seconds"], default=None)
+    fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
+    day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
+    d = date.today() - timedelta(days=364)
+    d -= timedelta(days=(d.weekday() + 1) % 7)
+    end = date.today() + timedelta(days=(6 - date.today().weekday()) % 7)
+    weeks, cur_m = [], None
+    while d <= end:
+        wk, start = [], d
+        for _ in range(7):
+            hit = day_map.get(d.isoformat())
+            alpha = round(max(.25, hit[0] / max_secs), 2) if hit else 0
+            wk.append((d.strftime("%-d %b %Y"), hit[0], hit[1], alpha) if hit else None)
+            d += timedelta(days=1)
+        name = start.strftime("%b %Y") if start.month != cur_m else None
+        cur_m = start.month
+        weeks.append((wk, name))
+    return templates.TemplateResponse(
+        request, "stats.html",
+        {
+            "totals": totals, "weeks": weeks, "top": top,
+            "best": (best["pages"], fmt(best["day"])) if best else None,
+            "longest": (round(longest["seconds"] / 3600, 1), fmt(longest["day"])) if longest else None,
+        },
+    )
 
 
 @app.get("/books/{book_id}")
@@ -191,6 +236,15 @@ def import_koreader(request: Request, file: UploadFile):
                     "INSERT INTO month_seconds (book_id, month, seconds) VALUES (?,?,?) "
                     "ON CONFLICT(book_id, month) DO UPDATE SET seconds=excluded.seconds",
                     (bid, month, secs),
+                )
+        con.execute("DELETE FROM days")
+        # ponytail: days rebuilt from the latest import file, multi-device merges would need a device column
+        for s in stats:
+            for day, (secs, pages) in s.days.items():
+                con.execute(
+                    "INSERT INTO days (day, seconds,pages) VALUES (?,?,?) "
+                    "ON CONFLICT(day) DO UPDATE SET seconds=seconds+excluded.seconds, pages=pages+excluded.pages",
+                    (day, secs, pages),
                 )
     return RedirectResponse(f"/?imported={created}", 303)
 

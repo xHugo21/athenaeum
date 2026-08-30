@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-top:0">Statistics</h2>
+{% if not totals['n'] %}
+<p class="muted">No books yet. Import KOReader stats from the <a href="/">library</a> first.</p>
+{% else %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1rem;margin-bottom:1.5rem">
+  <div class="card" style="text-align:center">
+    <div style="font-size:1.5rem;font-weight:700">{{ (totals['secs'] / 3600) | round(1) }}h</div>
+    <div class="muted">time read</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:1.5rem;font-weight:700">{{ totals['pages'] }}</div>
+    <div class="muted">total pages read</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:1.5rem;font-weight:700">{% if best %}{{ best[0] }}{% else %}–{% endif %}</div>
+    <div class="muted">{% if best %}most pages in a day ({{ best[1] }}){% else %}most pages in a day{% endif %}</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:1.5rem;font-weight:700">{% if longest %}{{ longest[0] }}h{% else %}–{% endif %}</div>
+    <div class="muted">{% if longest %}longest daily reading ({{ longest[1] }}){% else %}longest daily reading{% endif %}</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:1.5rem;font-weight:700">{% if totals['avg_rating'] %}{{ '%.1f' | format(totals['avg_rating']) }} ★{% else %}–{% endif %}</div>
+    <div class="muted">avg rating</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+  <h2 style="margin-top:0">Reading activity</h2>
+  <div style="display:flex;gap:3px">
+    {% for wk, name in weeks %}
+    <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+      {% for day in wk %}
+      {% if day %}
+      <div title="{{ day[0] }}: {{ (day[1] / 60) | round(0) }} min, {{ day[2] }} pages"
+           style="aspect-ratio:1;width:100%;border-radius:3px;background:var(--accent);opacity:{{ day[3] }}"></div>
+      {% else %}
+      <div style="aspect-ratio:1;width:100%;border-radius:3px;background:var(--border);opacity:.35"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:3px;margin-top:.35rem">
+    {% for wk, name in weeks %}
+    <div style="flex:1;min-width:0;position:relative;height:.9rem">
+      {% if name %}<span class="muted" style="position:absolute;left:0;white-space:nowrap;font-size:.65rem">{{ name }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Most time per book</h2>
+  <table>
+    {% for b in top %}
+    <tr>
+      <td><a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}</td>
+      <td style="text-align:right">{{ (b['total_seconds'] / 3600) | round(1) }}h</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}
