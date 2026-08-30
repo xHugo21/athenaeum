@@ -23,4 +23,9 @@ jobs:
           tags: |
             type=sha,prefix=
             type=raw,value=latest
-      - run: docker buildx build --platform linux/amd64 --push -t ${{ steps.meta.outputs.tags }} .
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
