@@ -145,6 +145,9 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
         "device_id": "dev1",
     }
     with TestClient(app) as client:
+        r = client.post("/api/plugin/device", json={"id": "d1", "model": "kobo"}, follow_redirects=False)
+        assert r.status_code == 200, "device endpoint must exist for the plugin"
+
         r = client.post("/api/plugin/import", json=payload, follow_redirects=False)
         assert r.status_code == 200 and r.json()["created"] == 1
 
