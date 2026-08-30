@@ -62,7 +62,17 @@
   </form>
 </div>
 
-<h2>Books ({{ books | length }})</h2>
+<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem">
+  <h2 style="margin:0">Books ({{ books | length }})</h2>
+  <div class="muted" style="display:flex;gap:.75rem;align-items:baseline">
+    {% for key, label in [('recent', 'Recent'), ('title', 'Title'), ('rating', 'Rating')] %}
+    <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}"
+       style="color:{{ 'var(--accent)' if sort == key else 'var(--muted)' }};font-weight:{{ 600 if sort == key else 400 }};text-decoration:none">
+      {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
 
 {% if books %}
 <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap:1rem;">

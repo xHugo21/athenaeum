@@ -106,15 +106,23 @@ def find_book(con, title: str, author: str | None, md5: str | None = None):
 
 @app.get("/")
 def index(request: Request):
+    sort = request.query_params.get("sort", "recent")
+    d = request.query_params.get("dir", "desc")
+    sort_sql = {
+        ("title", "asc"): "title COLLATE NOCASE ASC",
+        ("title", "desc"): "title COLLATE NOCASE DESC",
+        ("rating", "asc"): "rating IS NULL, rating ASC",
+        ("rating", "desc"): "rating DESC",
+    }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")
     with db() as con:
-        books = con.execute(
-            "SELECT * FROM books ORDER BY COALESCE(last_read_at, added_at) DESC"
-        ).fetchall()
+        books = con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "books": books,
+            "sort": sort,
+            "dir": d,
             "imported": request.query_params.get("imported"),
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
