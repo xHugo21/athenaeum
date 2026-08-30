@@ -166,9 +166,10 @@ def import_koreader(request: Request, file: UploadFile):
                 )
             else:
                 created += 1
+                isbn = guess_isbn(s.title, s.author)
                 cur = con.execute(
-                    "INSERT INTO books (title, author, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?)",
-                    (s.title, s.author, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, int(time.time())),
+                    "INSERT INTO books (title, author, isbn, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (s.title, s.author, isbn, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, int(time.time())),
                 )
                 bid = cur.lastrowid
             for month, secs in s.months.items():
@@ -197,3 +198,22 @@ def fetch_metadata(isbn: str) -> dict:
         }
     except httpx.HTTPError:
         return {}
+
+
+def guess_isbn(title: str, author: str | None) -> str | None:
+    q = f"title:{title}"
+    if author:
+        q += f" author:{author}"
+    try:
+        r = httpx.get(
+            "https://openlibrary.org/search.json",
+            params={"q": q, "fields": "isbn", "limit": 1, "sort": "editions"},
+            timeout=10,
+        )
+        docs = r.json().get("docs", []) if r.status_code == 200 else []
+        if not docs:
+            return None
+        isbns = docs[0].get("isbn", [])
+        return isbns[0] if isbns else None
+    except httpx.HTTPError:
+        return None
