@@ -18,7 +18,7 @@ templates = Jinja2Templates(
 
 
 def ts_date(ts: int) -> str:
-    return time.strftime("%Y-%m-%d", time.localtime(ts))
+    return time.strftime("%-d %b %Y", time.localtime(ts))
 
 
 templates.env.filters["ts_date"] = ts_date
@@ -90,15 +90,11 @@ def index(request: Request):
         books = con.execute(
             "SELECT * FROM books ORDER BY COALESCE(last_read_at, added_at) DESC"
         ).fetchall()
-        months = con.execute(
-            "SELECT month, SUM(seconds) s FROM month_seconds GROUP BY month ORDER BY month DESC LIMIT 12"
-        ).fetchall()
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "books": books,
-            "months": months,
             "imported": request.query_params.get("imported"),
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
