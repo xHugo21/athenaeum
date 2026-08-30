@@ -16,8 +16,7 @@ class BookStats:
     total_pages: int | None
     last_read_at: int | None
     md5: str | None = None
-    months: dict[str, int] = field(default_factory=dict)
-    days: dict[str, tuple[int, int]] = field(default_factory=dict)
+    sessions: list[tuple[int, int, int, int]] = field(default_factory=list)
 
 
 def parse_koreader(data: bytes) -> list[BookStats]:
@@ -32,12 +31,8 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         rows = con.execute(
             "SELECT id, title, authors, pages, total_read_time, total_read_pages, last_open, md5 FROM book"
         ).fetchall()
-        monthly = con.execute(
-            "SELECT id_book, strftime('%Y-%m', start_time, 'unixepoch') m, SUM(duration) FROM page_stat GROUP BY 1, 2"
-        ).fetchall()
-        daily = con.execute(
-            "SELECT id_book, date(start_time, 'unixepoch', 'localtime') d, SUM(duration), COUNT(DISTINCT page) "
-            "FROM page_stat_data GROUP BY 1, 2"
+        sessions = con.execute(
+            "SELECT id_book, page, start_time, duration, total_pages FROM page_stat_data"
         ).fetchall()
     except sqlite3.DatabaseError:
         raise ValueError("Not a KOReader statistics database (unexpected schema)")
@@ -60,16 +55,8 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         m.total_pages = max(m.total_pages or 0, pages or 0) or None
         m.last_read_at = max(m.last_read_at or 0, last or 0) or None
 
-    for bid, month, secs in monthly:
+    for bid, page, start, dur, tp in sessions:
         key = id_to_key.get(bid)
-        if key and month:
-            months = merged[key].months
-            months[month] = months.get(month, 0) + (secs or 0)
-
-    for bid, day, secs, pgs in daily:
-        key = id_to_key.get(bid)
-        if key and day:
-            days = merged[key].days
-            prev = days.get(day, (0, 0))
-            days[day] = (prev[0] + (secs or 0), prev[1] + (pgs or 0))
+        if key and start and dur:
+            merged[key].sessions.append((page or 0, start, dur, tp or 0))
     return list(merged.values())

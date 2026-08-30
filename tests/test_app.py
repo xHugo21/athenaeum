@@ -37,8 +37,7 @@ def test_parse_merges_duplicates():
     assert s.total_seconds == 210
     assert s.pages_read == 3
     assert s.total_pages == 300
-    assert sum(s.months.values()) == 210
-    assert parse_koreader(koreader_bytes())[0].total_seconds == 180
+    assert sum(d for _, _, d, _ in s.sessions) == 210
 
 
 def test_import_and_reimport(tmp_path, monkeypatch):
@@ -67,8 +66,8 @@ def test_import_and_reimport(tmp_path, monkeypatch):
             "SELECT title, author, total_seconds, pages_read FROM books"
         ).fetchone()
         assert (title, author, tot, pages) == ("The Hobbit", "J.R.R. Tolkien", 210, 3)
-        ms = c.execute("SELECT month, seconds FROM month_seconds ORDER BY month").fetchall()
-        assert sum(s for _, s in ms) == 210
+        ms = c.execute("SELECT SUM(duration) FROM sessions").fetchone()
+        assert ms[0] == 210
         (rating, review) = c.execute("SELECT rating, review FROM books").fetchone()
         assert (rating, review) == (4.5, "nice"), "re-import must keep rating/review; 4.7 snaps to 4.5"
 
@@ -132,8 +131,12 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
     md5 = "f" * 32
     payload = {
         "version": "0.3.0",
-        "books": [{"id": 1, "title": "Moby Dick", "authors": "Herman Melville", "pages": 720, "md5": md5}],
-        "stats": [],
+        "books": [{"id": 1, "title": "Moby Dick", "authors": "Herman Melville", "pages": 720,
+                   "total_read_time": 5400, "total_read_pages": 120, "last_open": 1700086400, "md5": md5}],
+        "stats": [
+            {"book_md5": md5, "page": 3, "start_time": 1700000000, "duration": 600, "total_pages": 720},
+            {"book_md5": md5, "page": 4, "start_time": 1700086400, "duration": 900, "total_pages": 720},
+        ],
         "annotations": {md5: [
             {"datetime": "2024-01-05T10:00:00", "page": 42, "pageno": 42, "total_pages": 720,
              "text": "Call me Ishmael.", "chapter": "Loomings", "drawer": "lighten"},
@@ -159,12 +162,20 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
         assert file_import.status_code == 303
 
     with sqlite3.connect("athenaeum.db") as c:
+        (secs, pread) = c.execute("SELECT total_seconds, pages_read FROM books WHERE title='Moby Dick'").fetchone()
+        assert (secs, pread) == (5400, 120), "plugin sync must store reading totals"
         (n,) = c.execute("SELECT COUNT(*) FROM books").fetchone()
         assert n == 2, "plugin book + file book stay separate (different md5)"
         (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
         assert n == 2, "re-sync must not duplicate annotations"
+        (session_secs,) = c.execute("SELECT SUM(duration) FROM sessions WHERE book_id=1").fetchone()
+        assert session_secs == 1500, "plugin stats rows must land in sessions"
+        (day_secs,) = c.execute("SELECT SUM(seconds) FROM days").fetchone()
+        assert day_secs == 1680, "global stats = plugin sessions + file sessions (1500 + 180)"
+        (book_secs,) = c.execute("SELECT SUM(seconds) FROM book_days WHERE book_id=1").fetchone()
+        assert book_secs == 1500, "book stats must rebuild from plugin sessions"
         (secs,) = c.execute("SELECT total_seconds FROM books WHERE md5=?", ("a" * 32,)).fetchone()
-        assert secs == 180, "manual file import owns the reading stats"
+        assert secs == 180, "manual file import owns its books' stats"
 
     with TestClient(app) as client:
         r = client.get("/books/1")

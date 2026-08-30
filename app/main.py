@@ -49,11 +49,13 @@ CREATE TABLE IF NOT EXISTS books (
     review TEXT,
     added_at INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS month_seconds (
+CREATE TABLE IF NOT EXISTS sessions (
     book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
-    month TEXT NOT NULL,
-    seconds INTEGER NOT NULL,
-    PRIMARY KEY (book_id, month)
+    page INTEGER NOT NULL,
+    start_time INTEGER NOT NULL,
+    duration INTEGER NOT NULL,
+    total_pages INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (book_id, page, start_time)
 );
 CREATE TABLE IF NOT EXISTS days (
     day TEXT PRIMARY KEY,
@@ -265,6 +267,21 @@ def download_db():
     return FileResponse(DB_PATH, filename="athenaeum.db")
 
 
+def rebuild_aggregates(con):
+    con.execute("DELETE FROM days")
+    con.execute("DELETE FROM book_days")
+    con.execute(
+        "INSERT INTO days (day, seconds, pages) "
+        "SELECT date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
+        "FROM sessions GROUP BY 1"
+    )
+    con.execute(
+        "INSERT INTO book_days (book_id, day, seconds, pages) "
+        "SELECT book_id, date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
+        "FROM sessions GROUP BY 1, 2"
+    )
+
+
 @app.post("/api/plugin/import")
 async def plugin_import(request: Request):
     # ponytail: accepts only the stock koinsight.koplugin payload; format drift = 400, no compat layer
@@ -284,18 +301,33 @@ async def plugin_import(request: Request):
             if row:
                 bid = row["id"]
                 con.execute(
-                    "UPDATE books SET md5=?, title=?, author=coalesce(nullif(?, ''), author) WHERE id=?",
-                    (md5, title, authors, bid),
+                    "UPDATE books SET md5=?, title=?, author=coalesce(nullif(?, ''), author), "
+                    "total_seconds=max(coalesce(total_seconds,0),coalesce(?,0)), "
+                    "pages_read=max(coalesce(pages_read,0),coalesce(?,0)), "
+                    "total_pages=coalesce(?,total_pages), "
+                    "last_read_at=max(coalesce(last_read_at,0),coalesce(?,0)) WHERE id=?",
+                    (md5, title, authors, book.get("total_read_time"), book.get("total_read_pages"), book.get("pages"), book.get("last_open"), bid),
                 )
             else:
                 created += 1
                 cur = con.execute(
-                    "INSERT INTO books (title, author, md5, added_at) VALUES (?,?,?,?)",
-                    (title, authors, md5, int(time.time())),
+                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (title, authors, md5, book.get("total_read_time") or 0, book.get("total_read_pages") or 0, book.get("pages"), book.get("last_open"), int(time.time())),
                 )
                 bid = cur.lastrowid
+            for s_row in body.get("stats") or []:
+                if s_row.get("book_md5") != md5:
+                    continue
+                if not s_row.get("start_time") or not s_row.get("duration"):
+                    continue
+                con.execute(
+                    "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
+                    "ON CONFLICT(book_id, page, start_time) DO UPDATE SET duration=excluded.duration, total_pages=excluded.total_pages",
+                    (bid, s_row.get("page") or 0, s_row.get("start_time"), s_row.get("duration"), s_row.get("total_pages") or 0),
+                )
             for a in anns.get(md5, []):
                 insert_annotation(con, bid, a)
+        rebuild_aggregates(con)
     return {"message": "Upload successful", "created": created}
 
 
@@ -334,27 +366,13 @@ def import_koreader(file: UploadFile):
                     ),
                 )
                 bid = cur.lastrowid
-            for month, secs in s.months.items():
+            for page, start, dur, tp in s.sessions:
                 con.execute(
-                    "INSERT INTO month_seconds (book_id, month, seconds) VALUES (?,?,?) "
-                    "ON CONFLICT(book_id, month) DO UPDATE SET seconds=excluded.seconds",
-                    (bid, month, secs),
+                    "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
+                    "ON CONFLICT(book_id, page, start_time) DO UPDATE SET duration=excluded.duration, total_pages=excluded.total_pages",
+                    (bid, page, start, dur, tp),
                 )
-            for day, (secs, pages) in s.days.items():
-                con.execute(
-                    "INSERT INTO book_days (book_id, day, seconds, pages) VALUES (?,?,?,?) "
-                    "ON CONFLICT(book_id, day) DO UPDATE SET seconds=excluded.seconds, pages=excluded.pages",
-                    (bid, day, secs, pages),
-                )
-        con.execute("DELETE FROM days")
-        # ponytail: days rebuilt from the latest import file, multi-device merges would need a device column
-        for s in stats:
-            for day, (secs, pages) in s.days.items():
-                con.execute(
-                    "INSERT INTO days (day, seconds,pages) VALUES (?,?,?) "
-                    "ON CONFLICT(day) DO UPDATE SET seconds=seconds+excluded.seconds, pages=pages+excluded.pages",
-                    (day, secs, pages),
-                )
+        rebuild_aggregates(con)
     return RedirectResponse(f"/?imported={created}", 303)
 
 
