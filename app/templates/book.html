@@ -33,13 +33,15 @@
     <div style="color:#e6a817;font-size:1.2rem;margin-bottom:.75rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] / 5 * 100) }}%">★★★★★</span></span></div>
     {% endif %}
 
-    {% if b['total_seconds'] %}
+    {% if b['total_seconds'] or b['pages_read'] or b['total_pages'] %}
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+        {% if b['total_seconds'] %}
         <div>
           <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Time read</div>
           <div style="font-size:1.3rem;font-weight:700">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h</div>
         </div>
+        {% endif %}
         <div>
           <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Pages</div>
           <div style="font-size:1.3rem;font-weight:700">{{ b['pages_read'] }}{% if b['total_pages'] %} / {{ b['total_pages'] }}{% endif %}</div>

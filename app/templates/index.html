@@ -65,7 +65,7 @@
         </div>
         {% endif %}
       </div>
-      {% set finished = (not b['total_seconds'] and not b['pages_read']) or (b['total_pages'] and b['pages_read'] and b['pages_read'] / b['total_pages'] >= 0.95) %}
+      {% set finished = (not b['total_seconds'] and not b['pages_read']) or (b['total_pages'] and b['pages_read'] and b['pages_read'] / b['total_pages'] >= 0.90) %}
       {% if b['rating'] %}
       <div style="color:#e6a817;font-size:.85rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] / 5 * 100) }}%">★★★★★</span></span></div>
       {% else %}

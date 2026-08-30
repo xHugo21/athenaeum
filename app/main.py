@@ -108,11 +108,12 @@ def add_book(
     total_pages = pages or meta.get("pages")
     with db() as con:
         con.execute(
-            "INSERT INTO books (title, author, isbn, total_pages, rating, review, added_at) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, added_at) VALUES (?,?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
                 isbn or None,
+                total_pages or 0,
                 total_pages,
                 rating or None,
                 review or None,
@@ -140,6 +141,15 @@ def set_isbn(book_id: int, isbn: str = Form(...)):
         con.execute(
             "UPDATE books SET isbn=? WHERE id=?",
             (isbn or None, book_id),
+        )
+        meta = fetch_metadata(isbn) if isbn else {}
+        con.execute(
+            "UPDATE books SET total_pages=coalesce(total_pages,?), title=coalesce(title,?), author=coalesce(author,?) WHERE id=?",
+            (meta.get("pages"), meta.get("title"), meta.get("author"), book_id),
+        )
+        con.execute(
+            "UPDATE books SET pages_read=total_pages WHERE id=? AND pages_read=0 AND total_seconds=0 AND total_pages IS NOT NULL",
+            (book_id,),
         )
     return RedirectResponse(f"/books/{book_id}", 303)
 
