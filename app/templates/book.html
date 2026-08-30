@@ -30,12 +30,6 @@
     {% if b['total_seconds'] or b['pages_read'] or b['total_pages'] %}
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
-        {% if b['total_seconds'] %}
-        <div>
-          <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Time read</div>
-          <div style="font-size:1.3rem;font-weight:700">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h</div>
-        </div>
-        {% endif %}
         <div>
           <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Pages</div>
           <div style="font-size:1.3rem;font-weight:700">{{ b['pages_read'] }}{% if b['total_pages'] %} / {{ b['total_pages'] }}{% endif %}</div>
@@ -63,17 +57,6 @@
     {% endif %}
   </div>
 </div>
-
-{% if months %}
-<div class="card" style="margin-bottom:1.5rem">
-  <h2 style="margin-top:0">Monthly reading</h2>
-  <div class="month-pills">
-    {% for m in months %}
-    <span class="month-pill">{{ m['month'] }} · {{ (m['seconds'] / 3600) | round(1) }}h</span>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem">
   <div class="card">
@@ -108,6 +91,41 @@
     </form>
   </div>
 </div>
+
+{% if agg and agg['n'] %}
+<div class="card" style="margin-top:1rem">
+  <h2 style="margin-top:0">Reading stats</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1rem">
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Time read</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Sessions</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ agg['n'] }}</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Avg per day read</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ ((agg['secs'] or 0) / agg['n'] / 60) | round(0) | int }} min</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">First read</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ agg['first_day'] | day_fmt }}</div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Last read</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ agg['last_day'] | day_fmt }}</div>
+    </div>
+    {% if best %}
+    <div>
+      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Best day</div>
+      <div style="font-size:1.3rem;font-weight:700">{{ ((best['seconds'] or 0) / 3600) | round(1) }}h</div>
+      <div class="muted" style="font-size:.75rem">{{ best['day'] | day_fmt }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)">
   <form class="inline" method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book?')">

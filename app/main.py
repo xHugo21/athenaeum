@@ -20,6 +20,7 @@ def ts_date(ts: int) -> str:
 
 
 templates.env.filters["ts_date"] = ts_date
+templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
 
 app = FastAPI(title="athenaeum")
 
@@ -55,6 +56,13 @@ CREATE TABLE IF NOT EXISTS days (
     day TEXT PRIMARY KEY,
     seconds INTEGER NOT NULL,
     pages INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS book_days (
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    seconds INTEGER NOT NULL,
+    pages INTEGER NOT NULL,
+    PRIMARY KEY (book_id, day)
 );
 """
 
@@ -131,11 +139,15 @@ def book_detail(request: Request, book_id: int):
         book = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
         if not book:
             return RedirectResponse("/", 303)
-        months = con.execute(
-            "SELECT month, seconds FROM month_seconds WHERE book_id=? ORDER BY month DESC LIMIT 12",
+        agg = con.execute(
+            "SELECT COUNT(*) n, SUM(seconds) secs, MIN(day) first_day, MAX(day) last_day FROM book_days WHERE book_id=?",
             (book_id,),
-        ).fetchall()
-    return templates.TemplateResponse(request, "book.html", {"b": book, "months": months})
+        ).fetchone()
+        best = con.execute(
+            "SELECT day, seconds FROM book_days WHERE book_id=? ORDER BY seconds DESC LIMIT 1",
+            (book_id,),
+        ).fetchone()
+    return templates.TemplateResponse(request, "book.html", {"b": book, "agg": agg, "best": best})
 
 
 @app.post("/books")
@@ -236,6 +248,12 @@ def import_koreader(file: UploadFile):
                     "INSERT INTO month_seconds (book_id, month, seconds) VALUES (?,?,?) "
                     "ON CONFLICT(book_id, month) DO UPDATE SET seconds=excluded.seconds",
                     (bid, month, secs),
+                )
+            for day, (secs, pages) in s.days.items():
+                con.execute(
+                    "INSERT INTO book_days (book_id, day, seconds, pages) VALUES (?,?,?,?) "
+                    "ON CONFLICT(book_id, day) DO UPDATE SET seconds=excluded.seconds, pages=excluded.pages",
+                    (bid, day, secs, pages),
                 )
         con.execute("DELETE FROM days")
         # ponytail: days rebuilt from the latest import file, multi-device merges would need a device column

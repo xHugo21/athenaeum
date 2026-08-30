@@ -24,6 +24,9 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         raise ValueError("Not a KOReader statistics database (no SQLite header)")
     con = sqlite3.connect(":memory:")
     try:
+        # ponytail: WAL-mode files can't deserialize into memory; flipping the header reads last checkpoint, no -wal merge
+        if data[18] == 2:
+            data = data[:18] + b"\x01\x01" + data[20:]
         con.deserialize(data)
         rows = con.execute(
             "SELECT id, title, authors, pages, total_read_time, total_read_pages, last_open FROM book"
