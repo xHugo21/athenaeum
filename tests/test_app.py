@@ -51,6 +51,10 @@ def test_import_and_reimport(tmp_path, monkeypatch):
 
         r = client.post("/books/1/rate", data={"rating": 5, "review": "nice"}, follow_redirects=False)
         assert r.status_code == 303
+        r = client.post("/books/1/rate", data={"rating": 3.5, "review": "nice"}, follow_redirects=False)
+        assert r.status_code == 303
+        r = client.post("/books/1/rate", data={"rating": 4.7, "review": "nice"}, follow_redirects=False)
+        assert r.status_code == 303
 
     import sqlite3
 
@@ -64,7 +68,7 @@ def test_import_and_reimport(tmp_path, monkeypatch):
         ms = c.execute("SELECT month, seconds FROM month_seconds ORDER BY month").fetchall()
         assert sum(s for _, s in ms) == 210
         (rating, review) = c.execute("SELECT rating, review FROM books").fetchone()
-        assert (rating, review) == (5, "nice"), "re-import must keep rating/review"
+        assert (rating, review) == (4.5, "nice"), "re-import must keep rating/review; 4.7 snaps to 4.5"
 
 
 def test_manual_add_with_isbn(tmp_path, monkeypatch):

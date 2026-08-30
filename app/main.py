@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS books (
     pages_read INTEGER NOT NULL DEFAULT 0,
     total_pages INTEGER,
     last_read_at INTEGER,
-    rating INTEGER,
+    rating REAL,
     review TEXT,
     added_at INTEGER NOT NULL
 );
@@ -99,9 +99,10 @@ def add_book(
     author: str = Form(""),
     isbn: str = Form(""),
     pages: int = Form(0),
-    rating: int = Form(0),
+    rating: float = Form(0),
     review: str = Form(""),
 ):
+    rating = round(rating * 2) / 2
     isbn = re.sub(r"[^0-9Xx]", "", isbn)
     meta = fetch_metadata(isbn) if isbn else {}
     total_pages = pages or meta.get("pages")
@@ -122,7 +123,8 @@ def add_book(
 
 
 @app.post("/books/{book_id}/rate")
-def rate_book(book_id: int, rating: int = Form(0), review: str = Form("")):
+def rate_book(book_id: int, rating: float = Form(0), review: str = Form("")):
+    rating = round(rating * 2) / 2
     with db() as con:
         con.execute(
             "UPDATE books SET rating=?, review=? WHERE id=?",
