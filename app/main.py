@@ -350,6 +350,8 @@ async def plugin_import(request: Request):
 
 @app.post("/import")
 def import_koreader(file: UploadFile):
+    if file.size and file.size > 20_000_000:
+        return RedirectResponse("/?error=File too large", 303)
     data = file.file.read()
     try:
         stats = parse_koreader(data)
