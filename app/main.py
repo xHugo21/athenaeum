@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import httpx
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .koreader import norm, parse_koreader
@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS books (
     title TEXT NOT NULL,
     author TEXT,
     isbn TEXT,
+    md5 TEXT,
     total_seconds INTEGER NOT NULL DEFAULT 0,
     pages_read INTEGER NOT NULL DEFAULT 0,
     total_pages INTEGER,
@@ -66,6 +67,19 @@ CREATE TABLE IF NOT EXISTS book_days (
     pages INTEGER NOT NULL,
     PRIMARY KEY (book_id, day)
 );
+CREATE TABLE IF NOT EXISTS annotations (
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    datetime TEXT NOT NULL,
+    page_ref TEXT NOT NULL,
+    type TEXT NOT NULL,
+    text TEXT,
+    note TEXT,
+    chapter TEXT,
+    pageno INTEGER,
+    total_pages INTEGER,
+    color TEXT,
+    PRIMARY KEY (book_id, datetime, page_ref)
+);
 """
 
 
@@ -75,10 +89,14 @@ def init():
         con.executescript(SCHEMA)
 
 
-def find_book(con, title: str, author: str | None):
+def find_book(con, title: str, author: str | None, md5: str | None = None):
+    if md5:
+        r = con.execute("SELECT id FROM books WHERE md5=?", (md5,)).fetchone()
+        if r:
+            return r
     key = norm(title) + "|" + norm(author or "")
     # ponytail: O(n) scan; fine at personal-library scale, add a normalized column if it ever matters
-    for r in con.execute("SELECT id, title, author FROM books"):
+    for r in con.execute("SELECT id, title, author, md5 FROM books"):
         if norm(r["title"]) + "|" + norm(r["author"] or "") == key:
             return r
     return None
@@ -164,8 +182,12 @@ def book_detail(request: Request, book_id: int):
             "SELECT day, seconds FROM book_days WHERE book_id=? ORDER BY seconds DESC LIMIT 1",
             (book_id,),
         ).fetchone()
+        anns = con.execute(
+            "SELECT * FROM annotations WHERE book_id=? ORDER BY pageno, datetime",
+            (book_id,),
+        ).fetchall()
     return templates.TemplateResponse(
-        request, "book.html", {"b": book, "agg": agg, "best": best}
+        request, "book.html", {"b": book, "agg": agg, "best": best, "anns": anns}
     )
 
 
@@ -243,6 +265,40 @@ def download_db():
     return FileResponse(DB_PATH, filename="athenaeum.db")
 
 
+@app.post("/api/plugin/import")
+async def plugin_import(request: Request):
+    # ponytail: accepts only the stock koinsight.koplugin payload; format drift = 400, no compat layer
+    body = await request.json()
+    if body.get("version") != "0.3.0":
+        return JSONResponse({"error": "Unsupported plugin version, need 0.3.0"}, status_code=400)
+    created = 0
+    anns = body.get("annotations") or {}
+    with db() as con:
+        for book in body.get("books") or []:
+            md5 = book.get("md5")
+            if not md5:
+                continue
+            title = " ".join((book.get("title") or "").split()) or "Untitled"
+            authors = " ".join((book.get("authors") or "").replace(";", ",").split()) or None
+            row = find_book(con, title, authors, md5)
+            if row:
+                bid = row["id"]
+                con.execute(
+                    "UPDATE books SET md5=?, title=?, author=coalesce(nullif(?, ''), author) WHERE id=?",
+                    (md5, title, authors, bid),
+                )
+            else:
+                created += 1
+                cur = con.execute(
+                    "INSERT INTO books (title, author, md5, added_at) VALUES (?,?,?,?)",
+                    (title, authors, md5, int(time.time())),
+                )
+                bid = cur.lastrowid
+            for a in anns.get(md5, []):
+                insert_annotation(con, bid, a)
+    return {"message": "Upload successful", "created": created}
+
+
 @app.post("/import")
 def import_koreader(file: UploadFile):
     data = file.file.read()
@@ -253,22 +309,23 @@ def import_koreader(file: UploadFile):
     created = 0
     with db() as con:
         for s in stats:
-            row = find_book(con, s.title, s.author)
+            row = find_book(con, s.title, s.author, s.md5)
             if row:
                 bid = row["id"]
                 con.execute(
-                    "UPDATE books SET total_seconds=?, pages_read=?, total_pages=coalesce(?,total_pages), last_read_at=coalesce(?,last_read_at) WHERE id=?",
-                    (s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, bid),
+                    "UPDATE books SET md5=?, total_seconds=?, pages_read=?, total_pages=coalesce(?,total_pages), last_read_at=coalesce(?,last_read_at) WHERE id=?",
+                    (s.md5, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, bid),
                 )
             else:
                 created += 1
                 isbn = guess_isbn(s.title, s.author)
                 cur = con.execute(
-                    "INSERT INTO books (title, author, isbn, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?)",
+                    "INSERT INTO books (title, author, isbn, md5, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
                     (
                         s.title,
                         s.author,
                         isbn,
+                        s.md5,
                         s.total_seconds,
                         s.pages_read,
                         s.total_pages,
@@ -299,6 +356,35 @@ def import_koreader(file: UploadFile):
                     (day, secs, pages),
                 )
     return RedirectResponse(f"/?imported={created}", 303)
+
+
+def ann_type(a: dict) -> str:
+    if not a.get("drawer") and not a.get("color") and not a.get("pos0") and not a.get("pos1"):
+        return "bookmark"
+    if a.get("note") and a.get("text"):
+        return "note"
+    return "highlight"
+
+
+def insert_annotation(con, book_id: int, a: dict):
+    con.execute(
+        "INSERT INTO annotations (book_id, datetime, page_ref, type, text, note, chapter, pageno, total_pages, color) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(book_id, datetime, page_ref) DO UPDATE SET "
+        "type=excluded.type, text=excluded.text, note=excluded.note, chapter=excluded.chapter, color=excluded.color",
+        (
+            book_id,
+            a.get("datetime"),
+            str(a.get("page")),
+            ann_type(a),
+            a.get("text"),
+            a.get("note"),
+            a.get("chapter"),
+            a.get("pageno"),
+            a.get("total_pages"),
+            a.get("color"),
+        ),
+    )
 
 
 def fetch_metadata(isbn: str) -> dict:

@@ -11,10 +11,10 @@ def koreader_bytes(with_duplicate=False) -> bytes:
         """
         CREATE TABLE book (
           id INTEGER PRIMARY KEY, title TEXT, authors TEXT, pages INTEGER,
-          total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER);
+          total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER, md5 TEXT);
         CREATE TABLE page_stat (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER);
         CREATE TABLE page_stat_data (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER, total_pages INTEGER DEFAULT 0);
-        INSERT INTO book VALUES (1, '  The   Hobbit ', 'J.R.R. Tolkien', 300, 180, 2, 1700086400);
+        INSERT INTO book VALUES (1, '  The   Hobbit ', 'J.R.R. Tolkien', 300, 180, 2, 1700086400, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
         INSERT INTO page_stat VALUES (1, 1, 1700000000, 60);
         INSERT INTO page_stat VALUES (1, 2, 1700086400, 120);
         INSERT INTO page_stat_data VALUES (1, 1, 1700000000, 60, 300);
@@ -22,7 +22,7 @@ def koreader_bytes(with_duplicate=False) -> bytes:
         """
     )
     if with_duplicate:
-        con.execute("INSERT INTO book VALUES (2, 'The Hobbit', 'J. r. r. Tolkien', 300, 30, 1, 1700172800)")
+        con.execute("INSERT INTO book VALUES (2, 'The Hobbit', 'J. r. r. Tolkien', 300, 30, 1, 1700172800, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')")
         con.execute("INSERT INTO page_stat VALUES (2, 1, 1700172800, 30)")
         con.execute("INSERT INTO page_stat_data VALUES (2, 1, 1700172800, 30, 300)")
     return bytes(con.serialize())
@@ -125,3 +125,47 @@ def test_reject_garbage(tmp_path, monkeypatch):
         r = client.post("/import", files={"file": ("x.sqlite3", b"not a db at all", "application/octet-stream")}, follow_redirects=False)
         assert r.status_code == 303
         assert "error" in r.headers["location"]
+
+
+def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    md5 = "f" * 32
+    payload = {
+        "version": "0.3.0",
+        "books": [{"id": 1, "title": "Moby Dick", "authors": "Herman Melville", "pages": 720, "md5": md5}],
+        "stats": [],
+        "annotations": {md5: [
+            {"datetime": "2024-01-05T10:00:00", "page": 42, "pageno": 42, "total_pages": 720,
+             "text": "Call me Ishmael.", "chapter": "Loomings", "drawer": "lighten"},
+            {"datetime": "2024-01-07T09:00:00", "page": 100},
+        ]},
+        "device_id": "dev1",
+    }
+    with TestClient(app) as client:
+        r = client.post("/api/plugin/import", json=payload, follow_redirects=False)
+        assert r.status_code == 200 and r.json()["created"] == 1
+
+        r = client.post("/api/plugin/import", json=payload, follow_redirects=False)
+        assert r.json()["created"] == 0, "re-sync must not duplicate"
+
+        r = client.post("/api/plugin/import", json=dict(payload, version="9.9"), follow_redirects=False)
+        assert r.status_code == 400
+
+        file_import = client.post(
+            "/import",
+            files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")},
+            follow_redirects=False,
+        )
+        assert file_import.status_code == 303
+
+    with sqlite3.connect("athenaeum.db") as c:
+        (n,) = c.execute("SELECT COUNT(*) FROM books").fetchone()
+        assert n == 2, "plugin book + file book stay separate (different md5)"
+        (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
+        assert n == 2, "re-sync must not duplicate annotations"
+        (secs,) = c.execute("SELECT total_seconds FROM books WHERE md5=?", ("a" * 32,)).fetchone()
+        assert secs == 180, "manual file import owns the reading stats"
+
+    with TestClient(app) as client:
+        r = client.get("/books/1")
+        assert "Call me Ishmael" in r.text

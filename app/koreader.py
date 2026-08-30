@@ -15,6 +15,7 @@ class BookStats:
     pages_read: int
     total_pages: int | None
     last_read_at: int | None
+    md5: str | None = None
     months: dict[str, int] = field(default_factory=dict)
     days: dict[str, tuple[int, int]] = field(default_factory=dict)
 
@@ -29,7 +30,7 @@ def parse_koreader(data: bytes) -> list[BookStats]:
             data = data[:18] + b"\x01\x01" + data[20:]
         con.deserialize(data)
         rows = con.execute(
-            "SELECT id, title, authors, pages, total_read_time, total_read_pages, last_open FROM book"
+            "SELECT id, title, authors, pages, total_read_time, total_read_pages, last_open, md5 FROM book"
         ).fetchall()
         monthly = con.execute(
             "SELECT id_book, strftime('%Y-%m', start_time, 'unixepoch') m, SUM(duration) FROM page_stat GROUP BY 1, 2"
@@ -45,7 +46,7 @@ def parse_koreader(data: bytes) -> list[BookStats]:
 
     merged: dict[tuple[str, str], BookStats] = {}
     id_to_key: dict[int, tuple[str, str]] = {}
-    for bid, title, authors, pages, secs, pread, last in rows:
+    for bid, title, authors, pages, secs, pread, last, md5 in rows:
         t = " ".join((title or "").split()) or "Untitled"
         a = " ".join(authors.split()).strip(";,") if authors and authors.strip() else None
         key = (norm(t), norm(a or ""))
@@ -53,6 +54,7 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         if key not in merged:
             merged[key] = BookStats(t, a, 0, 0, None, None)
         m = merged[key]
+        m.md5 = m.md5 or md5
         m.total_seconds += secs or 0
         m.pages_read += pread or 0
         m.total_pages = max(m.total_pages or 0, pages or 0) or None

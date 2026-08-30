@@ -92,6 +92,21 @@
   </div>
 </div>
 
+{% if anns %}
+<div class="card" style="margin-top:1rem">
+  <h2 style="margin-top:0">Highlights & notes</h2>
+  {% for a in anns %}
+  <div style="border-left:3px solid {{ a['color'] or 'var(--accent)' }};padding:.35rem .75rem;margin-bottom:.75rem">
+    <div style="white-space:pre-wrap;line-height:1.5">{{ a['text'] }}</div>
+    {% if a['note'] %}<div class="muted" style="white-space:pre-wrap;margin-top:.25rem">{{ a['note'] }}</div>{% endif %}
+    <div class="muted" style="font-size:.75rem;margin-top:.25rem">
+      {% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}{{ a['type'] }} · p. {{ a['pageno'] or '?' }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if agg and agg['n'] %}
 <div class="card" style="margin-top:1rem">
   <h2 style="margin-top:0">Reading stats</h2>
