@@ -107,8 +107,8 @@ def add_book(
         con.execute(
             "INSERT INTO books (title, author, isbn, rating, review, added_at) VALUES (?,?,?,?,?,?)",
             (
-                meta.get("title") or title,
-                meta.get("author") or author or None,
+                title or meta.get("title"),
+                author or meta.get("author") or None,
                 isbn or None,
                 rating or None,
                 review or None,
