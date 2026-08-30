@@ -24,20 +24,38 @@
 <div class="card" style="margin-bottom:2rem">
   <h2 style="margin-top:0">Add a book</h2>
   <form method="post" action="/books">
-    <div class="form-row">
-      <input name="title" placeholder="Title" required style="flex:2;min-width:12rem">
-      <input name="author" placeholder="Author" style="flex:1.5;min-width:10rem">
-      <input name="isbn" placeholder="ISBN" size="16" style="flex:1;min-width:8rem">
-      <input name="pages" type="number" min="1" placeholder="Pages" style="flex:.7;min-width:5.5rem">
+    <div class="form-group">
+      <label>Title *</label>
+      <input name="title" required style="width:100%">
     </div>
     <div class="form-row">
-      <select name="rating">
-        <option value="0">No rating</option>
-        {% for i in range(1, 11) %}{% set v = i * 0.5 %}<option value="{{ '%g' | format(v) }}">{{ '%g' | format(v) }} ★</option>{% endfor %}
-      </select>
-      <button>Add book</button>
+      <div class="form-group" style="flex:1.5;min-width:10rem;margin-bottom:.75rem">
+        <label>Author</label>
+        <input name="author" style="width:100%">
+      </div>
+      <div class="form-group" style="flex:1;min-width:8rem;margin-bottom:.75rem">
+        <label>ISBN</label>
+        <input name="isbn" style="width:100%">
+      </div>
+      <div class="form-group" style="flex:.7;min-width:5.5rem;margin-bottom:.75rem">
+        <label>Pages</label>
+        <input name="pages" type="number" min="1" style="width:100%">
+      </div>
     </div>
-    <textarea name="review" rows="2" placeholder="Review (optional)" style="margin-top:.25rem"></textarea>
+    <div class="form-group">
+      <label>Rating</label>
+      <input type="hidden" name="rating" id="rate-val" value="0">
+      <span style="position:relative;display:inline-block;font-size:1.4rem;line-height:1;color:#e6a817;cursor:pointer" title="Click to rate">
+        <span>☆☆☆☆☆</span><span id="rate-fill" style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:0;pointer-events:none">★★★★★</span>
+        {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="document.getElementById('rate-val').value=this.dataset.v;document.getElementById('rate-fill').style.width=(this.dataset.v*20)+'%'" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
+      </span>
+      <a href="#" class="muted" style="font-size:.75rem;margin-left:.4rem" onclick="document.getElementById('rate-val').value=0;document.getElementById('rate-fill').style.width=0;return false">clear</a>
+    </div>
+    <div class="form-group" style="margin-bottom:1rem">
+      <label>Review</label>
+      <textarea name="review" rows="2"></textarea>
+    </div>
+    <button>Add book</button>
   </form>
 </div>
 

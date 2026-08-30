@@ -108,6 +108,26 @@ def test_manual_add_with_isbn(tmp_path, monkeypatch):
     assert pages == 250
 
 
+def test_set_isbn_fills_pages_for_manual_add(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from app import main
+
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {"docs": [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]}
+
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: FakeResp())
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Manual Book", "pages": ""}, follow_redirects=False)
+        r = client.post("/books/1/isbn", data={"isbn": "9780140328721"}, follow_redirects=False)
+        assert r.status_code == 303
+    with sqlite3.connect("athenaeum.db") as c:
+        (total, read) = c.execute("SELECT total_pages, pages_read FROM books WHERE id=1").fetchone()
+    assert (total, read) == (96, 96), "metadata pages must fill NULL total_pages even for manual adds"
+
+
 def test_stats_page(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with TestClient(app) as client:
