@@ -2,9 +2,9 @@
 
 Personal book tracking web app.
 
-Allows import of KOReader statistics and manual entries.
+Allows manual entries and automatic import of KOReader statistics and highlights.
 
-## Run
+## Run locally
 
 ```sh
 uv sync
@@ -20,10 +20,24 @@ docker build -t athenaeum .
 docker run -p 8000:8000 -v athenaeum-data:/data athenaeum
 ```
 
+## Docker Compose
+
+```yaml
+services:
+  athenaeum:
+    image: ghcr.io/xhugo21/athenaeum:latest
+    user: "568:568"
+    ports:
+      - "9372:8000"
+    volumes:
+      - /stacks/athenaeum:/data
+    restart: unless-stopped
+```
+
 ## KOReader plugin sync
 
-The [koinsight.koplugin](https://github.com/Ko-Insight/KoInsight/tree/master/plugins/koinsight.koplugin)
-plugin syncs books, reading stats, highlights, notes and bookmarks straight
-from the device over Wi-Fi.
+Supports [koinsight.koplugin](https://github.com/Ko-Insight/KoInsight/tree/master/plugins/koinsight.koplugin) (kudos to KoInsight).
 
-Install it on your ereader and point the url to your athenaeum URL
+Syncs books, reading stats, highlights, notes and bookmarks straight from the device over Wi-Fi.
+
+Install on your e-reader and point it to your athenaeum URL
