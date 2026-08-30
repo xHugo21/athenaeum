@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import httpx
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .koreader import norm, parse_koreader
@@ -235,6 +235,12 @@ def delete_book(book_id: int):
     with db() as con:
         con.execute("DELETE FROM books WHERE id=?", (book_id,))
     return RedirectResponse("/", 303)
+
+
+@app.get("/db/download")
+def download_db():
+    # ponytail: raw file copy, corrupt if downloaded mid-import; sqlite backup API if that bites
+    return FileResponse(DB_PATH, filename="athenaeum.db")
 
 
 @app.post("/import")
