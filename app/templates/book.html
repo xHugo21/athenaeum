@@ -143,10 +143,10 @@
 </div>
 {% endif %}
 
-<div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)">
+<div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+  <a href="/" class="btn btn-ghost">← Back to library</a>
   <form class="inline" method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book?')">
     <button class="btn-danger" title="Delete book">🗑 Delete book</button>
   </form>
-  <a href="/" class="btn btn-ghost" style="margin-left:.5rem">← Back to library</a>
 </div>
 {% endblock %}
