@@ -98,18 +98,21 @@ def add_book(
     title: str = Form(...),
     author: str = Form(""),
     isbn: str = Form(""),
+    pages: int = Form(0),
     rating: int = Form(0),
     review: str = Form(""),
 ):
     isbn = re.sub(r"[^0-9Xx]", "", isbn)
     meta = fetch_metadata(isbn) if isbn else {}
+    total_pages = pages or meta.get("pages")
     with db() as con:
         con.execute(
-            "INSERT INTO books (title, author, isbn, rating, review, added_at) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO books (title, author, isbn, total_pages, rating, review, added_at) VALUES (?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
                 isbn or None,
+                total_pages,
                 rating or None,
                 review or None,
                 int(time.time()),
@@ -184,7 +187,7 @@ def fetch_metadata(isbn: str) -> dict:
     try:
         r = httpx.get(
             "https://openlibrary.org/search.json",
-            params={"q": f"isbn:{isbn}", "fields": "title,author_name", "limit": 1},
+            params={"q": f"isbn:{isbn}", "fields": "title,author_name,number_of_pages_median", "limit": 1},
             timeout=10,
         )
         docs = r.json().get("docs", []) if r.status_code == 200 else []
@@ -193,6 +196,7 @@ def fetch_metadata(isbn: str) -> dict:
         return {
             "title": docs[0].get("title"),
             "author": ", ".join(docs[0].get("author_name", [])) or None,
+            "pages": docs[0].get("number_of_pages_median") or None,
             "cover": f"https://covers.openlibrary.org/isbn/{isbn}-M.jpg",
         }
     except httpx.HTTPError:

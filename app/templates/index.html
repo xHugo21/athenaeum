@@ -36,6 +36,7 @@
       <input name="title" placeholder="Title" required style="flex:2;min-width:12rem">
       <input name="author" placeholder="Author" style="flex:1.5;min-width:10rem">
       <input name="isbn" placeholder="ISBN" size="16" style="flex:1;min-width:8rem">
+      <input name="pages" type="number" min="1" placeholder="Pages" style="flex:.7;min-width:5.5rem">
     </div>
     <div class="form-row">
       <select name="rating">
@@ -72,13 +73,16 @@
         </div>
         {% endif %}
       </div>
-      <div style="font-weight:600;font-size:.9rem;line-height:1.3;margin-bottom:.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b['title'] }}</div>
-      <div class="muted" style="font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b['author'] or '' }}</div>
+      {% set finished = (not b['total_seconds'] and not b['pages_read']) or (b['total_pages'] and b['pages_read'] and b['pages_read'] / b['total_pages'] >= 0.95) %}
       {% if b['rating'] %}
-      <div style="margin-top:.25rem;color:#e6a817;font-size:.85rem">{{ '★' * b['rating'] }}{{ '☆' * (5 - b['rating']) }}</div>
+      <div style="color:#e6a817;font-size:.85rem">{{ '★' * b['rating'] }}{{ '☆' * (5 - b['rating']) }}</div>
+      {% else %}
+      <div class="muted" style="font-size:.85rem">Not rated</div>
       {% endif %}
-      {% if b['total_seconds'] %}
-      <div class="muted" style="font-size:.75rem;margin-top:.2rem">{{ ((b['total_seconds'] or 0) / 3600) | round(1) }}h read</div>
+      {% if finished %}
+      <div style="margin-top:.2rem;font-size:.75rem;font-weight:600;color:var(--accent)">✓ Finished</div>
+      {% elif b['total_seconds'] %}
+      <div class="muted" style="font-size:.75rem;margin-top:.2rem">{{ (b['total_seconds'] / 3600) | round(1) }}h read</div>
       {% endif %}
     </div>
   </a>

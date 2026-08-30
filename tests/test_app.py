@@ -87,9 +87,22 @@ def test_manual_add_with_isbn(tmp_path, monkeypatch):
             follow_redirects=False,
         )
         assert r.status_code == 303
+        r = client.post(
+            "/books",
+            data={"title": "My Book", "author": "Me", "isbn": "978-0-14-032872-1", "pages": "250", "rating": 0, "review": ""},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
     with sqlite3.connect("athenaeum.db") as c:
-        row = c.execute("SELECT title, author, isbn, rating FROM books").fetchone()
-    assert row == ("Matilda", "Roald Dahl", "9780140328721", 5)
+        row = c.execute("SELECT title, author, isbn, rating FROM books ORDER BY id").fetchall()
+    assert row == [
+        ("whatever", "Roald Dahl", "9780140328721", 5),
+        ("My Book", "Me", "9780140328721", None),
+    ]
+    (pages,) = sqlite3.connect("athenaeum.db").execute(
+        "SELECT total_pages FROM books WHERE title='My Book'"
+    ).fetchone()
+    assert pages == 250
 
 
 def test_reject_garbage(tmp_path, monkeypatch):
