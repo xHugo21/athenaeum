@@ -20,8 +20,17 @@
     <h1>{{ b['title'] }}</h1>
     <p class="muted" style="margin-bottom:1rem">
       {{ b['author'] or 'Unknown author' }}
-      {% if b['isbn'] %} · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a>{% endif %}
+      {% if b['isbn'] %}
+      · <span style="white-space:nowrap"><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a> <a href="#" title="Edit ISBN" onclick="document.getElementById('ibf').hidden=false;this.hidden=true;return false" style="color:var(--muted);text-decoration:none">✎</a></span>
+      {% else %}
+      · <a href="#" class="muted" style="font-size:.8rem;text-decoration:underline dotted" onclick="document.getElementById('ibf').hidden=false;this.hidden=true;return false">Add ISBN</a>
+      {% endif %}
     </p>
+
+    <form id="ibf" method="post" action="/books/{{ b['id'] }}/isbn" hidden style="margin:-.75rem 0 .75rem">
+      <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721" style="width:11rem">
+      <button>Save</button>
+    </form>
 
     <form id="rf" method="post" action="/books/{{ b['id'] }}/rate" style="margin-bottom:.75rem">
       <input type="hidden" name="rating" value="{{ b['rating'] or 0 }}">
@@ -68,22 +77,6 @@
     <textarea name="review" rows="5" style="width:100%" placeholder="Your review">{{ b['review'] or '' }}</textarea>
     <button style="margin-top:.5rem">Save</button>
   </form>
-</div>
-
-<div style="margin-top:1rem">
-  <div class="card">
-    <h2 style="margin-top:0">ISBN & metadata</h2>
-    <form method="post" action="/books/{{ b['id'] }}/isbn">
-      <div class="form-group">
-        <label>ISBN</label>
-        <div class="form-row">
-          <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721" style="flex:1">
-          <button>Fetch</button>
-        </div>
-      </div>
-      <p class="muted" style="font-size:.8rem">Used for cover art from OpenLibrary</p>
-    </form>
-  </div>
 </div>
 
 {% if anns %}
