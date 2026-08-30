@@ -207,7 +207,7 @@ def delete_book(book_id: int):
 
 
 @app.post("/import")
-def import_koreader(request: Request, file: UploadFile):
+def import_koreader(file: UploadFile):
     data = file.file.read()
     try:
         stats = parse_koreader(data)
@@ -263,7 +263,6 @@ def fetch_metadata(isbn: str) -> dict:
             "title": docs[0].get("title"),
             "author": ", ".join(docs[0].get("author_name", [])) or None,
             "pages": docs[0].get("number_of_pages_median") or None,
-            "cover": f"https://covers.openlibrary.org/isbn/{isbn}-M.jpg",
         }
     except httpx.HTTPError:
         return {}

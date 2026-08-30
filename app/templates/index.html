@@ -49,20 +49,14 @@
   {% set cover_url = "https://covers.openlibrary.org/b/isbn/" ~ b['isbn'] ~ "-M.jpg" if b['isbn'] else none %}
   <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
     <div class="card" style="padding:.75rem;text-align:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
-      <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius-sm);background:var(--bg);margin-bottom:.6rem;display:flex;align-items:center;justify-content:center">
+      <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius-sm);background:var(--accent-light);margin-bottom:.6rem;display:flex;align-items:center;justify-content:center;position:relative">
+        <div style="padding:.75rem;text-align:center">
+          <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
+          <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
+        </div>
         {% if cover_url %}
-        <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="width:100%;height:100%;object-fit:cover"
-             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-             onload="if(this.naturalWidth<10||this.naturalHeight<10){this.style.display='none';this.nextElementSibling.style.display='flex'}">
-        <div style="display:none;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:.75rem;text-align:center;width:100%;height:100%;background:var(--accent-light)">
-          <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
-          <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
-        </div>
-        {% else %}
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:.75rem;text-align:center;width:100%;height:100%;background:var(--accent-light)">
-          <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
-          <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
-        </div>
+        <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="position:absolute;width:100%;height:100%;object-fit:cover"
+             onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
         {% endif %}
       </div>
       {% set finished = (not b['total_seconds'] and not b['pages_read']) or (b['total_pages'] and b['pages_read'] and b['pages_read'] / b['total_pages'] >= 0.90) %}

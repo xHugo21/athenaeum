@@ -60,8 +60,6 @@ def test_import_and_reimport(tmp_path, monkeypatch):
         r = client.post("/books/1/rate", data={"rating": 4.7, "review": "nice"}, follow_redirects=False)
         assert r.status_code == 303
 
-    import sqlite3
-
     with sqlite3.connect("athenaeum.db") as c:
         (n,) = c.execute("SELECT COUNT(*) FROM books").fetchone()
         assert n == 1, "re-import must not duplicate"
@@ -77,8 +75,6 @@ def test_import_and_reimport(tmp_path, monkeypatch):
 
 def test_manual_add_with_isbn(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    import sqlite3
-
     from app import main
 
     class FakeResp:

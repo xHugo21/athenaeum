@@ -1,7 +1,5 @@
-import os
 import re
 import sqlite3
-import tempfile
 from dataclasses import dataclass, field
 
 
@@ -24,11 +22,9 @@ class BookStats:
 def parse_koreader(data: bytes) -> list[BookStats]:
     if not data.startswith(b"SQLite format 3\x00"):
         raise ValueError("Not a KOReader statistics database (no SQLite header)")
-    fd, path = tempfile.mkstemp(suffix=".sqlite3")
+    con = sqlite3.connect(":memory:")
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        con = sqlite3.connect(path)
+        con.deserialize(data)
         rows = con.execute(
             "SELECT id, title, authors, pages, total_read_time, total_read_pages, last_open FROM book"
         ).fetchall()
@@ -43,7 +39,6 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         raise ValueError("Not a KOReader statistics database (unexpected schema)")
     finally:
         con.close()
-        os.unlink(path)
 
     merged: dict[tuple[str, str], BookStats] = {}
     id_to_key: dict[int, tuple[str, str]] = {}
