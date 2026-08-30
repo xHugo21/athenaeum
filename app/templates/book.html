@@ -23,9 +23,15 @@
       {% if b['isbn'] %} · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a>{% endif %}
     </p>
 
-    {% if b['rating'] %}
-    <div style="color:#e6a817;font-size:1.2rem;margin-bottom:.75rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] / 5 * 100) }}%">★★★★★</span></span></div>
-    {% endif %}
+    <form id="rf" method="post" action="/books/{{ b['id'] }}/rate" style="margin-bottom:.75rem">
+      <input type="hidden" name="rating" value="{{ b['rating'] or 0 }}">
+      <input type="hidden" name="review" value="{{ b['review'] or '' }}">
+      <div id="stars" style="position:relative;display:inline-block;font-size:1.4rem;line-height:1;color:#e6a817;cursor:pointer" title="Click to rate">
+        <span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] or 0) / 5 * 100 }}%;pointer-events:none">★★★★★</span>
+        {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="var f=document.getElementById('rf');f.rating.value=this.dataset.v;f.submit()" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
+      </div>
+      {% if b['rating'] %}<a href="#" onclick="var f=document.getElementById('rf');f.rating.value=0;f.submit();return false" class="muted" style="font-size:.75rem;margin-left:.4rem">clear</a>{% endif %}
+    </form>
 
     {% if b['total_seconds'] or b['pages_read'] or b['total_pages'] %}
     <div class="card" style="margin-bottom:1rem">
@@ -48,35 +54,23 @@
       {% endif %}
     </div>
     {% endif %}
-
-    {% if b['review'] %}
-    <div class="card" style="margin-bottom:1rem">
-      <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.35rem">Review</div>
-      <div style="white-space:pre-wrap;line-height:1.6">{{ b['review'] }}</div>
-    </div>
-    {% endif %}
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem">
-  <div class="card">
-    <h2 style="margin-top:0">Rating & review</h2>
-    <form method="post" action="/books/{{ b['id'] }}/rate">
-      <div class="form-group">
-        <label>Rating</label>
-        <select name="rating">
-          <option value="0">No rating</option>
-          {% for i in range(1, 11) %}{% set v = i * 0.5 %}<option value="{{ '%g' | format(v) }}" {% if b['rating'] == v %}selected{% endif %}>{{ '%g' | format(v) }} ★</option>{% endfor %}
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Review</label>
-        <textarea name="review" rows="4" placeholder="Your review">{{ b['review'] or '' }}</textarea>
-      </div>
-      <button>Save</button>
-    </form>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
+    <h2 style="margin:0">Review</h2>
+    <a href="#" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true;return false">{{ 'Edit' if b['review'] else 'Write a review' }}</a>
   </div>
+  <div id="rv" class="{{ '' if b['review'] else 'muted' }}" style="white-space:pre-wrap;line-height:1.6">{{ b['review'] or 'No review yet.' }}</div>
+  <form id="rvf" method="post" action="/books/{{ b['id'] }}/rate" hidden>
+    <input type="hidden" name="rating" value="{{ b['rating'] or 0 }}">
+    <textarea name="review" rows="5" style="width:100%" placeholder="Your review">{{ b['review'] or '' }}</textarea>
+    <button style="margin-top:.5rem">Save</button>
+  </form>
+</div>
 
+<div style="margin-top:1rem">
   <div class="card">
     <h2 style="margin-top:0">ISBN & metadata</h2>
     <form method="post" action="/books/{{ b['id'] }}/isbn">
