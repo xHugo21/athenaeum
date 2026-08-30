@@ -23,6 +23,7 @@ def ts_date(ts: int) -> str:
 
 templates.env.filters["ts_date"] = ts_date
 templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
+templates.env.filters["read_hm"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}min" if s >= 3600 else f"{s // 60}min"
 
 app = FastAPI(title="athenaeum")
 

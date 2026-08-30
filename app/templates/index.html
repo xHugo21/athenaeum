@@ -90,17 +90,13 @@
              onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
         {% endif %}
       </div>
-      {% set finished = (not b['total_seconds'] and not b['pages_read']) or (b['total_pages'] and b['pages_read'] and b['pages_read'] / b['total_pages'] >= 0.90) %}
+      {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
       {% if b['rating'] %}
       <div style="color:#e6a817;font-size:.85rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] / 5 * 100) }}%">★★★★★</span></span></div>
       {% else %}
-      <div class="muted" style="font-size:.85rem">Not rated</div>
+      <div style="color:#e6a817;font-size:.85rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:0">★★★★★</span></span></div>
       {% endif %}
-      {% if finished %}
-      <div style="margin-top:.2rem;font-size:.75rem;font-weight:600;color:var(--accent)">✓ Finished</div>
-      {% elif b['total_seconds'] %}
-      <div class="muted" style="font-size:.75rem;margin-top:.2rem">{{ (b['total_seconds'] / 3600) | round(1) }}h read</div>
-      {% endif %}
+      <div class="muted" style="margin-top:.2rem;font-size:.75rem"><span style="{{ 'color:var(--accent);font-weight:600' if pct and pct >= 90 }}">{{ pct ~ '%' if pct is not none else '—' }}</span>{% if b['total_seconds'] %} / {{ b['total_seconds'] | read_hm }}{% endif %}</div>
     </div>
   </a>
   {% endfor %}
