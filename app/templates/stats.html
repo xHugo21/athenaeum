@@ -34,8 +34,8 @@
     <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
       {% for day in wk %}
       {% if day %}
-      <div title="{{ day[0] }}: {{ (day[1] / 60) | round(0) }} min, {{ day[2] }} pages"
-           style="aspect-ratio:1;width:100%;border-radius:3px;background:var(--accent);opacity:{{ day[3] }}"></div>
+      <div class="day-cell" data-tip="{{ day[0] }}: {{ (day[1] / 60) | round(0) }} min, {{ day[2] }} pages"
+           style="aspect-ratio:1;width:100%;border-radius:3px;background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, transparent)"></div>
       {% else %}
       <div style="aspect-ratio:1;width:100%;border-radius:3px;background:var(--border);opacity:.35"></div>
       {% endif %}
@@ -64,4 +64,9 @@
   </table>
 </div>
 {% endif %}
+<style>
+.day-cell{position:relative}
+.day-cell::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
+.day-cell:hover::after{opacity:1}
+</style>
 {% endblock %}

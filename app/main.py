@@ -151,7 +151,7 @@ def stats(request: Request):
     d = date.today() - timedelta(days=364)
     d -= timedelta(days=(d.weekday() + 1) % 7)
     end = date.today() + timedelta(days=(6 - date.today().weekday()) % 7)
-    weeks, cur_m = [], None
+    weeks, cur_m, last_lbl = [], None, -9
     while d <= end:
         wk, start = [], d
         for _ in range(7):
@@ -159,7 +159,9 @@ def stats(request: Request):
             alpha = round(max(0.25, hit[0] / max_secs), 2) if hit else 0
             wk.append((d.strftime("%-d %b %Y"), hit[0], hit[1], alpha) if hit else None)
             d += timedelta(days=1)
-        name = start.strftime("%b %Y") if start.month != cur_m else None
+        name = start.strftime("%b %Y") if start.month != cur_m and len(weeks) - last_lbl >= 3 else None
+        if name:
+            last_lbl = len(weeks)
         cur_m = start.month
         weeks.append((wk, name))
     return templates.TemplateResponse(
