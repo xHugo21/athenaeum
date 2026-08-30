@@ -131,11 +131,10 @@ def rate_book(book_id: int, rating: int = Form(0), review: str = Form("")):
 @app.post("/books/{book_id}/isbn")
 def set_isbn(book_id: int, isbn: str = Form(...)):
     isbn = re.sub(r"[^0-9Xx]", "", isbn)
-    meta = fetch_metadata(isbn) if isbn else {}
     with db() as con:
         con.execute(
-            "UPDATE books SET isbn=?, title=coalesce(?,title), author=coalesce(?,author) WHERE id=?",
-            (isbn or None, meta.get("title"), meta.get("author"), book_id),
+            "UPDATE books SET isbn=? WHERE id=?",
+            (isbn or None, book_id),
         )
     return RedirectResponse(f"/books/{book_id}", 303)
 
