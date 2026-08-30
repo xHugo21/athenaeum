@@ -77,7 +77,7 @@ def index(request: Request):
         months = con.execute(
             "SELECT month, SUM(seconds) s FROM month_seconds GROUP BY month ORDER BY month DESC LIMIT 12"
         ).fetchall()
-    return templates.TemplateResponse(request, "index.html", {"books": books, "months": months})
+    return templates.TemplateResponse(request, "index.html", {"books": books, "months": months, "imported": request.query_params.get("imported"), "added": request.query_params.get("added"), "error": request.query_params.get("error")})
 
 
 @app.get("/books/{book_id}")
@@ -118,7 +118,7 @@ def add_book(
                 int(time.time()),
             ),
         )
-    return RedirectResponse("/", 303)
+    return RedirectResponse("/?added=1", 303)
 
 
 @app.post("/books/{book_id}/rate")

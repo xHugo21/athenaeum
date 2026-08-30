@@ -1,17 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-{% if error %}<p class="flash">{{ error }}</p>{% endif %}
-{% if imported is not none %}<p class="flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
-
-<h1>Your Library</h1>
-
-{% if months %}
-<div class="month-pills">
-  {% for m in months %}
-  <span class="month-pill" title="{{ m['month'] }}">{{ m['month'][2:] }} · {{ (m['s'] / 3600) | round(1) }}h</span>
-  {% endfor %}
-</div>
-{% endif %}
+{% if error %}<p class="flash" id="error-flash">{{ error }}</p>{% endif %}
+{% if imported %}<p class="flash" id="import-flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
+{% if added %}<p class="flash" id="added-flash">Book added.</p>{% endif %}
+{% if error or imported or added %}<script>setTimeout(()=>{document.querySelectorAll('.flash').forEach(e=>e.remove());history.replaceState(null,'','/')},5000)</script>{% endif %}
 
 <div class="card" style="margin-bottom:1.5rem">
   <h2 style="margin-top:0">Import KOReader stats</h2>
