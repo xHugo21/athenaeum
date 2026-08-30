@@ -7,15 +7,16 @@
     <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius);background:var(--bg);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center">
       {% if cover_url %}
       <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="width:100%;height:100%;object-fit:cover"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);padding:1rem;text-align:center;width:100%;height:100%">
-        <span style="font-size:3rem">📖</span>
-        <span style="font-size:.85rem">No cover available</span>
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+           onload="if(this.naturalWidth<10||this.naturalHeight<10){this.style.display='none';this.nextElementSibling.style.display='flex'}">
+      <div style="display:none;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:1.25rem;text-align:center;width:100%;height:100%;background:var(--accent-light)">
+        <div style="font-family:'Merriweather',Georgia,serif;font-weight:700;font-size:1rem;line-height:1.4;color:var(--text)">{{ b['title'] }}</div>
+        <div style="font-size:.85rem;margin-top:.4rem">{{ b['author'] or '' }}</div>
       </div>
       {% else %}
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);padding:1rem;text-align:center;width:100%;height:100%">
-        <span style="font-size:3rem">📖</span>
-        <span style="font-size:.85rem">No cover available</span>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:1.25rem;text-align:center;width:100%;height:100%;background:var(--accent-light)">
+        <div style="font-family:'Merriweather',Georgia,serif;font-weight:700;font-size:1rem;line-height:1.4;color:var(--text)">{{ b['title'] }}</div>
+        <div style="font-size:.85rem;margin-top:.4rem">{{ b['author'] or '' }}</div>
       </div>
       {% endif %}
     </div>
