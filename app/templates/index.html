@@ -88,10 +88,8 @@
           <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
           <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
         </div>
-        {% if b['isbn'] %}
-        <img src="https://covers.openlibrary.org/b/isbn/{{ b['isbn'] }}-M.jpg" alt="{{ b['title'] }}" loading="lazy"
+        <img src="/covers/{{ b['id'] }}.jpg" alt="{{ b['title'] }}" loading="lazy"
              onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
-        {% endif %}
       </div>
       <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
       {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}

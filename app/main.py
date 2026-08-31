@@ -422,6 +422,52 @@ def insert_annotation(con, book_id: int, a: dict):
     )
 
 
+COVERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "covers")
+os.makedirs(COVERS_DIR, exist_ok=True)
+
+
+def fetch_cover(book_id: int, isbn: str) -> str | None:
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    if os.path.exists(path):
+        return path
+    if not isbn:
+        return None
+    try:
+        r = httpx.get(
+            f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg",
+            follow_redirects=True,
+            timeout=15,
+        )
+        if r.status_code == 200 and len(r.content) > 1000:
+            with open(path, "wb") as f:
+                f.write(r.content)
+            return path
+    except httpx.HTTPError:
+        pass
+    return None
+
+
+@app.get("/covers/{book_id}.jpg")
+def cover_image(book_id: int):
+    with db() as con:
+        book = con.execute("SELECT isbn FROM books WHERE id=?", (book_id,)).fetchone()
+        if not book:
+            return RedirectResponse("/", 303)
+    path = fetch_cover(book_id, book["isbn"])
+    if path:
+        return FileResponse(path, media_type="image/jpeg")
+    return RedirectResponse("https://via.placeholder.com/128x192?text=No+Cover", 307)
+
+
+@app.post("/books/{book_id}/cover")
+async def upload_cover(book_id: int, cover: UploadFile):
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    data = await cover.read()
+    with open(path, "wb") as f:
+        f.write(data)
+    return RedirectResponse(f"/books/{book_id}", 303)
+
+
 def fetch_metadata(isbn: str) -> dict:
     try:
         r = httpx.get(
