@@ -88,10 +88,11 @@
   {% for b in books %}
   <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
     <div class="card card-hover" style="padding:.75rem;text-align:center">
-      <div class="cover" style="margin-bottom:.6rem">
-        <div style="padding:.75rem">
-          <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
-          <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
+      <div class="cover" style="margin-bottom:.6rem;--ph:hsl {{ (b['title'] | length * 47) % 360 }},35%,88%;--ph-fg:hsl {{ (b['title'] | length * 47) % 360 }},45%,30%">
+        <div class="cover-fallback">
+          <div class="cover-initial">{{ b['title'][:1] | upper }}</div>
+          <div style="font-weight:600;font-size:.85rem;line-height:1.25">{{ b['title'] }}</div>
+          <div class="muted" style="font-size:.72rem;margin-top:.25rem">{{ b['author'] or '' }}</div>
         </div>
         <img src="/covers/{{ b['id'] }}.jpg" alt="{{ b['title'] }}" loading="lazy"
              onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">

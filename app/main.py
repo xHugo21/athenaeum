@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import httpx
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from .koreader import norm, parse_koreader
@@ -429,11 +429,14 @@ COVERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "covers")
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 
+NO_COVER_FLAG = os.path.join(COVERS_DIR, ".nofCover")
+
+
 def fetch_cover(book_id: int, isbn: str) -> str | None:
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     if os.path.exists(path):
         return path
-    if not isbn:
+    if not isbn or os.path.exists(NO_COVER_FLAG):
         return None
     try:
         r = httpx.get(
@@ -447,19 +450,37 @@ def fetch_cover(book_id: int, isbn: str) -> str | None:
             return path
     except httpx.HTTPError:
         pass
+    open(NO_COVER_FLAG, "a").close()
     return None
+
+
+def placeholder_svg(title: str, author: str) -> bytes:
+    h = abs(hash(title)) % 360
+    bg = f"hsl({h},35%,88%)"
+    fg = f"hsl({h},45%,30%)"
+    initial = (title[:1] or "?").upper()
+    safe = (title.replace("&", "&amp;").replace("<", "&lt;")[:40])
+    author_safe = (author.replace("&", "&amp;").replace("<", "&lt;")[:20])
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 192" preserveAspectRatio="xMidYMid slice">
+  <rect width="128" height="192" fill="{bg}"/>
+  <rect x="0" y="0" width="128" height="6" fill="{fg}" opacity=".6"/>
+  <text x="64" y="90" text-anchor="middle" font-family="Georgia,serif" font-size="56" font-weight="700" fill="{fg}">{initial}</text>
+  <text x="64" y="130" text-anchor="middle" font-family="Georgia,serif" font-size="9" fill="{fg}" opacity=".8">{safe}</text>
+  <text x="64" y="144" text-anchor="middle" font-family="Georgia,serif" font-size="7" fill="{fg}" opacity=".6">{author_safe}</text>
+</svg>'''
+    return svg.encode()
 
 
 @app.get("/covers/{book_id}.jpg")
 def cover_image(book_id: int):
     with db() as con:
-        book = con.execute("SELECT isbn FROM books WHERE id=?", (book_id,)).fetchone()
+        book = con.execute("SELECT title, author, isbn FROM books WHERE id=?", (book_id,)).fetchone()
         if not book:
             return RedirectResponse("/", 303)
     path = fetch_cover(book_id, book["isbn"])
     if path:
         return FileResponse(path, media_type="image/jpeg")
-    return RedirectResponse("https://via.placeholder.com/128x192?text=No+Cover", 307)
+    return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml")
 
 
 @app.post("/books/{book_id}/cover")
