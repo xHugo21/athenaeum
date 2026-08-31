@@ -135,7 +135,7 @@ function buildShelves() {
   const shelves = [];
   let cur = [], curW = 0;
   for (const b of books) {
-    const px = Math.round(24 + (b.pages / maxPages) * 40);
+    const px = Math.round(24 + Math.log(1 + b.pages) / Math.log(1 + maxPages) * 40);
     b._w = px;
     b._h = 240 + Math.round(((b.id * 7 + b.pages * 3) % 60) - 30);
     if (cur.length && curW + GAP + px > usable) {
