@@ -124,10 +124,7 @@ function panel(id, btn) {
     btn.classList.add('on');
   }
 }
-let shelvesBuilt = false;
 function buildShelves() {
-  if (shelvesBuilt) return;
-  shelvesBuilt = true;
   const books = JSON.parse(document.getElementById('book-data').textContent);
   if (!books.length) return;
   const maxPages = Math.max(...books.map(b => b.pages)) || 1;

@@ -135,7 +135,7 @@ def test_stats_page(tmp_path, monkeypatch):
         r = client.get("/stats")
         assert r.status_code == 200
         assert "The Hobbit" in r.text
-        assert "0.1h" in r.text
+        assert "3m" in r.text
 
 
 def test_reject_garbage(tmp_path, monkeypatch):

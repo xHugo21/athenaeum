@@ -253,6 +253,8 @@ def rate_book(book_id: int, rating: float = Form(0), review: str = Form("")):
 @app.post("/books/{book_id}/isbn")
 def set_isbn(book_id: int, isbn: str = Form(...)):
     isbn = re.sub(r"[^0-9Xx]", "", isbn)
+    if isbn and os.path.exists(NO_COVER_FLAG):
+        os.remove(NO_COVER_FLAG)
     with db() as con:
         con.execute(
             "UPDATE books SET isbn=? WHERE id=?",
@@ -279,8 +281,16 @@ def delete_book(book_id: int):
 
 @app.get("/db/download")
 def download_db():
-    # ponytail: raw file copy, corrupt if downloaded mid-import; sqlite backup API if that bites
-    return FileResponse(DB_PATH, filename="athenaeum.db")
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        with sqlite3.connect(DB_PATH) as src, sqlite3.connect(tmp.name) as dst:
+            src.backup(dst)
+        data = open(tmp.name, "rb").read()
+    return Response(
+        data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": 'attachment; filename="athenaeum.db"'},
+    )
 
 
 def rebuild_aggregates(con):
@@ -487,10 +497,16 @@ def cover_image(book_id: int):
 
 @app.post("/books/{book_id}/cover")
 async def upload_cover(book_id: int, cover: UploadFile):
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    if cover.content_type and not cover.content_type.startswith("image/"):
+        return RedirectResponse(f"/books/{book_id}?error=Not+an+image", 303)
     data = await cover.read()
+    if len(data) > 5_000_000 or not data.startswith((b"\xff\xd8\xff", b"\x89PNG", b"GIF8", b"RIFF", b"WEBP")):
+        return RedirectResponse(f"/books/{book_id}?error=Invalid+image", 303)
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     with open(path, "wb") as f:
         f.write(data)
+    if os.path.exists(NO_COVER_FLAG):
+        os.remove(NO_COVER_FLAG)
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
