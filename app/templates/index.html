@@ -107,7 +107,7 @@
 <div id="shelf-view" style="display:none">
   <div id="shelves"></div>
 </div>
-<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ 20 + (b['id'] * 137) % 30 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ 200 + (b['id'] * 137) % 40 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
 {% else %}
 <p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
 {% endif %}
@@ -163,6 +163,10 @@ function buildShelves() {
       const lum = 58 + (b.id * 11) % 18;
       a.style.background = `hsl(${b.hue}, 18%, ${lum}%)`;
       a.style.color = `hsl(${b.hue}, 25%, 18%)`;
+      if (b.id % 20 === 0) {
+        a.style.background = 'var(--accent-light)';
+        a.style.color = 'var(--accent)';
+      }
       a.title = b.title + (b.author ? ' — ' + b.author : '');
       a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
       shelf.appendChild(a);
@@ -250,14 +254,25 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   justify-content: center;
   text-decoration: none;
   position: relative;
-  transition: transform .2s ease;
+  transition: transform .2s ease, box-shadow .2s ease;
   box-shadow: inset 3px 0 1px rgba(0,0,0,.08);
+  background-image: linear-gradient(to bottom, rgba(0,0,0,.06), transparent 15%, transparent 85%, rgba(0,0,0,.06));
   cursor: pointer;
   overflow: hidden;
 }
+.book-spine::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(0,0,0,.1);
+}
 .book-spine:hover {
   text-decoration: none;
-  transform: translateY(-2px);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: inset 3px 0 1px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.1);
   z-index: 1;
 }
 .spine-text {
