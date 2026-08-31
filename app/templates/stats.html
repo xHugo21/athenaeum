@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Stats · athenaeum{% endblock %}
 {% block content %}
 <h2 style="margin-top:0">Statistics</h2>
 {% if not totals['n'] %}
@@ -49,6 +50,11 @@
       {% if name %}<span class="muted" style="position:absolute;left:0;white-space:nowrap;font-size:.65rem">{{ name }}</span>{% endif %}
     </div>
     {% endfor %}
+  </div>
+  <div class="muted" style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end;margin-top:.5rem;font-size:.75rem">
+    less
+    {% for i in range(1, 5) %}<span class="lg on" style="background:color-mix(in srgb, var(--accent) {{ i * 25 }}%, transparent);opacity:1"></span>{% endfor %}
+    <span class="lg"></span> more
   </div>
 </div>
 

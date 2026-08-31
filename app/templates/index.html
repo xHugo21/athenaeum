@@ -1,11 +1,19 @@
 {% extends "base.html" %}
+{% block title %}Library · athenaeum{% endblock %}
 {% block content %}
-{% if error %}<p class="flash" id="error-flash">{{ error }}</p>{% endif %}
-{% if imported %}<p class="flash" id="import-flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
-{% if added %}<p class="flash" id="added-flash">Book added.</p>{% endif %}
-{% if error or imported or added %}<script>setTimeout(()=>{document.querySelectorAll('.flash').forEach(e=>e.remove());history.replaceState(null,'','/')},5000)</script>{% endif %}
+{% if error %}<p class="flash error">{{ error }}</p>{% endif %}
+{% if imported %}<p class="flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
+{% if added %}<p class="flash">Book added.</p>{% endif %}
 
-<div class="card" style="margin-bottom:1.5rem">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
+  <h1 style="margin:0">Library</h1>
+  <div style="display:flex;gap:.5rem">
+    <button class="btn-ghost" onclick="panel('add-card', this)">+ Add book</button>
+    <button class="btn-ghost" onclick="panel('import-card', this)">⬆ Import</button>
+  </div>
+</div>
+
+<div id="import-card" hidden class="card" style="margin-bottom:1rem">
   <h2 style="margin-top:0">Import KOReader stats</h2>
   <form id="import-form" method="post" action="/import" enctype="multipart/form-data">
     <label class="btn" id="import-btn" style="cursor:pointer">
@@ -18,29 +26,25 @@
     </span>
     <span class="muted" style="margin-left:.5rem">statistics.sqlite3 from KOReader</span>
   </form>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </div>
 
-<div class="card" style="margin-bottom:2rem">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <h2 style="margin:0">Add a book</h2>
-    <button class="btn-ghost" style="padding:.25rem .65rem;font-size:1rem;line-height:1" onclick="var f=document.getElementById('add-form');f.hidden=!f.hidden;this.textContent=f.hidden?'+':'−'">+</button>
-  </div>
-  <form id="add-form" hidden method="post" action="/books">
+<div id="add-card" hidden class="card" style="margin-bottom:1rem">
+  <h2 style="margin-top:0">Add a book</h2>
+  <form method="post" action="/books">
     <div class="form-group">
       <label>Title *</label>
       <input name="title" required style="width:100%">
     </div>
     <div class="form-row">
-      <div class="form-group" style="flex:1.5;min-width:10rem;margin-bottom:.75rem">
+      <div class="form-group" style="flex:1.5;min-width:10rem">
         <label>Author</label>
         <input name="author" style="width:100%">
       </div>
-      <div class="form-group" style="flex:1;min-width:8rem;margin-bottom:.75rem">
+      <div class="form-group" style="flex:1;min-width:8rem">
         <label>ISBN</label>
         <input name="isbn" style="width:100%">
       </div>
-      <div class="form-group" style="flex:.7;min-width:5.5rem;margin-bottom:.75rem">
+      <div class="form-group" style="flex:.7;min-width:5.5rem">
         <label>Pages</label>
         <input name="pages" type="number" min="1" style="width:100%">
       </div>
@@ -48,8 +52,8 @@
     <div class="form-group">
       <label>Rating</label>
       <input type="hidden" name="rating" id="rate-val" value="0">
-      <span style="position:relative;display:inline-block;font-size:1.4rem;line-height:1;color:#e6a817;cursor:pointer" title="Click to rate">
-        <span>☆☆☆☆☆</span><span id="rate-fill" style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:0;pointer-events:none">★★★★★</span>
+      <span class="stars" style="font-size:1.4rem;cursor:pointer" title="Click to rate">
+        <span>☆☆☆☆☆</span><span class="fill" id="rate-fill" style="width:0">★★★★★</span>
         {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="document.getElementById('rate-val').value=this.dataset.v;document.getElementById('rate-fill').style.width=(this.dataset.v*20)+'%'" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
       </span>
       <a href="#" class="muted" style="font-size:.75rem;margin-left:.4rem" onclick="document.getElementById('rate-val').value=0;document.getElementById('rate-fill').style.width=0;return false">clear</a>
@@ -62,7 +66,7 @@
   </form>
 </div>
 
-<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem">
+<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem">
   <h2 style="margin:0">Books ({{ books | length }})</h2>
   <div class="muted" style="display:flex;gap:.75rem;align-items:baseline">
     {% for key, label in [('recent', 'Recent'), ('title', 'Title'), ('rating', 'Rating')] %}
@@ -75,33 +79,42 @@
 </div>
 
 {% if books %}
-<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap:1rem;">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:1rem">
   {% for b in books %}
-  {% set cover_url = "https://covers.openlibrary.org/b/isbn/" ~ b['isbn'] ~ "-M.jpg" if b['isbn'] else none %}
   <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
-    <div class="card" style="padding:.75rem;text-align:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
-      <div style="aspect-ratio:2/3;overflow:hidden;border-radius:var(--radius-sm);background:var(--accent-light);margin-bottom:.6rem;display:flex;align-items:center;justify-content:center;position:relative">
-        <div style="padding:.75rem;text-align:center">
+    <div class="card card-hover" style="padding:.75rem;text-align:center">
+      <div class="cover" style="margin-bottom:.6rem">
+        <div style="padding:.75rem">
           <div style="font-weight:600;font-size:.85rem;line-height:1.3;color:var(--text)">{{ b['title'] }}</div>
           <div style="font-size:.75rem;margin-top:.2rem">{{ b['author'] or '' }}</div>
         </div>
-        {% if cover_url %}
-        <img src="{{ cover_url }}" alt="{{ b['title'] }}" style="position:absolute;width:100%;height:100%;object-fit:cover"
+        {% if b['isbn'] %}
+        <img src="https://covers.openlibrary.org/b/isbn/{{ b['isbn'] }}-M.jpg" alt="{{ b['title'] }}" loading="lazy"
              onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
         {% endif %}
       </div>
+      <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
       {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
-      {% if b['rating'] %}
-      <div style="color:#e6a817;font-size:.85rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:{{ (b['rating'] / 5 * 100) }}%">★★★★★</span></span></div>
-      {% else %}
-      <div style="color:#e6a817;font-size:.85rem"><span style="position:relative;display:inline-block"><span>☆☆☆☆☆</span><span style="position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;width:0">★★★★★</span></span></div>
-      {% endif %}
       <div class="muted" style="margin-top:.2rem;font-size:.75rem"><span style="{{ 'color:var(--accent);font-weight:600' if pct and pct >= 90 }}">{{ pct ~ '%' if pct is not none else '—' }}</span>{% if b['total_seconds'] %} / {{ b['total_seconds'] | read_hm }}{% endif %}</div>
     </div>
   </a>
   {% endfor %}
 </div>
 {% else %}
-<p class="muted" style="margin-top:.5rem">No books yet. Add one above or import from KOReader.</p>
+<p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
 {% endif %}
+
+<script>
+function panel(id, btn) {
+  const open = !document.getElementById(id).hidden;
+  document.getElementById('add-card').hidden = true;
+  document.getElementById('import-card').hidden = true;
+  document.querySelectorAll('.btn-ghost.on').forEach(b => b.classList.remove('on'));
+  if (!open) {
+    document.getElementById(id).hidden = false;
+    btn.classList.add('on');
+  }
+}
+</script>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 {% endblock %}
