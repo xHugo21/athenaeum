@@ -108,7 +108,7 @@
 <div id="shelf-view" style="display:none">
   <div id="shelves"></div>
 </div>
-<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ 200 + (b['id'] * 137) % 40 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
 {% else %}
 <p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
 {% endif %}
@@ -161,12 +161,14 @@ function buildShelves() {
       a.className = 'book-spine';
       a.style.width = b._w + 'px';
       a.style.height = b._h + 'px';
-      const lum = 58 + (b.id * 11) % 18;
-      a.style.background = `hsl(${b.hue}, 18%, ${lum}%)`;
-      a.style.color = `hsl(${b.hue}, 25%, 18%)`;
+      const lum = 42 + (b.id * 11) % 14;
+      a.style.background = `hsl(${b.hue}, 38%, ${lum}%)`;
+      a.style.color = `hsl(${b.hue}, 50%, 92%)`;
+      a.style.setProperty('--spine-stripe', `hsl(${b.hue}, 45%, 28%)`);
       if (b.id % 20 === 0) {
         a.style.background = 'var(--accent-light)';
         a.style.color = 'var(--accent)';
+        a.style.setProperty('--spine-stripe', 'var(--accent)');
       }
       a.title = b.title + (b.author ? ' — ' + b.author : '');
       a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
@@ -269,6 +271,14 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   bottom: 0;
   width: 1px;
   background: rgba(0,0,0,.1);
+}
+.book-spine::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 4px;
+  background: var(--spine-stripe, rgba(0,0,0,.2));
+  border-radius: var(--radius-sm) 2px 0 0;
 }
 .book-spine:hover {
   text-decoration: none;

@@ -117,7 +117,9 @@ def index(request: Request):
         ("rating", "desc"): "rating DESC",
     }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")
     with db() as con:
-        books = con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()
+        books = [dict(r) for r in con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()]
+        for b in books:
+            b["hue"] = abs(hash(b["title"])) % 360
         max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
     return templates.TemplateResponse(
         request,
