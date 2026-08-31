@@ -107,7 +107,7 @@
 <div id="shelf-view" style="display:none">
   <div id="shelves"></div>
 </div>
-<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ (b['id'] * 137) % 360 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ 20 + (b['id'] * 137) % 30 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
 {% else %}
 <p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
 {% endif %}
@@ -160,7 +160,9 @@ function buildShelves() {
       a.className = 'book-spine';
       a.style.width = b._w + 'px';
       a.style.height = b._h + 'px';
-      a.style.background = `hsl(${b.hue}, 45%, 42%)`;
+      const lum = 58 + (b.id * 11) % 18;
+      a.style.background = `hsl(${b.hue}, 18%, ${lum}%)`;
+      a.style.color = `hsl(${b.hue}, 25%, 18%)`;
       a.title = b.title + (b.author ? ' — ' + b.author : '');
       a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
       shelf.appendChild(a);
@@ -232,53 +234,40 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   border-radius: var(--radius) var(--radius) 0 0;
 }
 .shelf-board {
-  height: .75rem;
-  background: linear-gradient(to bottom, #8b7355, #6d5a42);
+  height: .5rem;
+  background: var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  box-shadow: 0 4px 8px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.15);
 }
 @media (prefers-color-scheme: dark) {
-  .shelf-board {
-    background: linear-gradient(to bottom, #5a4a3a, #3d3228);
-    box-shadow: 0 4px 8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05);
-  }
+  .shelf-board { background: var(--border); }
   .bookshelf { background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.15) 100%); }
 }
 .book-spine {
   flex: 0 0 auto;
-  border-radius: 3px 4px 4px 3px;
+  border-radius: var(--radius-sm) 2px 2px var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  color: rgba(255,255,255,.9);
   position: relative;
-  transition: transform .25s ease, box-shadow .25s ease;
-  box-shadow: inset -2px 0 4px rgba(0,0,0,.25), inset 2px 0 2px rgba(255,255,255,.1);
+  transition: transform .2s ease;
+  box-shadow: inset 3px 0 1px rgba(0,0,0,.08);
   cursor: pointer;
   overflow: hidden;
 }
-.book-spine::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(to right, rgba(0,0,0,.2), transparent);
-}
 .book-spine:hover {
   text-decoration: none;
-  transform: translateY(-1.5rem) rotate(-2deg);
-  box-shadow: inset -2px 0 4px rgba(0,0,0,.25), inset 2px 0 2px rgba(255,255,255,.1), 4px 6px 12px rgba(0,0,0,.25);
+  transform: translateY(-2px);
   z-index: 1;
 }
 .spine-text {
   writing-mode: vertical-rl;
   text-orientation: mixed;
+  font-family: 'Merriweather', Georgia, serif;
   font-weight: 700;
-  font-size: .7rem;
-  line-height: 1.2;
+  font-size: .72rem;
+  letter-spacing: .02em;
+  line-height: 1.15;
   padding: .75rem .25rem;
   height: 100%;
   overflow: hidden;
