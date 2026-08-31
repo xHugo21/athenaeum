@@ -24,6 +24,7 @@ def ts_date(ts: int) -> str:
 templates.env.filters["ts_date"] = ts_date
 templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
 templates.env.filters["read_hm"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}min" if s >= 3600 else f"{s // 60}min"
+templates.env.filters["hours"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}m" if s >= 3600 else f"{s // 60}m"
 
 app = FastAPI(title="athenaeum")
 
@@ -173,7 +174,7 @@ def stats(request: Request):
             "top": top,
             "best": (best["pages"], fmt(best["day"])) if best else None,
             "longest": (
-                (round(longest["seconds"] / 3600, 1), fmt(longest["day"]))
+                (longest["seconds"], fmt(longest["day"]))
                 if longest
                 else None
             ),

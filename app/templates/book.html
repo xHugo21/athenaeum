@@ -54,7 +54,7 @@
         {% if b['total_seconds'] %}
         <div>
           <div class="stat-label">Time read</div>
-          <div class="stat-value">{{ (b['total_seconds'] / 3600) | round(1) }}h</div>
+          <div class="stat-value">{{ b['total_seconds'] | hours }}</div>
         </div>
         {% endif %}
         {% if agg and agg['n'] %}
@@ -68,7 +68,7 @@
         </div>
         <div>
           <div class="stat-label">Best day</div>
-          <div class="stat-value">{{ ((best['seconds'] or 0) / 3600) | round(1) }}h</div>
+          <div class="stat-value">{{ (best['seconds'] or 0) | hours }}</div>
           <div class="muted" style="font-size:.75rem">{{ best['day'] | day_fmt }}</div>
         </div>
         <div>

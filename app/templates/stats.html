@@ -7,7 +7,7 @@
 {% else %}
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1rem;margin-bottom:1.5rem">
   <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{{ (totals['secs'] / 3600) | round(1) }}h</div>
+    <div style="font-size:1.5rem;font-weight:700">{{ totals['secs'] | hours }}</div>
     <div class="muted">time read</div>
   </div>
   <div class="card" style="text-align:center">
@@ -19,7 +19,7 @@
     <div class="muted">{% if best %}most pages in a day ({{ best[1] }}){% else %}most pages in a day{% endif %}</div>
   </div>
   <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{% if longest %}{{ longest[0] }}h{% else %}–{% endif %}</div>
+    <div style="font-size:1.5rem;font-weight:700">{% if longest %}{{ longest[0] | hours }}{% else %}–{% endif %}</div>
     <div class="muted">{% if longest %}longest daily reading ({{ longest[1] }}){% else %}longest daily reading{% endif %}</div>
   </div>
   <div class="card" style="text-align:center">
@@ -64,7 +64,7 @@
     {% for b in top %}
     <tr>
       <td><a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}</td>
-      <td style="text-align:right">{{ (b['total_seconds'] / 3600) | round(1) }}h</td>
+      <td style="text-align:right">{{ b['total_seconds'] | hours }}</td>
     </tr>
     {% endfor %}
   </table>
