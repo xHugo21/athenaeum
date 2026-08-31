@@ -471,14 +471,30 @@ def placeholder_svg(title: str, author: str) -> bytes:
     bg = f"hsl({h},35%,88%)"
     fg = f"hsl({h},45%,30%)"
     initial = (title[:1] or "?").upper()
-    safe = (title.replace("&", "&amp;").replace("<", "&lt;")[:40])
-    author_safe = (author.replace("&", "&amp;").replace("<", "&lt;")[:20])
+    def esc(s):
+        return s.replace("&", "&amp;").replace("<", "&lt;")
+    words = esc(title).split()
+    lines = []
+    for w in words:
+        if not lines or len(lines[-1]) + 1 + len(w) > 18:
+            lines.append(w)
+        else:
+            lines[-1] += " " + w
+    lines = lines[:4]
+    author_safe = esc(author)[:20]
+    longest = max((len(l) for l in lines), default=0)
+    title_size = 9 if longest <= 14 else 7
+    line_h = title_size + 1
+    title_y_start = 130 - (len(lines) - 1) * line_h
+    title_text = "".join(
+        f'<tspan x="64" dy="{line_h if i else 0}">{l}</tspan>' for i, l in enumerate(lines)
+    )
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 192" preserveAspectRatio="xMidYMid slice">
   <rect width="128" height="192" fill="{bg}"/>
   <rect x="0" y="0" width="128" height="6" fill="{fg}" opacity=".6"/>
-  <text x="64" y="90" text-anchor="middle" font-family="Georgia,serif" font-size="56" font-weight="700" fill="{fg}">{initial}</text>
-  <text x="64" y="130" text-anchor="middle" font-family="Georgia,serif" font-size="9" fill="{fg}" opacity=".8">{safe}</text>
-  <text x="64" y="144" text-anchor="middle" font-family="Georgia,serif" font-size="7" fill="{fg}" opacity=".6">{author_safe}</text>
+  <text x="64" y="84" text-anchor="middle" font-family="Georgia,serif" font-size="48" font-weight="700" fill="{fg}">{initial}</text>
+  <text x="64" y="{title_y_start}" text-anchor="middle" font-family="Georgia,serif" font-size="{title_size}" fill="{fg}" opacity=".85">{title_text}</text>
+  <text x="64" y="152" text-anchor="middle" font-family="Georgia,serif" font-size="7" fill="{fg}" opacity=".6">{author_safe}</text>
 </svg>'''
     return svg.encode()
 
