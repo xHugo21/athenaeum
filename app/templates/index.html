@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Library · athenaeum{% endblock %}
 {% block content %}
-{% if error %}<p class="flash error">{{ error }}</p>{% endif %}
-{% if imported %}<p class="flash">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
-{% if added %}<p class="flash">Book added.</p>{% endif %}
+{% if error %}<p class="flash error" onanimationend="this.remove()">{{ error }}</p>{% endif %}
+{% if imported %}<p class="flash" onanimationend="this.remove()">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
+{% if added %}<p class="flash" onanimationend="this.remove()">Book added.</p>{% endif %}
+{% if error or imported or added %}<script>history.replaceState(null, '', '/')</script>{% endif %}
 
 <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
   <h1 style="margin:0">Library</h1>
@@ -75,11 +76,12 @@
       {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
     </a>
     {% endfor %}
+    <button class="btn-ghost" id="view-toggle" onclick="toggleView()" title="Toggle bookshelf view">Shelf Mode</button>
   </div>
 </div>
 
 {% if books %}
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:1rem">
+<div id="grid-view" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:1rem">
   {% for b in books %}
   <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
     <div class="card card-hover" style="padding:.75rem;text-align:center">
@@ -98,6 +100,11 @@
   </a>
   {% endfor %}
 </div>
+
+<div id="shelf-view" style="display:none">
+  <div id="shelves"></div>
+</div>
+<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ (b['id'] * 137) % 360 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
 {% else %}
 <p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
 {% endif %}
@@ -113,6 +120,136 @@ function panel(id, btn) {
     btn.classList.add('on');
   }
 }
+let shelvesBuilt = false;
+function buildShelves() {
+  if (shelvesBuilt) return;
+  shelvesBuilt = true;
+  const books = JSON.parse(document.getElementById('book-data').textContent);
+  if (!books.length) return;
+  const maxPages = Math.max(...books.map(b => b.pages)) || 1;
+  const container = document.getElementById('shelves');
+  const W = Math.min(window.innerWidth - 40, 960);
+  const GAP = 4;
+  const PAD = 16;
+  const usable = W - PAD * 2;
+  const shelves = [];
+  let cur = [], curW = 0;
+  for (const b of books) {
+    const px = Math.round(24 + (b.pages / maxPages) * 40);
+    b._w = px;
+    b._h = 240 + Math.round(((b.id * 7 + b.pages * 3) % 60) - 30);
+    if (cur.length && curW + GAP + px > usable) {
+      shelves.push(cur);
+      cur = [];
+      curW = 0;
+    }
+    cur.push(b);
+    curW += (cur.length > 1 ? GAP : 0) + px;
+  }
+  if (cur.length) shelves.push(cur);
+  container.innerHTML = '';
+  for (const row of shelves) {
+    const shelf = document.createElement('div');
+    shelf.className = 'bookshelf';
+    for (const b of row) {
+      const a = document.createElement('a');
+      a.href = '/books/' + b.id;
+      a.className = 'book-spine';
+      a.style.width = b._w + 'px';
+      a.style.height = b._h + 'px';
+      a.style.background = `hsl(${b.hue}, 45%, 42%)`;
+      a.title = b.title + (b.author ? ' — ' + b.author : '');
+      a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
+      shelf.appendChild(a);
+    }
+    container.appendChild(shelf);
+    const board = document.createElement('div');
+    board.className = 'shelf-board';
+    container.appendChild(board);
+  }
+}
+function toggleView() {
+  const grid = document.getElementById('grid-view');
+  const shelf = document.getElementById('shelf-view');
+  const btn = document.getElementById('view-toggle');
+  const showShelf = shelf.style.display === 'none';
+  grid.style.display = showShelf ? 'none' : 'grid';
+  shelf.style.display = showShelf ? 'block' : 'none';
+  btn.classList.toggle('on', showShelf);
+  if (showShelf) setTimeout(buildShelves, 50);
+  localStorage.setItem('athenaeum-shelf', showShelf ? '1' : '0');
+}
+if (localStorage.getItem('athenaeum-shelf') === '1') {
+  document.getElementById('grid-view').style.display = 'none';
+  document.getElementById('shelf-view').style.display = 'block';
+  document.getElementById('view-toggle').classList.add('on');
+  setTimeout(buildShelves, 50);
+}
 </script>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+.bookshelf {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 1rem .5rem .5rem;
+  min-height: 16rem;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.03) 100%);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.shelf-board {
+  height: .75rem;
+  background: linear-gradient(to bottom, #8b7355, #6d5a42);
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 4px 8px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.15);
+}
+@media (prefers-color-scheme: dark) {
+  .shelf-board {
+    background: linear-gradient(to bottom, #5a4a3a, #3d3228);
+    box-shadow: 0 4px 8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .bookshelf { background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.15) 100%); }
+}
+.book-spine {
+  flex: 0 0 auto;
+  border-radius: 3px 4px 4px 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: rgba(255,255,255,.9);
+  position: relative;
+  transition: transform .25s ease, box-shadow .25s ease;
+  box-shadow: inset -2px 0 4px rgba(0,0,0,.25), inset 2px 0 2px rgba(255,255,255,.1);
+  cursor: pointer;
+  overflow: hidden;
+}
+.book-spine::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to right, rgba(0,0,0,.2), transparent);
+}
+.book-spine:hover {
+  text-decoration: none;
+  transform: translateY(-1.5rem) rotate(-2deg);
+  box-shadow: inset -2px 0 4px rgba(0,0,0,.25), inset 2px 0 2px rgba(255,255,255,.1), 4px 6px 12px rgba(0,0,0,.25);
+  z-index: 1;
+}
+.spine-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: 700;
+  font-size: .7rem;
+  line-height: 1.2;
+  padding: .75rem .25rem;
+  height: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
 {% endblock %}

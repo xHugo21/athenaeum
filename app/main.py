@@ -118,11 +118,13 @@ def index(request: Request):
     }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")
     with db() as con:
         books = con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()
+        max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "books": books,
+            "max_pages": max_pages or 1,
             "sort": sort,
             "dir": d,
             "imported": request.query_params.get("imported"),
