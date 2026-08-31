@@ -437,7 +437,7 @@ def insert_annotation(con, book_id: int, a: dict):
     )
 
 
-COVERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "covers")
+COVERS_DIR = os.path.join(os.path.dirname(DB_PATH), "covers")
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 
