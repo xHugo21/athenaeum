@@ -80,9 +80,9 @@
     {% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int %}
     <div style="flex:0 0 auto;text-align:center;padding-top:.25rem">
       <svg width="88" height="88" viewBox="0 0 88 88">
-        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--border)" stroke-width="6" stroke-dasharray="203.8 35" stroke-dashoffset="-101.9" stroke-linecap="round"/>
-        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="{{ (pct / 100 * 203.8) | round(1) }} {{ (35 + (100 - pct) / 100 * 203.8) | round(1) }}" stroke-dashoffset="-101.9" stroke-linecap="round"/>
-        <text x="44" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" dominant-baseline="middle">{{ pct }}%</text>
+        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--border)" stroke-width="6" stroke-dasharray="203.8 35" stroke-linecap="round" transform="rotate(116 44 44)"/>
+        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="{{ (pct / 100 * 203.8) | round(1) }} {{ (35 + (100 - pct) / 100 * 203.8) | round(1) }}" stroke-linecap="round" transform="rotate(116 44 44)"/>
+        <text x="44" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" dominant-baseline="central">{{ pct }}%</text>
       </svg>
       <div class="muted" style="font-size:.75rem;margin-top:-.25rem">{{ b['pages_read'] }} / {{ b['total_pages'] }}</div>
     </div>
