@@ -9,6 +9,10 @@
 <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
   <h1 style="margin:0">Library</h1>
   <div style="display:flex;gap:.5rem">
+    <div class="view-toggle" id="view-toggle">
+      <span class="view-opt on" onclick="setView(false)" title="Grid view">🪟</span>
+      <span class="view-opt" onclick="setView(true)" title="Shelf view">📚</span>
+    </div>
     <button class="btn-ghost" onclick="panel('add-card', this)">+ Add book</button>
     <button class="btn-ghost" onclick="panel('import-card', this)">⬆ Import</button>
   </div>
@@ -76,7 +80,6 @@
       {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
     </a>
     {% endfor %}
-    <button class="btn-ghost" id="view-toggle" onclick="toggleView()" title="Toggle bookshelf view">Shelf Mode</button>
   </div>
 </div>
 
@@ -135,7 +138,7 @@ function buildShelves() {
   const shelves = [];
   let cur = [], curW = 0;
   for (const b of books) {
-    const px = Math.round(24 + Math.log(1 + b.pages) / Math.log(1 + maxPages) * 40);
+    const px = Math.round(24 + Math.sqrt(b.pages) / Math.sqrt(maxPages) * 40);
     b._w = px;
     b._h = 240 + Math.round(((b.id * 7 + b.pages * 3) % 60) - 30);
     if (cur.length && curW + GAP + px > usable) {
@@ -168,25 +171,56 @@ function buildShelves() {
     container.appendChild(board);
   }
 }
-function toggleView() {
+function setView(showShelf) {
   const grid = document.getElementById('grid-view');
   const shelf = document.getElementById('shelf-view');
-  const btn = document.getElementById('view-toggle');
-  const showShelf = shelf.style.display === 'none';
+  const opts = document.querySelectorAll('#view-toggle .view-opt');
   grid.style.display = showShelf ? 'none' : 'grid';
   shelf.style.display = showShelf ? 'block' : 'none';
-  btn.classList.toggle('on', showShelf);
+  opts[0].classList.toggle('on', !showShelf);
+  opts[1].classList.toggle('on', showShelf);
   if (showShelf) setTimeout(buildShelves, 50);
   localStorage.setItem('athenaeum-shelf', showShelf ? '1' : '0');
 }
 if (localStorage.getItem('athenaeum-shelf') === '1') {
   document.getElementById('grid-view').style.display = 'none';
   document.getElementById('shelf-view').style.display = 'block';
-  document.getElementById('view-toggle').classList.add('on');
+  document.querySelectorAll('#view-toggle .view-opt')[0].classList.remove('on');
+  document.querySelectorAll('#view-toggle .view-opt')[1].classList.add('on');
   setTimeout(buildShelves, 50);
 }
 </script>
 <style>
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  line-height: 1;
+  height: 2rem;
+}
+.view-opt {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: .9rem;
+  line-height: 1;
+  opacity: .45;
+  transition: opacity .15s, background .15s;
+  user-select: none;
+  border: none;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.view-opt:hover { opacity: .7; }
+.view-opt.on {
+  opacity: 1;
+  background: var(--accent-light);
+}
 @keyframes spin{to{transform:rotate(360deg)}}
 .bookshelf {
   display: flex;
