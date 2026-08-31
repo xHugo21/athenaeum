@@ -17,7 +17,8 @@
     </div>
   </div>
 
-  <div style="flex:1;min-width:14rem">
+  <div style="flex:1;min-width:14rem;display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem">
+    <div style="flex:1;min-width:0">
     <h1>{{ b['title'] }}</h1>
     <p class="muted" style="margin-bottom:1rem">
       {{ b['author'] or 'Unknown author' }}
@@ -43,23 +44,9 @@
       {% if b['rating'] %}<a href="#" onclick="var f=document.getElementById('rf');f.rating.value=0;f.submit();return false" class="muted" style="font-size:.75rem;margin-left:.4rem">clear</a>{% endif %}
     </form>
 
-    {% if b['total_seconds'] or b['pages_read'] or b['total_pages'] or agg and agg['n'] %}
+    {% if b['total_seconds'] or agg and agg['n'] %}
     <div class="card" style="margin-bottom:1rem">
       <div class="stat-grid">
-        {% if b['pages_read'] or b['total_pages'] %}
-        <div>
-          <div class="stat-label">Pages</div>
-          <div class="stat-value">{{ b['pages_read'] }}{% if b['total_pages'] %} / {{ b['total_pages'] }}{% endif %}</div>
-        </div>
-        {% endif %}
-        {% if b['total_pages'] and b['pages_read'] %}
-        <div style="display:flex;flex-direction:column;justify-content:center;gap:.25rem;min-width:8rem;flex:1">
-          <div class="stat-label">{{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%</div>
-          <div style="background:var(--border);border-radius:3px;height:.5rem;overflow:hidden">
-            <div class="bar" style="width:{{ ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int }}%"></div>
-          </div>
-        </div>
-        {% endif %}
         {% if b['total_seconds'] %}
         <div>
           <div class="stat-label">Time read</div>
@@ -86,6 +73,18 @@
         </div>
         {% endif %}
       </div>
+    </div>
+    {% endif %}
+    </div>
+    {% if b['total_pages'] and b['pages_read'] %}
+    {% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int %}
+    <div style="flex:0 0 auto;text-align:center;padding-top:.25rem">
+      <svg width="88" height="88" viewBox="0 0 88 88">
+        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--border)" stroke-width="6" stroke-dasharray="203.8 35" stroke-dashoffset="-101.9" stroke-linecap="round"/>
+        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="{{ (pct / 100 * 203.8) | round(1) }} {{ (35 + (100 - pct) / 100 * 203.8) | round(1) }}" stroke-dashoffset="-101.9" stroke-linecap="round"/>
+        <text x="44" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" dominant-baseline="middle">{{ pct }}%</text>
+      </svg>
+      <div class="muted" style="font-size:.75rem;margin-top:-.25rem">{{ b['pages_read'] }} / {{ b['total_pages'] }}</div>
     </div>
     {% endif %}
   </div>
