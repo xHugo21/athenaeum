@@ -122,6 +122,11 @@ def index(request: Request):
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
         max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
+    cover_ts = {}
+    for b in books:
+        p = os.path.join(COVERS_DIR, f"{b['id']}.jpg")
+        if os.path.exists(p):
+            cover_ts[b["id"]] = int(os.path.getmtime(p))
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -133,6 +138,7 @@ def index(request: Request):
             "imported": request.query_params.get("imported"),
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
+            "cover_ts": cover_ts,
         },
     )
 
@@ -206,7 +212,16 @@ def book_detail(request: Request, book_id: int):
             (book_id,),
         ).fetchall()
     return templates.TemplateResponse(
-        request, "book.html", {"b": book, "agg": agg, "best": best, "anns": anns}
+        request,
+        "book.html",
+        {
+            "b": book,
+            "agg": agg,
+            "best": best,
+            "anns": anns,
+            "custom_cover": os.path.exists(os.path.join(COVERS_DIR, f"{book_id}.jpg")),
+            "cover_ts": int(os.path.getmtime(os.path.join(COVERS_DIR, f"{book_id}.jpg"))) if os.path.exists(os.path.join(COVERS_DIR, f"{book_id}.jpg")) else 0,
+        },
     )
 
 
@@ -508,8 +523,19 @@ def cover_image(book_id: int):
             return RedirectResponse("/", 303)
     path = fetch_cover(book_id, book["isbn"])
     if path:
-        return FileResponse(path, media_type="image/jpeg")
-    return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml")
+        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/books/{book_id}/cover/remove")
+def remove_cover(book_id: int):
+    # ponytail: file existence = "has custom cover"; no DB column, the FS is the source of truth
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    if os.path.exists(path):
+        os.remove(path)
+    if not os.path.exists(NO_COVER_FLAG):
+        open(NO_COVER_FLAG, "a").close()
+    return RedirectResponse(f"/books/{book_id}", 303)
 
 
 @app.post("/books/{book_id}/cover")

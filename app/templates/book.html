@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ b['title'] }} · athenaeum{% endblock %}
 {% block content %}
-{% set cover_url = "/covers/" ~ b['id'] ~ ".jpg" %}
+{% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
 
 <div style="display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:2rem">
   <div style="flex:0 0 auto;width:14.7rem">
-    <div class="cover" style="border-radius:var(--radius);box-shadow:var(--shadow-md);position:relative" onmouseenter="this.querySelector('.cover-upload').style.opacity=1" onmouseleave="this.querySelector('.cover-upload').style.opacity=0">
+    <div class="cover" style="border-radius:var(--radius);box-shadow:var(--shadow-md);position:relative" onmouseenter="this.querySelectorAll('.cover-upload').forEach(e=>e.style.opacity=1)" onmouseleave="this.querySelectorAll('.cover-upload').forEach(e=>e.style.opacity=0)">
       <div style="padding:1.25rem;text-align:center">
         <div style="font-family:'Merriweather',Georgia,serif;font-weight:700;font-size:1.05rem;line-height:1.4;color:var(--text)">{{ b['title'] }}</div>
         <div style="font-size:.85rem;margin-top:.4rem">{{ b['author'] or '' }}</div>
@@ -18,6 +18,11 @@
           <input type="file" name="cover" accept="image/*" hidden onchange="this.form.submit()">
         </label>
       </form>
+      {% if custom_cover %}
+      <form method="post" action="/books/{{ b['id'] }}/cover/remove" class="cover-upload" style="position:absolute;top:.4rem;right:.4rem;z-index:2;opacity:0;transition:opacity .2s">
+        <button type="submit" onclick="return confirm('Remove custom cover?')" title="Remove custom cover" style="padding:0;background:none;color:#fff;font-size:1.1rem;border:0;cursor:pointer;line-height:1;text-shadow:0 0 4px rgba(0,0,0,.8),0 1px 2px rgba(0,0,0,.6)">✕</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 

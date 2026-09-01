@@ -94,7 +94,7 @@
           <div style="font-weight:600;font-size:.85rem;line-height:1.25">{{ b['title'] }}</div>
           <div class="muted" style="font-size:.72rem;margin-top:.25rem">{{ b['author'] or '' }}</div>
         </div>
-        <img src="/covers/{{ b['id'] }}.jpg" alt="{{ b['title'] }}" loading="lazy"
+        <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="{{ b['title'] }}" loading="lazy"
              onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
       </div>
       <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
