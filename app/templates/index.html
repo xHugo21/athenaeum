@@ -125,14 +125,15 @@ function panel(id, btn) {
   }
 }
 function buildShelves() {
+  const SPINES = ['62% .13 42', '55% .14 38', '48% .13 34', '58% .11 55', '50% .10 50', '43% .09 40'];
   const books = JSON.parse(document.getElementById('book-data').textContent);
   if (!books.length) return;
   const maxPages = Math.max(...books.map(b => b.pages)) || 1;
   const container = document.getElementById('shelves');
-  const W = Math.min(window.innerWidth - 40, 960);
-  const GAP = 4;
-  const PAD = 16;
-  const usable = W - PAD * 2;
+  const GAP = 3;
+  const PAD = 4;
+  const usable = container.clientWidth - PAD * 2;
+  if (usable <= 0) return;
   const shelves = [];
   let cur = [], curW = 0;
   for (const b of books) {
@@ -158,23 +159,27 @@ function buildShelves() {
       a.className = 'book-spine';
       a.style.width = b._w + 'px';
       a.style.height = b._h + 'px';
-      const lum = 42 + (b.id * 11) % 14;
-      a.style.background = `hsl(${b.hue}, 38%, ${lum}%)`;
-      a.style.color = `hsl(${b.hue}, 50%, 92%)`;
-      a.style.setProperty('--spine-stripe', `hsl(${b.hue}, 45%, 28%)`);
-      if (b.id % 20 === 0) {
-        a.style.background = 'var(--accent-light)';
-        a.style.color = 'var(--accent)';
-        a.style.setProperty('--spine-stripe', 'var(--accent)');
-      }
+      a.style.setProperty('--shade', SPINES[b.hue % SPINES.length]);
+      a.dataset.label = b.title + (b.author ? ' — ' + b.author : '');
       a.title = b.title + (b.author ? ' — ' + b.author : '');
       a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
       shelf.appendChild(a);
     }
-    container.appendChild(shelf);
+    const group = document.createElement('div');
+    group.className = 'shelf-group';
+    group.appendChild(shelf);
     const board = document.createElement('div');
     board.className = 'shelf-board';
-    container.appendChild(board);
+    group.appendChild(board);
+    const caption = document.createElement('div');
+    caption.className = 'shelf-caption';
+    group.appendChild(caption);
+    shelf.addEventListener('mouseover', e => {
+      const s = e.target.closest('.book-spine');
+      if (s) caption.textContent = s.dataset.label;
+    });
+    shelf.addEventListener('mouseleave', () => caption.textContent = '');
+    container.appendChild(group);
   }
 }
 function setView(showShelf) {
@@ -231,56 +236,44 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
 .bookshelf {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
-  padding: 1rem .5rem .5rem;
+  gap: 3px;
+  padding: 1.5rem .25rem 0;
   min-height: 16rem;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.03) 100%);
-  border-radius: var(--radius) var(--radius) 0 0;
 }
 .shelf-board {
-  height: .5rem;
+  height: 2px;
   background: var(--border);
-  border-radius: 0 0 var(--radius) var(--radius);
 }
-@media (prefers-color-scheme: dark) {
-  .shelf-board { background: var(--border); }
-  .bookshelf { background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.15) 100%); }
+.shelf-caption {
+  min-height: 1.9rem;
+  padding-top: .5rem;
+  font-size: .8rem;
+  line-height: 1.4;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shelf-group {
+  margin-bottom: 1.25rem;
 }
 .book-spine {
   flex: 0 0 auto;
-  border-radius: var(--radius-sm) 2px 2px var(--radius-sm);
+  background: oklch(var(--shade));
+  color: oklch(94% .02 60);
+  border-radius: 2px 2px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
   position: relative;
-  transition: transform .2s ease, box-shadow .2s ease;
-  box-shadow: inset 3px 0 1px rgba(0,0,0,.08);
-  background-image: linear-gradient(to bottom, rgba(0,0,0,.06), transparent 15%, transparent 85%, rgba(0,0,0,.06));
+  transition: transform .15s ease;
   cursor: pointer;
   overflow: hidden;
 }
-.book-spine::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0,0,0,.1);
-}
-.book-spine::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: 4px;
-  background: var(--spine-stripe, rgba(0,0,0,.2));
-  border-radius: var(--radius-sm) 2px 0 0;
-}
 .book-spine:hover {
   text-decoration: none;
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: inset 3px 0 1px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.1);
+  transform: translateY(-4px);
   z-index: 1;
 }
 .spine-text {

@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 import time
+import zlib
 from datetime import date, timedelta
 
 import httpx
@@ -119,7 +120,7 @@ def index(request: Request):
     with db() as con:
         books = [dict(r) for r in con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()]
         for b in books:
-            b["hue"] = abs(hash(b["title"])) % 360
+            b["hue"] = zlib.crc32(b["title"].encode()) % 360
         max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
     return templates.TemplateResponse(
         request,
