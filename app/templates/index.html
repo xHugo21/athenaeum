@@ -72,14 +72,22 @@
 </div>
 
 <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem">
-  <h2 style="margin:0">Books ({{ books | length }})</h2>
-  <div class="muted" style="display:flex;gap:.75rem;align-items:baseline">
-    {% for key, label in [('recent', 'Recent'), ('title', 'Title'), ('rating', 'Rating')] %}
-    <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}"
-       style="color:{{ 'var(--accent)' if sort == key else 'var(--muted)' }};font-weight:{{ 600 if sort == key else 400 }};text-decoration:none">
-      {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
-    </a>
-    {% endfor %}
+  <h2 id="book-count" style="margin:0">Books ({{ books | length }})</h2>
+  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+    <div class="search">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+      </svg>
+      <input type="search" id="q" placeholder="Search" autocomplete="off" aria-label="Filter books">
+    </div>
+    <div class="muted" style="display:flex;gap:.75rem;align-items:baseline">
+      {% for key, label in [('recent', 'Recent'), ('title', 'Title'), ('rating', 'Rating')] %}
+      <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}"
+         style="color:{{ 'var(--accent)' if sort == key else 'var(--muted)' }};font-weight:{{ 600 if sort == key else 400 }};text-decoration:none">
+        {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
+      </a>
+      {% endfor %}
+    </div>
   </div>
 </div>
 
@@ -190,8 +198,43 @@ function setView(showShelf) {
   shelf.style.display = showShelf ? 'block' : 'none';
   opts[0].classList.toggle('on', !showShelf);
   opts[1].classList.toggle('on', showShelf);
-  if (showShelf) setTimeout(buildShelves, 50);
+  if (showShelf) setTimeout(() => { buildShelves(); applyFilter(); }, 50);
   localStorage.setItem('athenaeum-shelf', showShelf ? '1' : '0');
+}
+function applyFilter() {
+  const q = (document.getElementById('q').value || '').trim().toLowerCase();
+  const books = JSON.parse(document.getElementById('book-data').textContent);
+  const matches = new Set();
+  for (const b of books) {
+    if (!q || b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q)) {
+      matches.add(b.id);
+    }
+  }
+  document.querySelectorAll('#grid-view > a').forEach((a, i) => {
+    const id = books[i] && books[i].id;
+    a.style.display = matches.has(id) ? '' : 'none';
+  });
+  document.querySelectorAll('#shelves .book-spine').forEach(s => {
+    const id = +s.href.split('/').pop();
+    s.classList.toggle('hidden', !matches.has(id));
+  });
+  document.querySelectorAll('#shelves .shelf-group').forEach(g => {
+    g.style.display = g.querySelector('.book-spine:not(.hidden)') ? '' : 'none';
+  });
+  const h2 = document.getElementById('book-count');
+  if (h2) {
+    const base = '{{ books | length }}';
+    h2.textContent = q ? `Books (${matches.size} of ${base})` : `Books (${base})`;
+  }
+  localStorage.setItem('athenaeum-q', q);
+}
+document.getElementById('q').addEventListener('input', applyFilter);
+const savedQ = localStorage.getItem('athenaeum-q');
+if (savedQ) { document.getElementById('q').value = savedQ; }
+if (document.getElementById('shelf-view').style.display === 'block') {
+  setTimeout(() => { buildShelves(); applyFilter(); }, 50);
+} else {
+  applyFilter();
 }
 if (localStorage.getItem('athenaeum-shelf') === '1') {
   document.getElementById('grid-view').style.display = 'none';
@@ -210,6 +253,57 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   line-height: 1;
   height: 2rem;
 }
+.search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: border-color .15s, box-shadow .15s;
+}
+.search:hover { border-color: var(--muted); }
+.search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.search-icon {
+  flex: 0 0 auto;
+  margin-left: .65rem;
+  margin-right: .35rem;
+  color: var(--muted);
+  transition: color .15s;
+}
+.search:focus-within .search-icon { color: var(--accent); }
+.search input {
+  border: 0 !important;
+  background: transparent !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  padding: 0 .65rem 0 0 !important;
+  width: 10rem;
+  font-size: .85rem;
+  height: 100%;
+  border-radius: 0 !important;
+  color: var(--text);
+}
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: .35rem;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 3l6 6M9 3l-6 6' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>");
+  background-size: 8px 8px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.search input::-webkit-search-cancel-button:hover { background-color: var(--muted); }
 .view-opt {
   width: 2rem;
   height: 2rem;
@@ -276,6 +370,7 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   transform: translateY(-4px);
   z-index: 1;
 }
+.book-spine.hidden { display: none; }
 .spine-text {
   writing-mode: vertical-rl;
   text-orientation: mixed;
