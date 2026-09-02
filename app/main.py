@@ -93,12 +93,6 @@ CREATE TABLE IF NOT EXISTS annotations (
 def init():
     with db() as con:
         con.executescript(SCHEMA)
-        cols = {r[1] for r in con.execute("PRAGMA table_info(books)")}
-        if "cover_failed" not in cols:
-            con.execute("ALTER TABLE books ADD COLUMN cover_failed INTEGER NOT NULL DEFAULT 0")
-            flag = os.path.join(COVERS_DIR, ".nofCover")
-            if os.path.exists(flag):
-                os.remove(flag)
 
 
 def find_book(con, title: str, author: str | None, md5: str | None = None):
