@@ -157,7 +157,7 @@
 <nav>
   <a href="/" {% if path == '/' or path.startswith('/books/') %}class="active"{% endif %}>📚 athenaeum</a>
   <a href="/stats" {% if path.startswith('/stats') %}class="active"{% endif %}>stats</a>
-  <a href="/db/download" download>backup</a>
+  
 </nav>
 {% block content %}{% endblock %}
 </body>
