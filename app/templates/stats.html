@@ -60,10 +60,16 @@
 
 <div class="card">
   <h2 style="margin-top:0">Most time per book</h2>
-  <table>
+  {% set top_secs = top[0]['total_seconds'] if top else 0 %}
+  <table class="ranked">
     {% for b in top %}
+    {% set pct = ((b['total_seconds'] or 0) / top_secs * 100) if top_secs else 0 %}
     <tr>
-      <td><a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}</td>
+      <td class="rank">{{ loop.index }}</td>
+      <td>
+        <div class="rank-bar"><span style="width:{{ pct | round(0) | int }}%"></span></div>
+        <a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}
+      </td>
       <td style="text-align:right">{{ b['total_seconds'] | hours }}</td>
     </tr>
     {% endfor %}
@@ -74,5 +80,9 @@
 .day-cell{position:relative}
 .day-cell::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
 .day-cell:hover::after{opacity:1}
+table.ranked td { padding: .45rem .6rem; vertical-align: middle; }
+table.ranked td.rank { width: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; }
+.rank-bar { display: inline-block; width: 4rem; height: .4rem; background: var(--border); border-radius: 2px; vertical-align: middle; margin-right: .6rem; }
+.rank-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
 </style>
 {% endblock %}

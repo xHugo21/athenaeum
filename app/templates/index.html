@@ -61,7 +61,7 @@
         <span>☆☆☆☆☆</span><span class="fill" id="rate-fill" style="width:0">★★★★★</span>
         {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="document.getElementById('rate-val').value=this.dataset.v;document.getElementById('rate-fill').style.width=(this.dataset.v*20)+'%'" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
       </span>
-      <a href="#" class="muted" style="font-size:.75rem;margin-left:.4rem" onclick="document.getElementById('rate-val').value=0;document.getElementById('rate-fill').style.width=0;return false">clear</a>
+      <button type="button" class="muted" style="background:none;border:0;padding:0;margin-left:.4rem;font-size:.75rem;color:var(--muted);cursor:pointer" onclick="document.getElementById('rate-val').value=0;document.getElementById('rate-fill').style.width=0">clear</button>
     </div>
     <div class="form-group" style="margin-bottom:1rem">
       <label>Review</label>
