@@ -96,7 +96,7 @@ def init():
 
 def find_book(con, title: str, author: str | None, md5: str | None = None):
     if md5:
-        r = con.execute("SELECT id FROM books WHERE md5=?", (md5,)).fetchone()
+        r = con.execute("SELECT id, title, author, md5 FROM books WHERE md5=?", (md5,)).fetchone()
         if r:
             return r
     key = norm(title) + "|" + norm(author or "")
@@ -408,8 +408,8 @@ def import_koreader(file: UploadFile):
             if row:
                 bid = row["id"]
                 con.execute(
-                    "UPDATE books SET md5=?, total_seconds=?, pages_read=?, total_pages=coalesce(?,total_pages), last_read_at=coalesce(?,last_read_at) WHERE id=?",
-                    (s.md5, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, bid),
+                    "UPDATE books SET md5=?, title=?, author=coalesce(?,author), total_seconds=?, pages_read=?, total_pages=coalesce(?,total_pages), last_read_at=coalesce(?,last_read_at) WHERE id=?",
+                    (s.md5, s.title, s.author, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, bid),
                 )
             else:
                 created += 1

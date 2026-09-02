@@ -72,6 +72,38 @@ def test_import_and_reimport(tmp_path, monkeypatch):
         assert (rating, review) == (4.5, "nice"), "re-import must keep rating/review; 4.7 snaps to 4.5"
 
 
+def test_file_reimport_propagates_title_on_md5_match(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    md5 = "a" * 32
+
+    def koreader_with(title: str) -> bytes:
+        con = sqlite3.connect(":memory:")
+        con.executescript(
+            f"""
+            CREATE TABLE book (id INTEGER PRIMARY KEY, title TEXT, authors TEXT, pages INTEGER,
+                total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER, md5 TEXT);
+            CREATE TABLE page_stat_data (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER, total_pages INTEGER DEFAULT 0);
+            INSERT INTO book VALUES (1, '{title}', 'J.R.R. Tolkien', 300, 180, 2, 1700086400, '{md5}');
+            INSERT INTO page_stat_data VALUES (1, 1, 1700000000, 60, 300);
+            """
+        )
+        return bytes(con.serialize())
+
+    with TestClient(app) as client:
+        r = client.post("/import", files={"file": ("statistics.sqlite3", koreader_with("  The  Hobbit  "), "application/octet-stream")}, follow_redirects=False)
+        assert r.status_code == 303
+
+        r = client.post("/import", files={"file": ("statistics.sqlite3", koreader_with("The Hobbit, or There and Back Again"), "application/octet-stream")}, follow_redirects=False)
+        assert r.status_code == 303
+        assert "imported=0" in r.headers["location"], "same md5 = same book, no new row"
+
+    with sqlite3.connect("athenaeum.db") as c:
+        (n,) = c.execute("SELECT COUNT(*) FROM books").fetchone()
+        assert n == 1
+        (title,) = c.execute("SELECT title FROM books").fetchone()
+        assert title == "The Hobbit, or There and Back Again", "md5 match must propagate corrected title"
+
+
 def test_manual_add_with_isbn(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     from app import main
