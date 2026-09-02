@@ -28,19 +28,31 @@
 
   <div style="flex:1;min-width:14rem;display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem">
     <div style="flex:1;min-width:0">
-    <h1>{{ b['title'] }}</h1>
-    <p class="muted" style="margin-bottom:1rem">
-      {{ b['author'] or 'Unknown author' }}
-      {% if b['isbn'] %}
-      · <span style="white-space:nowrap"><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a> <a href="#" title="Edit ISBN" onclick="document.getElementById('ibf').hidden=false;this.hidden=true;return false" style="color:var(--muted);text-decoration:none">✎</a></span>
-      {% else %}
-      · <a href="#" class="muted" style="font-size:.8rem;text-decoration:underline dotted" onclick="document.getElementById('ibf').hidden=false;return false">Add ISBN</a>
-      {% endif %}
-    </p>
+    <div id="hdr-view">
+      <h1>{{ b['title'] }}</h1>
+      <p class="muted" style="margin-bottom:1rem">
+        {{ b['author'] or 'Unknown author' }}
+        {% if b['isbn'] %}
+        · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a>
+        {% endif %}
+        · <a href="#" onclick="var v=document.getElementById('hdr-view'),e=document.getElementById('hdr-edit');v.hidden=true;e.hidden=false;return false">Edit</a>
+      </p>
+    </div>
 
-    <form id="ibf" method="post" action="/books/{{ b['id'] }}/isbn" hidden style="margin:-.75rem 0 .75rem">
-      <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721" style="width:11rem">
-      <button>Save</button>
+    <form id="hdr-edit" method="post" action="/books/{{ b['id'] }}/edit" hidden style="margin-bottom:1rem">
+      <div style="display:grid;gap:.4rem;max-width:32rem">
+        <label>Title <input name="title" value="{{ b['title'] }}" required></label>
+        <label>Author <input name="author" value="{{ b['author'] or '' }}"></label>
+        <label>ISBN <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721"></label>
+        <div style="display:flex;gap:.5rem">
+          <label style="flex:1">Pages read <input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
+          <label style="flex:1">Total pages <input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
+        </div>
+        <div>
+          <button>Save</button>
+          <button type="button" onclick="var v=document.getElementById('hdr-view'),e=document.getElementById('hdr-edit');e.hidden=true;v.hidden=false;return false">Cancel</button>
+        </div>
+      </div>
     </form>
 
     <form id="rf" method="post" action="/books/{{ b['id'] }}/rate" style="margin-bottom:.75rem">

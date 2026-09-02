@@ -266,25 +266,38 @@ def rate_book(book_id: int, rating: float = Form(0), review: str = Form("")):
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
-@app.post("/books/{book_id}/isbn")
-def set_isbn(book_id: int, isbn: str = Form(...)):
+@app.post("/books/{book_id}/edit")
+def edit_book(
+    book_id: int,
+    title: str = Form(...),
+    author: str = Form(""),
+    isbn: str = Form(""),
+    pages_read: int = Form(0),
+    total_pages: int = Form(0),
+):
     isbn = re.sub(r"[^0-9Xx]", "", isbn)
-    if isbn and os.path.exists(NO_COVER_FLAG):
-        os.remove(NO_COVER_FLAG)
     with db() as con:
+        row = con.execute("SELECT isbn, total_seconds FROM books WHERE id=?", (book_id,)).fetchone()
+        if not row:
+            return RedirectResponse("/", 303)
+        meta = fetch_metadata(isbn) if isbn and not row["isbn"] else {}
+        new_total = total_pages or meta.get("pages")
+        new_read = pages_read
+        if new_total and not row["total_seconds"] and not pages_read:
+            new_read = new_total
         con.execute(
-            "UPDATE books SET isbn=? WHERE id=?",
-            (isbn or None, book_id),
+            "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=? WHERE id=?",
+            (
+                title.strip() or None,
+                author.strip() or None,
+                isbn or None,
+                max(0, new_read),
+                new_total,
+                book_id,
+            ),
         )
-        meta = fetch_metadata(isbn) if isbn else {}
-        con.execute(
-            "UPDATE books SET total_pages=coalesce(total_pages,?), title=coalesce(title,?), author=coalesce(author,?) WHERE id=?",
-            (meta.get("pages"), meta.get("title"), meta.get("author"), book_id),
-        )
-        con.execute(
-            "UPDATE books SET pages_read=total_pages WHERE id=? AND pages_read=0 AND total_seconds=0 AND total_pages IS NOT NULL",
-            (book_id,),
-        )
+    if isbn and not row["isbn"] and os.path.exists(NO_COVER_FLAG):
+        os.remove(NO_COVER_FLAG)
     return RedirectResponse(f"/books/{book_id}", 303)
 
 

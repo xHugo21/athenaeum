@@ -121,7 +121,7 @@ def test_set_isbn_fills_pages_for_manual_add(tmp_path, monkeypatch):
     monkeypatch.setattr(main.httpx, "get", lambda *a, **k: FakeResp())
     with TestClient(app) as client:
         client.post("/books", data={"title": "Manual Book", "pages": ""}, follow_redirects=False)
-        r = client.post("/books/1/isbn", data={"isbn": "9780140328721"}, follow_redirects=False)
+        r = client.post("/books/1/edit", data={"title": "Manual Book", "isbn": "9780140328721"}, follow_redirects=False)
         assert r.status_code == 303
     with sqlite3.connect("athenaeum.db") as c:
         (total, read) = c.execute("SELECT total_pages, pages_read FROM books WHERE id=1").fetchone()
