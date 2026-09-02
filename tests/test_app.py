@@ -203,3 +203,36 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
     with TestClient(app) as client:
         r = client.get("/books/1")
         assert "Call me Ishmael" in r.text
+
+
+def test_highlights_export(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "1984", "author": "Orwell"}, follow_redirects=False)
+        con = sqlite3.connect("athenaeum.db")
+        con.execute(
+            "INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (1, "2024-01-01 10:00:00", "5", "highlight", "It was a bright cold day in April.", None, "Chapter 1", 5, 200, "#ff0000"),
+        )
+        con.execute(
+            "INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (1, "2024-01-01 11:00:00", "12", "note", "The clocks were striking thirteen.", "Surreal.", "Chapter 2", 12, 200, None),
+        )
+        con.execute(
+            "INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (1, "2024-01-02 09:00:00", "42", "bookmark", None, None, None, 42, 200, None),
+        )
+        con.commit()
+        con.close()
+        r = client.get("/books/1/highlights.md")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/markdown")
+        assert 'filename="1984-highlights.md"' in r.headers["content-disposition"]
+        body = r.text
+        assert "# 1984" in body and "*Orwell*" in body
+        assert "> It was a bright cold day in April." in body
+        assert "*— Chapter 1 — p. 5*" in body
+        assert "> The clocks were striking thirteen." in body
+        assert "**Note:** Surreal." in body
+        assert "Bookmarks" not in body
+        assert "p. 42" not in body

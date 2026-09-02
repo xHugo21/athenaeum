@@ -437,6 +437,46 @@ def import_koreader(file: UploadFile):
     return RedirectResponse(f"/?imported={created}", 303)
 
 
+@app.get("/books/{book_id}/highlights.md")
+def download_highlights(book_id: int):
+    with db() as con:
+        book = con.execute("SELECT title, author FROM books WHERE id=?", (book_id,)).fetchone()
+        if not book:
+            return RedirectResponse("/", 303)
+        anns = con.execute(
+            "SELECT * FROM annotations WHERE book_id=? ORDER BY pageno, datetime",
+            (book_id,),
+        ).fetchall()
+    out = [f"# {book['title']}", ""]
+    if book["author"]:
+        out.append(f"*{book['author']}*")
+        out.append("")
+    for a in anns:
+        if a["type"] == "bookmark":
+            continue
+        meta_bits = []
+        if a["chapter"]:
+            meta_bits.append(a["chapter"])
+        meta_bits.append(f"p. {a['pageno'] or '?'}")
+        meta = " — ".join(meta_bits)
+        for line in (a["text"] or "").splitlines() or [""]:
+            out.append(f"> {line}")
+        out.append(f">")
+        out.append(f"> *— {meta}*")
+        if a["note"]:
+            out.append(">")
+            for line in a["note"].splitlines():
+                out.append(f"> **Note:** {line}" if line == a["note"].splitlines()[0] else f"> {line}")
+        out.append("")
+    body = "\n".join(out).rstrip() + "\n"
+    fname = re.sub(r"[^A-Za-z0-9._-]+", "_", book["title"]).strip("_") or "highlights"
+    return Response(
+        body.encode(),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}-highlights.md"'},
+    )
+
+
 def ann_type(a: dict) -> str:
     if not a.get("drawer") and not a.get("color") and not a.get("pos0") and not a.get("pos1"):
         return "bookmark"
