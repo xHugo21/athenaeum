@@ -1,3 +1,4 @@
+import os
 import sqlite3
 
 from app.koreader import parse_koreader
@@ -235,6 +236,42 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
     with TestClient(app) as client:
         r = client.get("/books/1")
         assert "Call me Ishmael" in r.text
+
+
+def test_old_db_migration_with_nofcover_flag(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    con = sqlite3.connect("athenaeum.db")
+    con.executescript(
+        """
+        CREATE TABLE books (
+            id INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT, isbn TEXT, md5 TEXT,
+            total_seconds INTEGER NOT NULL DEFAULT 0, pages_read INTEGER NOT NULL DEFAULT 0,
+            total_pages INTEGER, last_read_at INTEGER, rating REAL, review TEXT,
+            added_at INTEGER NOT NULL);
+        INSERT INTO books (title, isbn, added_at) VALUES ('Old Book', '9780140328721', 0);
+        """
+    )
+    con.commit()
+    con.close()
+    os.makedirs("covers")
+    open("covers/.nofCover", "a").close()
+
+    from app import main
+
+    with TestClient(main.app) as client:
+        cols = {r[1] for r in sqlite3.connect("athenaeum.db").execute("PRAGMA table_info(books)")}
+        assert "cover_failed" in cols, "migration must add cover_failed to existing DBs"
+        assert not os.path.exists("covers/.nofCover"), "global flag file must be removed"
+        (failed,) = sqlite3.connect("athenaeum.db").execute("SELECT cover_failed FROM books WHERE id=1").fetchone()
+        assert failed == 0
+
+        class FakeResp:
+            status_code = 200
+            content = b"x" * 2000
+
+        monkeypatch.setattr(main.httpx, "get", lambda *a, **k: FakeResp())
+        r = client.get("/covers/1.jpg")
+        assert r.status_code == 200, "old book must still get its cover fetched"
 
 
 def test_highlights_export(tmp_path, monkeypatch):

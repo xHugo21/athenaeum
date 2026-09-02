@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS books (
     last_read_at INTEGER,
     rating REAL,
     review TEXT,
+    cover_failed INTEGER NOT NULL DEFAULT 0,
     added_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
@@ -92,6 +93,12 @@ CREATE TABLE IF NOT EXISTS annotations (
 def init():
     with db() as con:
         con.executescript(SCHEMA)
+        cols = {r[1] for r in con.execute("PRAGMA table_info(books)")}
+        if "cover_failed" not in cols:
+            con.execute("ALTER TABLE books ADD COLUMN cover_failed INTEGER NOT NULL DEFAULT 0")
+            flag = os.path.join(COVERS_DIR, ".nofCover")
+            if os.path.exists(flag):
+                os.remove(flag)
 
 
 def find_book(con, title: str, author: str | None, md5: str | None = None):
@@ -285,6 +292,8 @@ def edit_book(
         new_read = pages_read
         if new_total and not row["total_seconds"] and not pages_read:
             new_read = new_total
+        if isbn and isbn != row["isbn"]:
+            con.execute("UPDATE books SET cover_failed=0 WHERE id=?", (book_id,))
         con.execute(
             "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=? WHERE id=?",
             (
@@ -296,8 +305,6 @@ def edit_book(
                 book_id,
             ),
         )
-    if isbn and not row["isbn"] and os.path.exists(NO_COVER_FLAG):
-        os.remove(NO_COVER_FLAG)
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -510,14 +517,11 @@ COVERS_DIR = os.path.join(os.path.dirname(DB_PATH), "covers")
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 
-NO_COVER_FLAG = os.path.join(COVERS_DIR, ".nofCover")
-
-
-def fetch_cover(book_id: int, isbn: str) -> str | None:
+def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     if os.path.exists(path):
         return path
-    if not isbn or os.path.exists(NO_COVER_FLAG):
+    if not isbn or failed:
         return None
     try:
         r = httpx.get(
@@ -531,7 +535,8 @@ def fetch_cover(book_id: int, isbn: str) -> str | None:
             return path
     except httpx.HTTPError:
         pass
-    open(NO_COVER_FLAG, "a").close()
+    with db() as con:
+        con.execute("UPDATE books SET cover_failed=1 WHERE id=?", (book_id,))
     return None
 
 
@@ -571,10 +576,10 @@ def placeholder_svg(title: str, author: str) -> bytes:
 @app.get("/covers/{book_id}.jpg")
 def cover_image(book_id: int):
     with db() as con:
-        book = con.execute("SELECT title, author, isbn FROM books WHERE id=?", (book_id,)).fetchone()
+        book = con.execute("SELECT title, author, isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
         if not book:
             return RedirectResponse("/", 303)
-    path = fetch_cover(book_id, book["isbn"])
+    path = fetch_cover(book_id, book["isbn"], book["cover_failed"])
     if path:
         return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
     return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
@@ -586,8 +591,8 @@ def remove_cover(book_id: int):
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     if os.path.exists(path):
         os.remove(path)
-    if not os.path.exists(NO_COVER_FLAG):
-        open(NO_COVER_FLAG, "a").close()
+    with db() as con:
+        con.execute("UPDATE books SET cover_failed=1 WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -601,8 +606,6 @@ async def upload_cover(book_id: int, cover: UploadFile):
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     with open(path, "wb") as f:
         f.write(data)
-    if os.path.exists(NO_COVER_FLAG):
-        os.remove(NO_COVER_FLAG)
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
