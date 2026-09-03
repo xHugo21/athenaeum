@@ -95,21 +95,19 @@
 {% if books %}
 <div id="grid-view" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:1rem">
   {% for b in books %}
-  <a href="/books/{{ b['id'] }}" style="text-decoration:none;color:inherit">
-    <div class="card card-hover" style="padding:.75rem;text-align:center">
-      <div class="cover" style="margin-bottom:.6rem;--ph:hsl {{ (b['title'] | length * 47) % 360 }},35%,88%;--ph-fg:hsl {{ (b['title'] | length * 47) % 360 }},45%,30%">
-        <div class="cover-fallback">
-          <div class="cover-initial">{{ b['title'][:1] | upper }}</div>
-          <div style="font-weight:600;font-size:.85rem;line-height:1.25">{{ b['title'] }}</div>
-          <div class="muted" style="font-size:.72rem;margin-top:.25rem">{{ b['author'] or '' }}</div>
-        </div>
-        <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="{{ b['title'] }}" loading="lazy"
-             onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
+  <a href="/books/{{ b['id'] }}" class="grid-item" style="text-decoration:none;color:inherit">
+    <div class="cover" style="--ph:hsl {{ (b['title'] | length * 47) % 360 }},35%,88%;--ph-fg:hsl {{ (b['title'] | length * 47) % 360 }},45%,30%">
+      <div class="cover-fallback">
+        <div class="cover-initial">{{ b['title'][:1] | upper }}</div>
+        <div style="font-weight:600;font-size:.85rem;line-height:1.25">{{ b['title'] }}</div>
+        <div class="muted" style="font-size:.72rem;margin-top:.25rem">{{ b['author'] or '' }}</div>
       </div>
-      <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
-      {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
-      <div class="muted" style="margin-top:.2rem;font-size:.75rem"><span style="{{ 'color:var(--accent);font-weight:600' if pct and pct >= 90 }}">{{ pct ~ '%' if pct is not none else '—' }}</span>{% if b['total_seconds'] %} / {{ b['total_seconds'] | read_hm }}{% endif %}</div>
+      <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="{{ b['title'] }}" loading="lazy"
+           onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
     </div>
+    <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
+    {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
+    <div class="muted" style="margin-top:.2rem;font-size:.75rem"><span style="{{ 'color:var(--accent);font-weight:600' if pct and pct >= 90 }}">{{ pct ~ '%' if pct is not none else '—' }}</span>{% if b['total_seconds'] %} / {{ b['total_seconds'] | read_hm }}{% endif %}</div>
   </a>
   {% endfor %}
 </div>
@@ -246,6 +244,20 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
 }
 </script>
 <style>
+.grid-item {
+  display: block;
+  text-align: center;
+  transition: transform .15s ease;
+}
+.grid-item:hover { text-decoration: none; }
+.grid-item:hover .cover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+.grid-item .cover {
+  margin-bottom: .6rem;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
 .view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
