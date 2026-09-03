@@ -3,6 +3,7 @@ import re
 import sqlite3
 import time
 import zlib
+from contextlib import asynccontextmanager
 from datetime import date, timedelta
 
 import httpx
@@ -26,8 +27,6 @@ templates.env.filters["ts_date"] = ts_date
 templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
 templates.env.filters["read_hm"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}min" if s >= 3600 else f"{s // 60}min"
 templates.env.filters["hours"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}m" if s >= 3600 else f"{s // 60}m"
-
-app = FastAPI(title="athenaeum")
 
 
 def db() -> sqlite3.Connection:
@@ -89,10 +88,13 @@ CREATE TABLE IF NOT EXISTS annotations (
 """
 
 
-@app.on_event("startup")
-def init():
+@asynccontextmanager
+async def lifespan(app):
     with db() as con:
         con.executescript(SCHEMA)
+    yield
+
+app = FastAPI(title="athenaeum", lifespan=lifespan)
 
 
 def find_book(con, title: str, author: str | None, md5: str | None = None):
@@ -313,8 +315,8 @@ def delete_book(book_id: int):
 def download_db():
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-        with sqlite3.connect(DB_PATH) as src, sqlite3.connect(tmp.name) as dst:
-            src.backup(dst)
+        with sqlite3.connect(DB_PATH) as con:
+            con.execute(f"VACUUM INTO '{tmp.name}'")
         data = open(tmp.name, "rb").read()
     return Response(
         data,
