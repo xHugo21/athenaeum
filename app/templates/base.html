@@ -1,5 +1,9 @@
 <!doctype html>
 <html lang="en">
+<script>
+  const t = localStorage.getItem('athenaeum-theme');
+  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --bg: #f8f7f4;
     --surface: #ffffff;
     --text: #1a1a1a;
@@ -25,7 +29,8 @@
     --radius-sm: 6px;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #1a1a1a;
       --surface: #252525;
       --text: #e8e8e8;
@@ -38,6 +43,20 @@
       --shadow: 0 1px 3px rgba(0,0,0,.2);
       --shadow-md: 0 4px 12px rgba(0,0,0,.3);
     }
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #1a1a1a;
+    --surface: #252525;
+    --text: #e8e8e8;
+    --muted: #999;
+    --accent: #ff7f50;
+    --accent-light: #3d2018;
+    --border: #3a3a3a;
+    --ok-bg: #1e3323; --ok-text: #8fd694; --ok-border: #2e5236;
+    --err-bg: #3d1e1c; --err-text: #f2a196; --err-border: #6b2f2a;
+    --shadow: 0 1px 3px rgba(0,0,0,.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.3);
   }
   * { box-sizing: border-box; margin: 0; }
   body {
@@ -157,8 +176,26 @@
 <nav>
   <a href="/" {% if path == '/' or path.startswith('/books/') %}class="active"{% endif %}>📚 athenaeum</a>
   <a href="/stats" {% if path.startswith('/stats') %}class="active"{% endif %}>stats</a>
-  
+  <span style="margin-left:auto"></span>
+  <button id="theme-toggle" class="btn-ghost" type="button" title="Toggle theme" aria-label="Toggle theme" style="height:2rem;padding:0 .65rem">🌓</button>
 </nav>
+<script>
+  const btn = document.getElementById('theme-toggle');
+  const setBtn = () => {
+    const cur = document.documentElement.dataset.theme
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    btn.textContent = cur === 'dark' ? '☀' : '🌙';
+  };
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.dataset.theme
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('athenaeum-theme', next);
+    setBtn();
+  });
+  setBtn();
+</script>
 {% block content %}{% endblock %}
 </body>
 </html>
