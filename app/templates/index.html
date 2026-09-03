@@ -250,13 +250,15 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   transition: transform .15s ease;
 }
 .grid-item:hover { text-decoration: none; }
+.grid-item .cover {
+  margin-bottom: .6rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
 .grid-item:hover .cover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-md);
-}
-.grid-item .cover {
-  margin-bottom: .6rem;
-  transition: transform .15s ease, box-shadow .15s ease;
+  filter: brightness(1.04) saturate(1.05);
 }
 .view-toggle {
   display: inline-flex;
