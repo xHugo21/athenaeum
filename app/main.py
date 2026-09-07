@@ -348,10 +348,11 @@ def plugin_device():
 
 @app.post("/api/plugin/import")
 async def plugin_import(request: Request):
-    # ponytail: accepts only the stock koinsight.koplugin payload; format drift = 400, no compat layer
+    # ponytail: accepts any v0.3.x payload; minor bumps stay compatible, breaking change = minor bump = 400
     body = await request.json()
-    if body.get("version") != "0.3.0":
-        return JSONResponse({"error": "Unsupported plugin version, need 0.3.0"}, status_code=400)
+    v = body.get("version", "0.0.0").split(".")
+    if len(v) != 3 or (int(v[0]), int(v[1])) < (0, 3):
+        return JSONResponse({"error": "Unsupported plugin version, need >=0.3.0"}, status_code=400)
     created = 0
     anns = body.get("annotations") or {}
     with db() as con:

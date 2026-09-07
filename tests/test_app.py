@@ -206,7 +206,11 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
         r = client.post("/api/plugin/import", json=payload, follow_redirects=False)
         assert r.json()["created"] == 0, "re-sync must not duplicate"
 
-        r = client.post("/api/plugin/import", json=dict(payload, version="9.9"), follow_redirects=False)
+        r = client.post("/api/plugin/import", json=dict(payload, version="0.2.9"), follow_redirects=False)
+        assert r.status_code == 400
+        r = client.post("/api/plugin/import", json=dict(payload, version="0.3.5"), follow_redirects=False)
+        assert r.status_code == 200
+        r = client.post("/api/plugin/import", json=dict(payload, version="bad"), follow_redirects=False)
         assert r.status_code == 400
 
         file_import = client.post(
