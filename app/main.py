@@ -1,5 +1,8 @@
+import hashlib
+import hmac
 import os
 import re
+import secrets
 import sqlite3
 import time
 import zlib
@@ -14,8 +17,11 @@ from fastapi.templating import Jinja2Templates
 from .koreader import norm, parse_koreader
 
 DB_PATH = os.environ.get("ATHENAEUM_DB", "athenaeum.db")
+PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
+SESSION_COOKIE = "athenaeum_session"
 templates = Jinja2Templates(
-    directory=os.path.join(os.path.dirname(__file__), "templates")
+    directory=os.path.join(os.path.dirname(__file__), "templates"),
+    context_processors=[lambda request: {"session": bool(PASSWORD and request.cookies.get(SESSION_COOKIE))}],
 )
 
 
@@ -95,6 +101,53 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="athenaeum", lifespan=lifespan)
+
+
+def make_token(nonce: str, expires: int) -> str:
+    sig = hmac.new(PASSWORD.encode(), f"{expires}|{nonce}".encode(), hashlib.sha256).hexdigest()
+    return f"{expires}|{nonce}|{sig}"
+
+
+def check_token(token: str) -> bool:
+    try:
+        expires, nonce, sig = token.split("|")
+        if time.time() > int(expires):
+            return False
+    except ValueError:
+        return False
+    return hmac.compare_digest(make_token(nonce, int(expires)), token)
+
+
+@app.middleware("http")
+async def auth(request: Request, call_next):
+    if PASSWORD and request.url.path not in ("/login", "/api/plugin/device", "/api/plugin/import"):
+        token = request.cookies.get(SESSION_COOKIE, "")
+        if not check_token(token):
+            return RedirectResponse("/login", 303)
+    return await call_next(request)
+
+
+@app.get("/login")
+def login_form(request: Request):
+    return templates.TemplateResponse(request, "login.html", {"error": request.query_params.get("error")})
+
+
+@app.post("/login")
+def login(request: Request, password: str = Form("")):
+    if not secrets.compare_digest(password, PASSWORD or ""):
+        return RedirectResponse("/login?error=Wrong+password", 303)
+    expires = int(time.time()) + 30 * 86400
+    token = make_token(secrets.token_hex(16), expires)
+    res = RedirectResponse("/", 303)
+    res.set_cookie(SESSION_COOKIE, token, max_age=30 * 86400, httponly=True, samesite="lax")
+    return res
+
+
+@app.post("/logout")
+def logout():
+    res = RedirectResponse("/login", 303)
+    res.delete_cookie(SESSION_COOKIE)
+    return res
 
 
 def find_book(con, title: str, author: str | None, md5: str | None = None):

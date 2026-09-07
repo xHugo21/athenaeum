@@ -32,6 +32,8 @@ services:
     volumes:
       - /stacks/athenaeum:/data
     restart: unless-stopped
+    environment:
+      - ATHENAEUM_PASSWORD=changeme
 ```
 
 ## KOReader plugin sync
