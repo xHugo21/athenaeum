@@ -257,7 +257,8 @@ def test_stats_streaks(tmp_path, monkeypatch):
         r = client.get("/stats")
         assert r.status_code == 200
         assert "Monthly reading" in r.text and "By weekday" in r.text
-        assert "3 days" in r.text and "best streak" in r.text
+        assert 'class="streak-num">3<' in r.text and "current streak" in r.text
+        assert 'class="streak-num best">3<' in r.text
 
 
 def test_highlights_export(tmp_path, monkeypatch):

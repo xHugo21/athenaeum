@@ -5,46 +5,42 @@
 {% if not totals['n'] %}
 <p class="muted">No books yet. Import KOReader stats from the <a href="/">library</a> first.</p>
 {% else %}
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1rem;margin-bottom:1.5rem">
-  <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{{ totals['secs'] | hours }}</div>
-    <div class="muted">time read</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1.25rem;margin-bottom:1.5rem">
+  <div class="metric">
+    <div class="metric-value">{{ totals['secs'] | hours }}</div>
+    <div class="metric-label">time read</div>
   </div>
-  <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{{ totals['pages'] }}</div>
-    <div class="muted">total pages read</div>
+  <div class="metric">
+    <div class="metric-value">{{ totals['pages'] | int }}</div>
+    <div class="metric-label">pages read</div>
   </div>
-  <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{% if best %}{{ best[0] }}{% else %}–{% endif %}</div>
-    <div class="muted">{% if best %}most pages in a day ({{ best[1] }}){% else %}most pages in a day{% endif %}</div>
+  <div class="metric">
+    <div class="metric-value">{% if best %}{{ best[0] }}{% else %}–{% endif %}</div>
+    <div class="metric-label">{% if best %}best pages in a day<span class="metric-sub">{{ best[1] }}</span>{% else %}most pages in a day{% endif %}</div>
   </div>
-  <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{% if longest %}{{ longest[0] | hours }}{% else %}–{% endif %}</div>
-    <div class="muted">{% if longest %}longest daily reading ({{ longest[1] }}){% else %}longest daily reading{% endif %}</div>
-  </div>
-  <div class="card" style="text-align:center">
-    <div style="font-size:1.5rem;font-weight:700">{% if totals['avg_rating'] %}{{ '%.1f' | format(totals['avg_rating']) }} ★{% else %}–{% endif %}</div>
-    <div class="muted">avg rating</div>
+  <div class="metric">
+    <div class="metric-value">{% if longest %}{{ longest[0] | hours }}{% else %}–{% endif %}</div>
+    <div class="metric-label">{% if longest %}longest daily reading<span class="metric-sub">{{ longest[1] }}</span>{% else %}longest daily reading{% endif %}</div>
   </div>
 </div>
 
-<div class="card" style="margin-bottom:1rem">
-  <h2 style="margin-top:0">Streaks</h2>
-  <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+<div class="card hero-streak">
+  <div class="streak-pair">
     <div>
-      <div class="stat-value">{{ cur_streak }} day{{ 's' if cur_streak != 1 }}</div>
-      <div class="stat-label">current streak</div>
+      <div class="streak-num">{{ cur_streak }}</div>
+      <div class="streak-cap">day{{ 's' if cur_streak != 1 }} &middot; current streak</div>
     </div>
+    <div class="streak-divider"></div>
     <div>
-      <div class="stat-value">{{ best_streak }} day{{ 's' if best_streak != 1 }}</div>
-      <div class="stat-label">best streak</div>
+      <div class="streak-num best">{{ best_streak }}</div>
+      <div class="streak-cap">day{{ 's' if best_streak != 1 }} &middot; best streak</div>
     </div>
   </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem;margin-bottom:1rem">
   <div class="card">
-    <h2 style="margin-top:0">Monthly reading <span class="muted" style="font-weight:400">(12 months)</span></h2>
+    <h2 style="margin-top:0">Monthly reading</h2>
     <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
       {% for label, secs in month_bars %}
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ (secs / 3600) | round(1) }}h">
@@ -116,6 +112,85 @@
 </div>
 {% endif %}
 <style>
+.metric {
+  position: relative;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: transform .15s, box-shadow .15s;
+}
+.metric:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.metric::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 1rem; bottom: 1rem;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  opacity: .55;
+}
+.metric-value {
+  font-family: 'Merriweather', Georgia, serif;
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+.metric-unit { font-size: 1.1rem; opacity: .75; margin-left: .15rem; }
+.metric-label {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-top: .35rem;
+  font-weight: 600;
+  display: block;
+}
+.metric-sub {
+  display: block;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  font-size: .78rem;
+  margin-top: .2rem;
+  opacity: .8;
+}
+.hero-streak {
+  margin-bottom: 1.25rem;
+  padding: 1.5rem 1.75rem;
+}
+.streak-pair {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.streak-num {
+  font-family: 'Merriweather', Georgia, serif;
+  font-weight: 700;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: -.02em;
+}
+.streak-num.best { color: var(--text); opacity: .7; }
+.streak-cap {
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-top: .5rem;
+  font-weight: 600;
+}
+.streak-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
 [data-tip]{position:relative}
 [data-tip]::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
 [data-tip]:hover::after{opacity:1}
