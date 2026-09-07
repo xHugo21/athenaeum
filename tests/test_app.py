@@ -241,6 +241,25 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
         assert "Call me Ishmael" in r.text
 
 
+def test_stats_streaks(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from datetime import date, timedelta
+
+    base = date.today()
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "T"}, follow_redirects=False)
+        con = sqlite3.connect("athenaeum.db")
+        for i in range(3):
+            con.execute("INSERT INTO days VALUES (?, 60, 1)", ((base - timedelta(days=i)).isoformat(),))
+        con.execute("INSERT INTO days VALUES (?, 60, 1)", ((base - timedelta(days=10)).isoformat(),))
+        con.commit()
+        con.close()
+        r = client.get("/stats")
+        assert r.status_code == 200
+        assert "Monthly reading" in r.text and "By weekday" in r.text
+        assert "3 days" in r.text and "best streak" in r.text
+
+
 def test_highlights_export(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with TestClient(app) as client:

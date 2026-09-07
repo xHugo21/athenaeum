@@ -28,6 +28,45 @@
   </div>
 </div>
 
+<div class="card" style="margin-bottom:1rem">
+  <h2 style="margin-top:0">Streaks</h2>
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+    <div>
+      <div class="stat-value">{{ cur_streak }} day{{ 's' if cur_streak != 1 }}</div>
+      <div class="stat-label">current streak</div>
+    </div>
+    <div>
+      <div class="stat-value">{{ best_streak }} day{{ 's' if best_streak != 1 }}</div>
+      <div class="stat-label">best streak</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem;margin-bottom:1rem">
+  <div class="card">
+    <h2 style="margin-top:0">Monthly reading <span class="muted" style="font-weight:400">(12 months)</span></h2>
+    <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
+      {% for label, secs in month_bars %}
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ (secs / 3600) | round(1) }}h">
+        <div class="bar" style="width:100%;height:{{ (secs / max_month * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
+        <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">By weekday</h2>
+    <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
+      {% for label, secs in wd_bars %}
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ (secs / 3600) | round(1) }}h">
+        <div class="bar" style="width:100%;height:{{ (secs / max_wd * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
+        <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
 <div class="card" style="margin-bottom:1.5rem">
   <h2 style="margin-top:0">Reading activity</h2>
   <div style="display:flex;gap:3px">
@@ -77,6 +116,9 @@
 </div>
 {% endif %}
 <style>
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
+[data-tip]:hover::after{opacity:1}
 .day-cell{position:relative}
 .day-cell::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
 .day-cell:hover::after{opacity:1}

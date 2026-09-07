@@ -214,6 +214,33 @@ def stats(request: Request):
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
+    month_secs, wd_secs = {}, [0] * 7
+    for r in days:
+        month_secs[r["day"][:7]] = month_secs.get(r["day"][:7], 0) + r["seconds"]
+        wd_secs[date.fromisoformat(r["day"]).weekday()] += r["seconds"]
+    m, months = date.today().replace(day=1), []
+    for _ in range(12):
+        months.append(m)
+        m = (m - timedelta(days=1)).replace(day=1)
+    months.reverse()
+    month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
+    wd_bars = [(lbl, wd_secs[i]) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
+    have = {r["day"] for r in days if r["seconds"] > 0}
+    cur_streak, d0 = 0, date.today()
+    if d0.isoformat() not in have:
+        d0 -= timedelta(days=1)
+    while d0.isoformat() in have:
+        cur_streak += 1
+        d0 -= timedelta(days=1)
+    best_streak = run = 0
+    prev = None
+    for day in sorted(have):
+        dd = date.fromisoformat(day)
+        run = run + 1 if prev and (dd - prev).days == 1 else 1
+        best_streak = max(best_streak, run)
+        prev = dd
+    max_month = max((s for _, s in month_bars), default=0) or 1
+    max_wd = max(wd_secs) or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
     d = date.today() - timedelta(days=364)
@@ -245,6 +272,12 @@ def stats(request: Request):
                 if longest
                 else None
             ),
+            "month_bars": month_bars,
+            "wd_bars": wd_bars,
+            "max_month": max_month,
+            "max_wd": max_wd,
+            "cur_streak": cur_streak,
+            "best_streak": best_streak,
         },
     )
 
