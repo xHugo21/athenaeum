@@ -400,5 +400,8 @@ if (localStorage.getItem('athenaeum-shelf') === '1') {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+@media (max-width: 480px) {
+  #grid-view { grid-template-columns: repeat(2, 1fr) !important; }
+}
 </style>
 {% endblock %}

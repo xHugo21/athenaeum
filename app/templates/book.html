@@ -162,4 +162,12 @@
     <button class="btn-danger" title="Delete book">🗑 Delete book</button>
   </form>
 </div>
+<style>
+@media (max-width: 480px) {
+  .cover-upload { opacity: 1 !important; }
+  form input[name="title"], form input[name="author"], form input[name="isbn"] { width: 100%; }
+  #rf .stars { font-size: 1.7rem; }
+  .stat-value { font-size: 1.1rem; }
+}
+</style>
 {% endblock %}

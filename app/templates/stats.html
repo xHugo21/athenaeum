@@ -201,5 +201,13 @@ table.ranked td { padding: .45rem .6rem; vertical-align: middle; }
 table.ranked td.rank { width: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; }
 .rank-bar { display: inline-block; width: 4rem; height: .4rem; background: var(--border); border-radius: 2px; vertical-align: middle; margin-right: .6rem; }
 .rank-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+@media (max-width: 480px) {
+  .metric { padding: .9rem 1rem; }
+  .metric-value { font-size: 1.5rem; }
+  .streak-num { font-size: 2.5rem; }
+  .streak-pair { gap: 1.5rem; }
+  table.ranked .rank-bar { width: 2.5rem; margin-right: .4rem; }
+  td, th { padding: .45rem .35rem; }
+}
 </style>
 {% endblock %}
