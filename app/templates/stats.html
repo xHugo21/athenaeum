@@ -7,7 +7,7 @@
 {% else %}
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1.25rem;margin-bottom:1.5rem">
   <div class="metric">
-    <div class="metric-value">{{ totals['secs'] | hours }}</div>
+    <div class="metric-value">{{ totals['secs'] | read_hm }}</div>
     <div class="metric-label">time read</div>
   </div>
   <div class="metric">
@@ -16,10 +16,10 @@
   </div>
   <div class="metric">
     <div class="metric-value">{% if best %}{{ best[0] }}{% else %}–{% endif %}</div>
-    <div class="metric-label">{% if best %}best pages in a day<span class="metric-sub">{{ best[1] }}</span>{% else %}most pages in a day{% endif %}</div>
+    <div class="metric-label">{% if best %}most pages in a day<span class="metric-sub">{{ best[1] }}</span>{% else %}most pages in a day{% endif %}</div>
   </div>
   <div class="metric">
-    <div class="metric-value">{% if longest %}{{ longest[0] | hours }}{% else %}–{% endif %}</div>
+    <div class="metric-value">{% if longest %}{{ longest[0] | read_hm }}{% else %}–{% endif %}</div>
     <div class="metric-label">{% if longest %}longest daily reading<span class="metric-sub">{{ longest[1] }}</span>{% else %}longest daily reading{% endif %}</div>
   </div>
 </div>
@@ -43,7 +43,7 @@
     <h2 style="margin-top:0">Monthly reading</h2>
     <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
       {% for label, secs in month_bars %}
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ (secs / 3600) | round(1) }}h">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ secs | read_hm }}">
         <div class="bar" style="width:100%;height:{{ (secs / max_month * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
         <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
       </div>
@@ -51,10 +51,10 @@
     </div>
   </div>
   <div class="card">
-    <h2 style="margin-top:0">By weekday</h2>
+    <h2 style="margin-top:0">Average read time per day</h2>
     <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
       {% for label, secs in wd_bars %}
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ (secs / 3600) | round(1) }}h">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ secs | read_hm }}">
         <div class="bar" style="width:100%;height:{{ (secs / max_wd * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
         <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
       </div>
@@ -105,7 +105,7 @@
         <div class="rank-bar"><span style="width:{{ pct | round(0) | int }}%"></span></div>
         <a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}
       </td>
-      <td style="text-align:right">{{ b['total_seconds'] | hours }}</td>
+      <td style="text-align:right">{{ b['total_seconds'] | read_hm }}</td>
     </tr>
     {% endfor %}
   </table>

@@ -31,8 +31,15 @@ def ts_date(ts: int) -> str:
 
 templates.env.filters["ts_date"] = ts_date
 templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
-templates.env.filters["read_hm"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}min" if s >= 3600 else f"{s // 60}min"
-templates.env.filters["hours"] = lambda s: f"{s // 3600}h {s % 3600 // 60:02d}m" if s >= 3600 else f"{s // 60}m"
+def read_hm(s: int) -> str:
+    h, m = s // 3600, s % 3600 // 60
+    if h and m:
+        return f"{h}h {m:02d}min"
+    if h:
+        return f"{h}h"
+    return f"{m}min"
+templates.env.filters["read_hm"] = read_hm
+
 
 
 def db() -> sqlite3.Connection:
@@ -214,17 +221,19 @@ def stats(request: Request):
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
-    month_secs, wd_secs = {}, [0] * 7
+    month_secs, wd_secs, wd_count = {}, [0] * 7, [0] * 7
     for r in days:
         month_secs[r["day"][:7]] = month_secs.get(r["day"][:7], 0) + r["seconds"]
-        wd_secs[date.fromisoformat(r["day"]).weekday()] += r["seconds"]
+        wd = date.fromisoformat(r["day"]).weekday()
+        wd_secs[wd] += r["seconds"]
+        wd_count[wd] += 1
     m, months = date.today().replace(day=1), []
     for _ in range(12):
         months.append(m)
         m = (m - timedelta(days=1)).replace(day=1)
     months.reverse()
     month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
-    wd_bars = [(lbl, wd_secs[i]) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
+    wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
@@ -240,7 +249,7 @@ def stats(request: Request):
         best_streak = max(best_streak, run)
         prev = dd
     max_month = max((s for _, s in month_bars), default=0) or 1
-    max_wd = max(wd_secs) or 1
+    max_wd = max(s for _, s in wd_bars) or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
     d = date.today() - timedelta(days=364)
