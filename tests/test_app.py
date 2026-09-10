@@ -1,3 +1,4 @@
+import os
 import sqlite3
 
 from app.koreader import parse_koreader
@@ -292,3 +293,20 @@ def test_highlights_export(tmp_path, monkeypatch):
         assert "**Note:** Surreal." in body
         assert "Bookmarks" not in body
         assert "p. 42" not in body
+
+
+def test_delete_book_removes_cover_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("covers", exist_ok=True)
+    with TestClient(app) as client:
+        client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+        r = client.post("/books/1/cover", files={"cover": ("c.jpg", b"\xff\xd8\xff" + b"x" * 100, "image/jpeg")}, follow_redirects=False)
+        assert r.status_code == 303
+        assert os.path.exists("covers/1.jpg"), "upload should write the cover"
+
+        r = client.post("/books/1/delete", follow_redirects=False)
+        assert r.status_code == 303
+
+    assert not os.path.exists("covers/1.jpg"), "deleting a book must remove its cover file"
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0

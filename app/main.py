@@ -403,6 +403,9 @@ def edit_book(
 def delete_book(book_id: int):
     with db() as con:
         con.execute("DELETE FROM books WHERE id=?", (book_id,))
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    if os.path.exists(path):
+        os.remove(path)
     return RedirectResponse("/", 303)
 
 
@@ -437,13 +440,16 @@ def rebuild_aggregates(con):
 
 @app.post("/api/plugin/device")
 def plugin_device():
-    # ponytail: device registry stub, plugin errors out if this 404s
+    # ponytail: registry stub on purpose, the plugin only needs a non-404; no device list, dedupe, or revoke.
+    # upgrade: fork the plugin and need per-device identity, then build it with the /api/plugin/* auth work.
     return {"message": "Device registered successfully"}
 
 
 @app.post("/api/plugin/import")
 async def plugin_import(request: Request):
-    # ponytail: accepts any v0.3.x payload; minor bumps stay compatible, breaking change = minor bump = 400
+    # ponytail: version gate is a floor (>= 0.3.0) on purpose, so later plugin bumps keep importing; deliberately not a v0.3.x ceiling.
+    # ceiling: a breaking payload change ships unnoticed, malformed version or JSON raises an unhandled 500.
+    # upgrade: fork the plugin, then pin the exact payload version and validate input, with the /api/plugin/* auth work.
     body = await request.json()
     v = body.get("version", "0.0.0").split(".")
     if len(v) != 3 or (int(v[0]), int(v[1])) < (0, 3):
@@ -679,7 +685,6 @@ def cover_image(book_id: int):
 
 @app.post("/books/{book_id}/cover/remove")
 def remove_cover(book_id: int):
-    # ponytail: file existence = "has custom cover"; no DB column, the FS is the source of truth
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     if os.path.exists(path):
         os.remove(path)

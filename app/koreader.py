@@ -24,7 +24,8 @@ def parse_koreader(data: bytes) -> list[BookStats]:
         raise ValueError("Not a KOReader statistics database (no SQLite header)")
     con = sqlite3.connect(":memory:")
     try:
-        # ponytail: WAL-mode files can't deserialize into memory; flipping the header reads last checkpoint, no -wal merge
+        # ponytail: WAL-mode files can't deserialize into memory; flipping the header reads last checkpoint, no -wal merge, so sessions since the last checkpoint import as silent staleness.
+        # upgrade: not until we fork the plugin. Then send stat.db-wal (or PRAGMA wal_checkpoint(TRUNCATE) client-side) and let sqlite merge it via a temp-file open, and do it in the same pass as putting /api/plugin/* behind ATHENAEUM_PASSWORD, currently exempted at main.py:130 and unauthenticated.
         if data[18] == 2:
             data = data[:18] + b"\x01\x01" + data[20:]
         con.deserialize(data)
