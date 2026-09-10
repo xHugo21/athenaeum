@@ -310,3 +310,12 @@ def test_delete_book_removes_cover_file(tmp_path, monkeypatch):
     assert not os.path.exists("covers/1.jpg"), "deleting a book must remove its cover file"
     with sqlite3.connect("athenaeum.db") as c:
         assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0
+
+
+def test_md5_lookup_is_indexed(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+    with sqlite3.connect("athenaeum.db") as c:
+        plan = c.execute("EXPLAIN QUERY PLAN SELECT id FROM books WHERE md5=?", ("x",)).fetchall()
+        assert any("idx_books_md5" in r[3] for r in plan), f"md5 lookup must use the index, got {plan}"

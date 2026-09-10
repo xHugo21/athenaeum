@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS annotations (
     color TEXT,
     PRIMARY KEY (book_id, datetime, page_ref)
 );
+CREATE INDEX IF NOT EXISTS idx_books_md5 ON books(md5);
 """
 
 
@@ -163,7 +164,6 @@ def find_book(con, title: str, author: str | None, md5: str | None = None):
         if r:
             return r
     key = norm(title) + "|" + norm(author or "")
-    # ponytail: O(n) scan; fine at personal-library scale, add a normalized column if it ever matters
     for r in con.execute("SELECT id, title, author, md5 FROM books"):
         if norm(r["title"]) + "|" + norm(r["author"] or "") == key:
             return r
@@ -317,8 +317,8 @@ def book_detail(request: Request, book_id: int):
             "agg": agg,
             "best": best,
             "anns": anns,
-            "custom_cover": os.path.exists(os.path.join(COVERS_DIR, f"{book_id}.jpg")),
-            "cover_ts": int(os.path.getmtime(os.path.join(COVERS_DIR, f"{book_id}.jpg"))) if os.path.exists(os.path.join(COVERS_DIR, f"{book_id}.jpg")) else 0,
+            "custom_cover": os.path.exists(cover_path := os.path.join(COVERS_DIR, f"{book_id}.jpg")),
+            "cover_ts": int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
         },
     )
 
@@ -673,12 +673,14 @@ def placeholder_svg(title: str, author: str) -> bytes:
 
 @app.get("/covers/{book_id}.jpg")
 def cover_image(book_id: int):
+    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
     with db() as con:
         book = con.execute("SELECT title, author, isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
-        if not book:
-            return RedirectResponse("/", 303)
-    path = fetch_cover(book_id, book["isbn"], book["cover_failed"])
-    if path:
+    if not book:
+        return RedirectResponse("/", 303)
+    if fetch_cover(book_id, book["isbn"], book["cover_failed"]):
         return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
     return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
