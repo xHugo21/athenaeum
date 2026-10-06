@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}To read · athenaeum{% endblock %}
+{% block title %}TBR · athenaeum{% endblock %}
 {% block content %}
-<h2 style="margin-top:0">To read</h2>
-<form class="form-row" method="post" action="/toread">
+<h2 style="margin-top:0">To be read</h2>
+<form class="form-row" method="post" action="/tbr">
   <div class="form-group" style="flex:2;min-width:12rem;margin-bottom:0">
     <label for="title">Title</label>
     <input id="title" name="title" required style="width:100%">
@@ -14,12 +14,12 @@
   <button type="submit">Add</button>
 </form>
 {% if books %}
-<ul class="toread">
+<ul class="tbr">
   {% for b in books %}
   <li>
-    <span class="toread-title">{{ b['title'] }}</span>
+    <span class="tbr-title">{{ b['title'] }}</span>
     {% if b['author'] %}<span class="muted">{{ b['author'] }}</span>{% endif %}
-    <form class="inline toread-remove" method="post" action="/toread/{{ b['id'] }}/delete">
+    <form class="inline tbr-remove" method="post" action="/tbr/{{ b['id'] }}/delete">
       <button class="btn-ghost" type="submit" title="Remove">✕</button>
     </form>
   </li>
@@ -29,11 +29,11 @@
 <p class="muted" style="margin-top:1.25rem">No books on your list yet.</p>
 {% endif %}
 <style>
-.toread { list-style: none; padding: 0; margin: 1.25rem 0 0; }
-.toread li { display: flex; align-items: baseline; gap: .6rem; padding: .7rem .25rem; border-bottom: 1px solid var(--border); }
-.toread li:first-child { border-top: 1px solid var(--border); }
-.toread-title { font-weight: 600; }
-.toread-remove { margin-left: auto; }
-.toread-remove button { height: 2rem; padding: 0 .6rem; line-height: 1; }
+.tbr { list-style: none; padding: 0; margin: 1.25rem 0 0; }
+.tbr li { display: flex; align-items: baseline; gap: .6rem; padding: .7rem .25rem; border-bottom: 1px solid var(--border); }
+.tbr li:first-child { border-top: 1px solid var(--border); }
+.tbr-title { font-weight: 600; }
+.tbr-remove { margin-left: auto; }
+.tbr-remove button { height: 2rem; padding: 0 .6rem; line-height: 1; }
 </style>
 {% endblock %}

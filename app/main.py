@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS annotations (
     color TEXT,
     PRIMARY KEY (book_id, datetime, page_ref)
 );
-CREATE TABLE IF NOT EXISTS toread (
+CREATE TABLE IF NOT EXISTS tbr (
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
     author TEXT,
@@ -415,29 +415,29 @@ def delete_book(book_id: int):
     return RedirectResponse("/", 303)
 
 
-@app.get("/toread")
-def toread(request: Request):
+@app.get("/tbr")
+def tbr(request: Request):
     with db() as con:
-        books = con.execute("SELECT * FROM toread ORDER BY added_at DESC, id DESC").fetchall()
-    return templates.TemplateResponse(request, "toread.html", {"books": books})
+        books = con.execute("SELECT * FROM tbr ORDER BY added_at DESC, id DESC").fetchall()
+    return templates.TemplateResponse(request, "tbr.html", {"books": books})
 
 
-@app.post("/toread")
-def add_toread(title: str = Form(...), author: str = Form("")):
+@app.post("/tbr")
+def add_tbr(title: str = Form(...), author: str = Form("")):
     if title.strip():
         with db() as con:
             con.execute(
-                "INSERT INTO toread (title, author, added_at) VALUES (?,?,?)",
+                "INSERT INTO tbr (title, author, added_at) VALUES (?,?,?)",
                 (title.strip(), author.strip() or None, int(time.time())),
             )
-    return RedirectResponse("/toread", 303)
+    return RedirectResponse("/tbr", 303)
 
 
-@app.post("/toread/{book_id}/delete")
-def delete_toread(book_id: int):
+@app.post("/tbr/{book_id}/delete")
+def delete_tbr(book_id: int):
     with db() as con:
-        con.execute("DELETE FROM toread WHERE id=?", (book_id,))
-    return RedirectResponse("/toread", 303)
+        con.execute("DELETE FROM tbr WHERE id=?", (book_id,))
+    return RedirectResponse("/tbr", 303)
 
 
 @app.get("/db/download")
