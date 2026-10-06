@@ -307,6 +307,7 @@ def book_detail(request: Request, book_id: int):
             "SELECT COUNT(*) n, SUM(seconds) secs, MIN(day) first_day, MAX(day) last_day FROM book_days WHERE book_id=?",
             (book_id,),
         ).fetchone()
+        sessions_n = con.execute("SELECT COUNT(*) FROM sessions WHERE book_id=?", (book_id,)).fetchone()[0]
         best = con.execute(
             "SELECT day, seconds FROM book_days WHERE book_id=? ORDER BY seconds DESC LIMIT 1",
             (book_id,),
@@ -321,6 +322,7 @@ def book_detail(request: Request, book_id: int):
         {
             "b": book,
             "agg": agg,
+            "sessions_n": sessions_n,
             "best": best,
             "anns": anns,
             "custom_cover": os.path.exists(cover_path := os.path.join(COVERS_DIR, f"{book_id}.jpg")),

@@ -89,6 +89,10 @@
         {% if agg and agg['n'] %}
         <div>
           <div class="stat-label">Sessions</div>
+          <div class="stat-value">{{ sessions_n }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Days read</div>
           <div class="stat-value">{{ agg['n'] }}</div>
         </div>
         <div>

@@ -331,6 +331,29 @@ def test_tbr_add_and_remove(tmp_path, monkeypatch):
         assert c.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 0
 
 
+def test_book_page_shows_sessions_and_days(tmp_path, monkeypatch):
+    import re
+
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "T"}, follow_redirects=False)
+        con = sqlite3.connect("athenaeum.db")
+        con.execute("INSERT INTO book_days VALUES (1, '2024-01-01', 1800, 40)")
+        for i in range(3):
+            con.execute("INSERT INTO sessions VALUES (1, ?, ?, 600, 0)", (i, 1704067200 + i))
+        con.commit()
+        con.close()
+        r = client.get("/books/1")
+        assert r.status_code == 200
+
+    def stat(label):
+        m = re.search(r'stat-label">' + label + r'</div>\s*<div class="stat-value"[^>]*>([^<]+)<', r.text)
+        return m.group(1) if m else None
+
+    assert stat("Sessions") == "3", "sessions must count session rows, not days"
+    assert stat("Days read") == "1"
+
+
 def test_md5_lookup_is_indexed(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with TestClient(app) as client:
