@@ -98,6 +98,12 @@ CREATE TABLE IF NOT EXISTS annotations (
     color TEXT,
     PRIMARY KEY (book_id, datetime, page_ref)
 );
+CREATE TABLE IF NOT EXISTS toread (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT,
+    added_at INTEGER NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_books_md5 ON books(md5);
 """
 
@@ -407,6 +413,31 @@ def delete_book(book_id: int):
     if os.path.exists(path):
         os.remove(path)
     return RedirectResponse("/", 303)
+
+
+@app.get("/toread")
+def toread(request: Request):
+    with db() as con:
+        books = con.execute("SELECT * FROM toread ORDER BY added_at DESC, id DESC").fetchall()
+    return templates.TemplateResponse(request, "toread.html", {"books": books})
+
+
+@app.post("/toread")
+def add_toread(title: str = Form(...), author: str = Form("")):
+    if title.strip():
+        with db() as con:
+            con.execute(
+                "INSERT INTO toread (title, author, added_at) VALUES (?,?,?)",
+                (title.strip(), author.strip() or None, int(time.time())),
+            )
+    return RedirectResponse("/toread", 303)
+
+
+@app.post("/toread/{book_id}/delete")
+def delete_toread(book_id: int):
+    with db() as con:
+        con.execute("DELETE FROM toread WHERE id=?", (book_id,))
+    return RedirectResponse("/toread", 303)
 
 
 @app.get("/db/download")

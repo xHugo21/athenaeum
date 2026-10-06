@@ -193,6 +193,7 @@
 <nav>
   <a href="/" {% if path == '/' or path.startswith('/books/') %}class="active"{% endif %}>📚 athenaeum</a>
   <a href="/stats" {% if path.startswith('/stats') %}class="active"{% endif %}>stats</a>
+  <a href="/toread" {% if path.startswith('/toread') %}class="active"{% endif %}>to read</a>
   <span style="margin-left:auto"></span>
   <span style="display:flex;align-items:center;gap:.5rem">
     {% if session %}

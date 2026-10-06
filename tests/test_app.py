@@ -312,6 +312,25 @@ def test_delete_book_removes_cover_file(tmp_path, monkeypatch):
         assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0
 
 
+def test_toread_add_and_remove(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        r = client.post("/toread", data={"title": "  Dune  ", "author": "Frank Herbert"}, follow_redirects=False)
+        assert r.status_code == 303
+        client.post("/toread", data={"title": "  ", "author": "nobody"}, follow_redirects=False)
+        r = client.get("/toread")
+        assert r.status_code == 200
+        assert "Dune" in r.text and "Frank Herbert" in r.text
+    with sqlite3.connect("athenaeum.db") as c:
+        rows = c.execute("SELECT title, author FROM toread").fetchall()
+    assert rows == [("Dune", "Frank Herbert")], "blank title must be ignored, title trimmed"
+    with TestClient(app) as client:
+        r = client.post("/toread/1/delete", follow_redirects=False)
+        assert r.status_code == 303
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT COUNT(*) FROM toread").fetchone()[0] == 0
+
+
 def test_md5_lookup_is_indexed(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with TestClient(app) as client:
