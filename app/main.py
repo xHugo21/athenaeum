@@ -615,6 +615,62 @@ def download_highlights(book_id: int):
     )
 
 
+@app.get("/books/{book_id}/highlights/edit")
+def highlight_form(request: Request, book_id: int, datetime: str = "", page_ref: str = ""):
+    with db() as con:
+        book = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
+        if not book:
+            return RedirectResponse("/", 303)
+        row = con.execute(
+            "SELECT * FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",
+            (book_id, datetime, page_ref),
+        ).fetchone()
+    return templates.TemplateResponse(
+        request, "highlight_edit.html", {"b": book, "a": dict(row) if row else {}}
+    )
+
+
+@app.post("/books/{book_id}/highlights/edit")
+def highlight_save(
+    book_id: int,
+    text: str = Form(""),
+    note: str = Form(""),
+    pageno: str = Form(""),
+    chapter: str = Form(""),
+    datetime: str = Form(""),
+    page_ref: str = Form(""),
+):
+    a = {
+        "text": text.strip() or None,
+        "note": note.strip() or None,
+        "chapter": chapter.strip() or None,
+        "pageno": int(pageno) if pageno.strip().isdigit() else None,
+    }
+    a["type"] = "bookmark" if not (a["text"] or a["note"]) else "note" if a["note"] else "highlight"
+    with db() as con:
+        if datetime and page_ref:
+            con.execute(
+                "UPDATE annotations SET type=?, text=?, note=?, chapter=?, pageno=? "
+                "WHERE book_id=? AND datetime=? AND page_ref=?",
+                (a["type"], a["text"], a["note"], a["chapter"], a["pageno"], book_id, datetime, page_ref),
+            )
+        else:
+            a["datetime"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            a["page"] = "m:" + secrets.token_hex(6)
+            insert_annotation(con, book_id, a)
+    return RedirectResponse(f"/books/{book_id}#highlights", 303)
+
+
+@app.post("/books/{book_id}/highlights/delete")
+def highlight_delete(book_id: int, datetime: str = Form(...), page_ref: str = Form(...)):
+    with db() as con:
+        con.execute(
+            "DELETE FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",
+            (book_id, datetime, page_ref),
+        )
+    return RedirectResponse(f"/books/{book_id}#highlights", 303)
+
+
 def ann_type(a: dict) -> str:
     if not a.get("drawer") and not a.get("color") and not a.get("pos0") and not a.get("pos1"):
         return "bookmark"
@@ -633,7 +689,7 @@ def insert_annotation(con, book_id: int, a: dict):
             book_id,
             a.get("datetime"),
             str(a.get("page")),
-            ann_type(a),
+            a.get("type") or ann_type(a),
             a.get("text"),
             a.get("note"),
             a.get("chapter"),

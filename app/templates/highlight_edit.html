@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if a else 'Add' }} highlight · {{ b['title'] }}{% endblock %}
+{% block content %}
+<h1 style="font-size:1.35rem">{{ 'Edit' if a else 'Add' }} highlight</h1>
+<p class="muted" style="margin-bottom:1rem">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
+<form method="post" action="/books/{{ b['id'] }}/highlights/edit">
+  {% if a %}
+  <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
+  <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
+  {% endif %}
+  <div class="form-group">
+    <label for="text">Quote</label>
+    <textarea id="text" name="text" rows="4" placeholder="Highlighted passage">{{ a.get('text') or '' }}</textarea>
+  </div>
+  <div class="form-group">
+    <label for="note">Note</label>
+    <textarea id="note" name="note" rows="2" placeholder="Optional note">{{ a.get('note') or '' }}</textarea>
+  </div>
+  <div class="form-row">
+    <div class="form-group" style="margin:0">
+      <label for="pageno">Page</label>
+      <input id="pageno" name="pageno" type="number" min="0" style="width:6rem" value="{{ a.get('pageno') or '' }}">
+    </div>
+    <div class="form-group" style="margin:0;flex:1">
+      <label for="chapter">Chapter</label>
+      <input id="chapter" name="chapter" style="width:100%" value="{{ a.get('chapter') or '' }}">
+    </div>
+  </div>
+  <p class="muted" style="margin-bottom:.75rem">Leave the quote empty to save a bookmark.</p>
+  <button>Save</button>
+  <a href="/books/{{ b['id'] }}#highlights" class="btn btn-ghost">Cancel</a>
+</form>
+{% if a %}
+<form method="post" action="/books/{{ b['id'] }}/highlights/delete" onsubmit="return confirm('Delete this highlight?')" style="margin-top:1.5rem">
+  <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
+  <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
+  <button class="btn-danger">Delete</button>
+</form>
+{% endif %}
+{% endblock %}

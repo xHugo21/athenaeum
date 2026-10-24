@@ -361,3 +361,54 @@ def test_md5_lookup_is_indexed(tmp_path, monkeypatch):
     with sqlite3.connect("athenaeum.db") as c:
         plan = c.execute("EXPLAIN QUERY PLAN SELECT id FROM books WHERE md5=?", ("x",)).fetchall()
         assert any("idx_books_md5" in r[3] for r in plan), f"md5 lookup must use the index, got {plan}"
+
+
+def test_manual_highlight_crud(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Kindle Book", "author": "Someone"}, follow_redirects=False)
+        r = client.post(
+            "/books/1/highlights/edit",
+            data={"text": "A passage", "pageno": "12", "chapter": "One"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        page = client.get("/books/1").text
+        assert "A passage" in page and "One" in page and "p. 12" in page
+
+    with sqlite3.connect("athenaeum.db") as c:
+        datetime, page_ref, kind, total_pages = c.execute(
+            "SELECT datetime, page_ref, type, total_pages FROM annotations"
+        ).fetchone()
+    assert kind == "highlight" and page_ref.startswith("m:") and total_pages is None
+
+    with TestClient(app) as client:
+        form = client.get(f"/books/1/highlights/edit?datetime={datetime}&page_ref={page_ref}").text
+        assert "A passage" in form and "Delete" in form
+        r = client.post(
+            "/books/1/highlights/edit",
+            data={"text": "A passage", "note": "My thought", "pageno": "12", "chapter": "One",
+                  "datetime": datetime, "page_ref": page_ref},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+
+    with sqlite3.connect("athenaeum.db") as c:
+        (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
+        kind, note = c.execute("SELECT type, note FROM annotations").fetchone()
+    assert n == 1, "editing must update in place"
+    assert (kind, note) == ("note", "My thought")
+
+    with TestClient(app) as client:
+        assert "My thought" in client.get("/books/1").text, "typed notes must show on the book page"
+        r = client.post(
+            "/books/1/highlights/delete",
+            data={"datetime": datetime, "page_ref": page_ref},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert "No highlights yet" in client.get("/books/1").text
+
+    with sqlite3.connect("athenaeum.db") as c:
+        (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
+    assert n == 0

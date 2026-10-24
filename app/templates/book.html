@@ -128,32 +128,39 @@
   </form>
 </div>
 
-{% set hls = anns | selectattr('type', 'equalto', 'highlight') | list %}
+{% set hls = anns | rejectattr('type', 'equalto', 'bookmark') | list %}
 {% set bms = anns | selectattr('type', 'equalto', 'bookmark') | list %}
-{% if hls %}
-<div class="card" style="margin-top:1rem">
+<div class="card" style="margin-top:1rem" id="highlights">
   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
     <h2 style="margin-top:0">Highlights</h2>
-    <a href="/books/{{ b['id'] }}/highlights.md" download title="Download as Markdown">↓ Export</a>
+    <span style="display:flex;gap:1rem">
+      <a href="/books/{{ b['id'] }}/highlights/edit">+ Add</a>
+      <a href="/books/{{ b['id'] }}/highlights.md" download title="Download as Markdown">↓ Export</a>
+    </span>
   </div>
   {% for a in hls %}
   <div style="border-left:3px solid {{ a['color'] or 'var(--accent)' }};padding:.35rem .75rem;margin-bottom:.75rem">
-    <div style="white-space:pre-wrap;line-height:1.5">{{ a['text'] }}</div>
+    {% if a['text'] %}<div style="white-space:pre-wrap;line-height:1.5">{{ a['text'] }}</div>{% endif %}
     {% if a['note'] %}<div class="muted" style="white-space:pre-wrap;margin-top:.25rem">{{ a['note'] }}</div>{% endif %}
     <div class="muted" style="font-size:.75rem;margin-top:.25rem">
       {% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}
+      · <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
     </div>
   </div>
+  {% else %}
+  <p class="muted">No highlights yet.</p>
   {% endfor %}
 </div>
-{% endif %}
 
 {% if bms %}
 <div class="card" style="margin-top:1rem">
   <h2 style="margin-top:0">Bookmarks</h2>
   {% for a in bms %}
   <div style="padding:.35rem .75rem;margin-bottom:.75rem">
-    <div class="muted" style="font-size:.8rem">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</div>
+    <div class="muted" style="font-size:.8rem">
+      {% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}
+      · <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
+    </div>
     {% if a['note'] %}<div style="white-space:pre-wrap;line-height:1.5">{{ a['note'] }}</div>{% endif %}
   </div>
   {% endfor %}
