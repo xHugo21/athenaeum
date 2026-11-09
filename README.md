@@ -12,7 +12,7 @@
 
 <div align="center">
 <img width="90%" alt="Walkthrough of athenaeum: searching the library, opening a book, browsing the shelf view, reading the stats page, and switching to dark mode" src="assets/demo.gif" />
-<p><sub>20-second tour &middot; <a href="assets/demo.mp4">full-quality MP4 (1.6&nbsp;MB)</a></sub></p>
+<p><sub>20-second tour &middot; <a href="assets/demo.mp4">full-quality MP4 (1.7&nbsp;MB)</a></sub></p>
 </div>
 
 ## Run locally
