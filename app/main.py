@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS books (
     rating REAL,
     review TEXT,
     cover_failed INTEGER NOT NULL DEFAULT 0,
+    finished INTEGER NOT NULL DEFAULT 0,
     added_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
@@ -110,10 +111,17 @@ CREATE INDEX IF NOT EXISTS idx_books_md5 ON books(md5);
 """
 
 
+def migrate(con):
+    if "finished" not in {r[1] for r in con.execute("PRAGMA table_info(books)")}:
+        con.execute("ALTER TABLE books ADD COLUMN finished INTEGER NOT NULL DEFAULT 0")
+        con.execute("UPDATE books SET finished=1 WHERE md5 IS NULL")
+
+
 @asynccontextmanager
 async def lifespan(app):
     with db() as con:
         con.executescript(SCHEMA)
+        migrate(con)
     yield
 
 app = FastAPI(title="athenaeum", lifespan=lifespan)
@@ -349,7 +357,7 @@ def add_book(
     total_pages = pages or meta.get("pages")
     with db() as con:
         con.execute(
-            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, added_at) VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, finished, added_at) VALUES (?,?,?,?,?,?,?,1,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
@@ -407,6 +415,13 @@ def edit_book(
                 book_id,
             ),
         )
+    return RedirectResponse(f"/books/{book_id}", 303)
+
+
+@app.post("/books/{book_id}/finished")
+def set_finished(book_id: int, finished: int = Form(0)):
+    with db() as con:
+        con.execute("UPDATE books SET finished=? WHERE id=?", (1 if finished else 0, book_id))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 

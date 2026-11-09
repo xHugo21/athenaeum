@@ -413,3 +413,42 @@ def test_manual_highlight_crud(tmp_path, monkeypatch):
     with sqlite3.connect("athenaeum.db") as c:
         (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
     assert n == 0
+
+
+def test_manual_book_is_read_and_can_be_unmarked(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Bought yesterday"}, follow_redirects=False)
+        assert 'data-state="finished"' in client.get("/").text
+        book = client.get("/books/1").text
+        assert "Mark as unread" in book and 'class="tag">read<' in book
+
+        client.post("/books/1/finished", data={"finished": 0}, follow_redirects=False)
+        assert 'data-state="unread"' in client.get("/").text
+        assert "Mark as read" in client.get("/books/1").text
+
+
+def test_imported_book_can_be_marked_read_short_of_last_page(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+        assert 'data-state="reading"' in client.get("/").text
+        assert "Mark as read" in client.get("/books/1").text
+
+        client.post("/books/1/finished", data={"finished": 1}, follow_redirects=False)
+        assert 'data-state="finished"' in client.get("/").text
+        book = client.get("/books/1").text
+        assert "Mark as unread" in book and 'class="tag">read<' in book
+
+
+def test_migrate_marks_manual_books_read(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from app.main import migrate
+
+    con = sqlite3.connect("athenaeum.db")
+    con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT NOT NULL, md5 TEXT)")
+    con.execute("INSERT INTO books (title, md5) VALUES ('manual', NULL), ('synced', 'abc')")
+    migrate(con)
+    con.commit()
+    rows = dict(con.execute("SELECT title, finished FROM books").fetchall())
+    assert rows == {"manual": 1, "synced": 0}

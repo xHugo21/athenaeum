@@ -16,7 +16,14 @@
   .rate-row .of { font-size: 12px; color: var(--muted); }
   .progress-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
   .progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .pct-line { display: flex; align-items: center; gap: 8px; }
   .progress-head .pct { font-size: 13px; font-weight: 500; }
+  .tag {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+    border: 1px solid var(--accent-line); border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-strong);
+    font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
+  }
   .progress-head .pages { font-size: 12px; color: var(--muted); }
   .progress-block .track { height: 5px; }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px 24px; margin-top: 22px; }
@@ -52,10 +59,18 @@
 
 {% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
 {% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int if b['total_pages'] else none %}
+{% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
 
 <div class="page-head">
   <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
   <div class="actions">
+    <form method="post" action="/books/{{ b['id'] }}/finished">
+      <input type="hidden" name="finished" value="{{ 0 if done else 1 }}">
+      <button class="btn" type="submit">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-{{ 'x' if done else 'check' }}"/></svg>
+        {{ 'Mark as unread' if done else 'Mark as read' }}
+      </button>
+    </form>
     <a class="btn" href="/books/{{ b['id'] }}/highlights.md" download>
       <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export highlights
     </a>
@@ -125,7 +140,10 @@
 
     <div class="progress-block">
       <div class="progress-head">
-        <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
+        <span class="pct-line">
+          <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
+          {% if done %}<span class="tag">read</span>{% endif %}
+        </span>
         <span class="pages num">{% if b['total_pages'] %}{{ b['pages_read'] or 0 }} / {{ b['total_pages'] }} pages{% endif %}</span>
       </div>
       <div class="track"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
