@@ -1,8 +1,15 @@
-# athenaeum
+<div align="center">
+    <br/>
+    <p>
+        <img width="120" title="Athenaeum" alt="athenaeum logo" src="assets/logo.png" />
+        <h1>athenaeum</h1>
+    </p>
+    <p width="120">
+        Personal reading archive: KOReader statistics, highlights and your own verdicts in one private place.
+    </p>
+    <br/>
+</div>
 
-Personal book tracking web app.
-
-Allows manual entries and automatic import of KOReader statistics and highlights.
 <div align="center">
 <img width="80%" alt="screenshot1" src="https://github.com/user-attachments/assets/e107e845-0bab-426c-af97-9541952be6ba" />
 <br /><br />
