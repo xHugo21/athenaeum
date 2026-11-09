@@ -12,6 +12,9 @@
   .meta .sep { color: var(--line-2); }
   .meta a { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
   .meta a:hover { color: var(--text); }
+  .meta .inline-form { display: inline-flex; margin: 0; }
+  .meta .linkbtn { font-size: 13px; }
+  .meta-actions { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
   .rate-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
   .rate-row .of { font-size: 12px; color: var(--muted); }
   .progress-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -47,6 +50,7 @@
   .bm-row .t { font-size: 13px; color: var(--text-2); }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
   @media (max-width: 760px) {
+    .meta .isbn-part { display: none; }
     .book-layout { grid-template-columns: 1fr; gap: 24px; }
     .cover-col { position: static; flex-direction: column; align-items: center; gap: 10px; }
     .cover-col .cover { width: min(100%, calc(60vh * 2 / 3)); aspect-ratio: 2 / 3; }
@@ -63,18 +67,6 @@
 
 <div class="page-head">
   <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
-  <div class="actions">
-    <form method="post" action="/books/{{ b['id'] }}/finished">
-      <input type="hidden" name="finished" value="{{ 0 if done else 1 }}">
-      <button class="btn" type="submit">
-        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-{{ 'x' if done else 'check' }}"/></svg>
-        {{ 'Mark as unread' if done else 'Mark as read' }}
-      </button>
-    </form>
-    <a class="btn" href="/books/{{ b['id'] }}/highlights.md" download>
-      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export highlights
-    </a>
-  </div>
 </div>
 
 <div class="book-layout">
@@ -107,12 +99,19 @@
   <div class="book-main">
     <div id="hdr-view">
       <h1>{{ b['title'] }}</h1>
-      <p class="meta">
+      <div class="meta">
         <span>{{ b['author'] or 'Unknown author' }}</span>
-        {% if b['isbn'] %}<span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a>{% endif %}
+        {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a></span>{% endif %}
         <span class="sep">·</span>
-        <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
-      </p>
+        <span class="meta-actions">
+          <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
+          <span class="sep">·</span>
+          <form class="inline-form" method="post" action="/books/{{ b['id'] }}/finished">
+            <input type="hidden" name="finished" value="{{ 0 if done else 1 }}">
+            <button class="linkbtn" type="submit">{{ 'Mark as unread' if done else 'Mark as read' }}</button>
+          </form>
+        </span>
+      </div>
     </div>
 
     <form id="hdr-edit" method="post" action="/books/{{ b['id'] }}/edit" hidden class="edit-form" style="margin-top:14px">
@@ -194,6 +193,11 @@
   <div class="section-head">
     <h2>Highlights <span class="count num">{{ hls | length }}</span></h2>
     <div class="actions">
+      {% if hls %}
+      <a class="btn sm btn-ghost" href="/books/{{ b['id'] }}/highlights.md" download title="Download these highlights as Markdown">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export
+      </a>
+      {% endif %}
       <a class="btn sm" href="/books/{{ b['id'] }}/highlights/edit">
         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add
       </a>
