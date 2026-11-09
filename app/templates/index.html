@@ -1,407 +1,465 @@
 {% extends "base.html" %}
 {% block title %}Library · athenaeum{% endblock %}
 {% block content %}
-{% if error %}<p class="flash error" onanimationend="this.remove()">{{ error }}</p>{% endif %}
-{% if imported %}<p class="flash" onanimationend="this.remove()">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
-{% if added %}<p class="flash" onanimationend="this.remove()">Book added.</p>{% endif %}
+<style>
+  .layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 36px; }
+  .rail { position: sticky; top: 76px; align-self: start; display: flex; flex-direction: column; gap: 26px; }
+  .rail-group > .label { margin-bottom: 8px; }
+  .rail-list { display: flex; flex-direction: column; gap: 1px; }
+  .rail-list button, .rail-list a {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    height: 30px; padding: 0 8px; margin: 0 -8px;
+    border: 0; border-radius: 5px; background: none;
+    color: var(--text-2); font-size: 13px; text-align: left; cursor: pointer;
+  }
+  .rail-list button:hover, .rail-list a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+  .rail-list b { font-size: 11px; font-weight: 400; color: var(--muted); }
+  .rail-list [aria-pressed="true"], .rail-list a[aria-current] { background: var(--surface-2); color: var(--text); font-weight: 500; }
+  .rail-list [aria-pressed="true"] span::before, .rail-list a[aria-current] span::before {
+    content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); margin-right: 8px; vertical-align: 2px;
+  }
+  .chip {
+    height: 26px; display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 8px; margin-left: 2px;
+    border: 1px solid var(--line-2); border-radius: 999px;
+    background: var(--surface-2); color: var(--text-2);
+    font-size: 12px; cursor: pointer;
+  }
+  .chip:hover { color: var(--text); border-color: var(--muted); }
+  .results { min-width: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 26px 20px; }
+  .book { display: flex; flex-direction: column; gap: 10px; color: inherit; }
+  .book:hover { text-decoration: none; }
+  .book .cover { transition: transform .18s ease, box-shadow .18s ease; }
+  .book:hover .cover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+  .book .bm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .bm-title { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .book:hover .bm-title { color: var(--accent-strong); }
+  .bm-author { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .book .track { margin-top: 9px; }
+  .bm-readout { display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .shelf-group { margin-bottom: 18px; }
+  .shelf { display: flex; align-items: flex-end; gap: 4px; padding: 18px 4px 0; min-height: 220px; }
+  .book-spine {
+    flex: 0 0 auto; background: var(--spine); border-radius: 2px 2px 0 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    position: relative; transition: transform .16s ease; cursor: pointer;
+  }
+  .book-spine:hover { transform: translateY(-4px); z-index: 1; text-decoration: none; }
+  .book-spine.hidden { display: none; }
+  .spine-text {
+    writing-mode: vertical-rl; font-size: 11px; font-weight: 500; letter-spacing: .01em;
+    color: rgba(255, 255, 255, .93); padding: 10px 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .shelf-board { height: 1px; background: var(--line-2); }
+  .shelf-caption { min-height: 20px; padding-top: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 20px; }
+    .rail {
+      position: static; flex-direction: row; gap: 22px;
+      overflow-x: auto; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+      scrollbar-width: none;
+      mask-image: linear-gradient(90deg, #000 88%, transparent);
+      -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    }
+    .rail::-webkit-scrollbar { display: none; }
+    .rail-group { flex: 0 0 auto; }
+    .rail-list { flex-direction: row; gap: 4px; }
+    .rail-list button, .rail-list a {
+      height: 28px; padding: 0 10px; margin: 0;
+      border: 1px solid var(--line); border-radius: 999px; white-space: nowrap;
+    }
+    .rail-list [aria-pressed="true"], .rail-list a[aria-current] { border-color: var(--accent-line); background: var(--accent-soft); }
+    .rail-list [aria-pressed="true"] span::before, .rail-list a[aria-current] span::before { display: none; }
+    .shelf { min-height: 0; }
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
+    .book .track { margin-top: 7px; }
+  }
+</style>
+{% set rated = books | selectattr('rating') | list %}
+{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0, unread=0) %}
+{% for b in books %}
+  {% set ns.secs = ns.secs + (b['total_seconds'] or 0) %}
+  {% set ns.pages = ns.pages + (b['pages_read'] or 0) %}
+  {% if not b['pages_read'] %}{% set ns.unread = ns.unread + 1 %}
+  {% elif b['total_pages'] and b['pages_read'] >= b['total_pages'] %}{% set ns.finished = ns.finished + 1 %}
+  {% else %}{% set ns.reading = ns.reading + 1 %}{% endif %}
+{% endfor %}
+{% for b in rated %}{% set ns.stars = ns.stars + (b['rating'] or 0) %}{% endfor %}
+
+{% if error %}<p class="flash error" role="status" onanimationend="this.remove()">{{ error }}</p>{% endif %}
+{% if imported %}<p class="flash" role="status" onanimationend="this.remove()">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
+{% if added %}<p class="flash" role="status" onanimationend="this.remove()">Book added.</p>{% endif %}
 {% if error or imported or added %}<script>history.replaceState(null, '', '/')</script>{% endif %}
 
-<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
-  <h1 style="margin:0">Library</h1>
-  <div style="display:flex;gap:.5rem">
-    <div class="view-toggle" id="view-toggle">
-      <span class="view-opt on" onclick="setView(false)" title="Grid view">🪟</span>
-      <span class="view-opt" onclick="setView(true)" title="Shelf view">📚</span>
+<div class="page-head">
+  <div class="title">
+    <h1>Library</h1>
+    <span class="count num" id="book-count" aria-live="polite">{{ books | length }} titles</span>
+    <button class="chip" id="filter-chip" type="button" onclick="resetFilters()" hidden>
+      <span id="filter-chip-label"></span><span aria-hidden="true">×</span>
+    </button>
+  </div>
+  <div class="actions">
+    <div class="search">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="search" id="q" placeholder="Search title or author" autocomplete="off" aria-label="Search library">
     </div>
-    <button class="btn-ghost" onclick="panel('add-card', this)">+ Add book</button>
-    <button class="btn-ghost" onclick="panel('import-card', this)">⬆ Import</button>
-    <button class="btn-ghost" onclick="location.href='/db/download'">⬇ Backup</button>
+    <div class="seg" role="group" aria-label="Library layout">
+      <button type="button" id="view-grid" aria-pressed="true" onclick="setView(false)">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-grid"/></svg>Grid
+      </button>
+      <button type="button" id="view-shelf" aria-pressed="false" onclick="setView(true)">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-shelf"/></svg>Shelf
+      </button>
+    </div>
+    <button class="btn" type="button" onclick="panel('add-card', this)" aria-controls="add-card" aria-expanded="false">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add
+    </button>
+    <button class="btn" type="button" onclick="panel('import-card', this)" aria-controls="import-card" aria-expanded="false">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Import
+    </button>
+    <a class="btn btn-ghost" href="/db/download" title="Download the database file" aria-label="Download the database file">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg><span class="hide-sm">Backup</span>
+    </a>
   </div>
 </div>
 
-<div id="import-card" hidden class="card" style="margin-bottom:1rem">
-  <h2 style="margin-top:0">Import KOReader stats</h2>
-  <form id="import-form" method="post" action="/import" enctype="multipart/form-data">
-    <label class="btn" id="import-btn" style="cursor:pointer">
-      📂 Choose file
-      <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="document.getElementById('import-btn').style.display='none';document.getElementById('import-spinner').style.display='flex';this.form.submit()" style="display:none">
+<div class="summary">
+  <div><div class="label">Time read</div><div class="v num">{{ ns.secs | read_hm }}</div></div>
+  <div><div class="label">Pages read</div><div class="v num">{{ ns.pages | comma }}</div></div>
+  <div><div class="label">Titles</div><div class="v num">{{ books | length }}</div></div>
+  <div><div class="label">Average rating</div><div class="v num">{{ (ns.stars / (rated | length)) | round(1) if rated else '—' }}</div></div>
+</div>
+
+<div class="panel" id="import-card" hidden>
+  <h2>Import KOReader statistics</h2>
+  <form id="import-form" method="post" action="/import" enctype="multipart/form-data" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <label class="btn btn-primary" id="import-btn" style="cursor:pointer">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Choose file
+      <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="document.getElementById('import-btn').style.display='none';document.getElementById('import-spinner').hidden=false;this.form.submit()" style="display:none">
     </label>
-    <span id="import-spinner" style="display:none;align-items:center;gap:.5rem;color:var(--accent);font-weight:600">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation:spin .8s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+    <span id="import-spinner" hidden style="display:flex;align-items:center;gap:8px;color:var(--accent-strong);font-size:13px;font-weight:500">
+      <svg class="icon" viewBox="0 0 24 24" style="animation:spin .8s linear infinite" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
       Importing…
     </span>
-    <span class="muted" style="margin-left:.5rem">statistics.sqlite3 from KOReader</span>
+    <span class="muted" style="font-size:13px">statistics.sqlite3 from your e-reader. Existing books are updated, not duplicated.</span>
   </form>
 </div>
 
-<div id="add-card" hidden class="card" style="margin-bottom:1rem">
-  <h2 style="margin-top:0">Add a book</h2>
+<div class="panel" id="add-card" hidden>
+  <h2>Add a book</h2>
   <form method="post" action="/books">
-    <div class="form-group">
-      <label>Title *</label>
-      <input name="title" required style="width:100%">
-    </div>
-    <div class="form-row">
-      <div class="form-group" style="flex:1.5;min-width:10rem">
-        <label>Author</label>
-        <input name="author" style="width:100%">
+    <div class="form-grid">
+      <label class="field span-6"><span>Title</span><input id="f-title" name="title" required autofocus></label>
+      <label class="field span-4"><span>Author</span><input id="f-author" name="author"></label>
+      <label class="field span-2"><span>Pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
+      <label class="field span-4"><span>ISBN</span><input id="f-isbn" name="isbn" inputmode="numeric" placeholder="9780140328721"></label>
+      <div class="field span-4"><span>Rating</span>
+        <input type="hidden" name="rating" id="rate-val" value="0">
+        {% include "_stars.html" %}
       </div>
-      <div class="form-group" style="flex:1;min-width:8rem">
-        <label>ISBN</label>
-        <input name="isbn" style="width:100%">
-      </div>
-      <div class="form-group" style="flex:.7;min-width:5.5rem">
-        <label>Pages</label>
-        <input name="pages" type="number" min="1" style="width:100%">
-      </div>
+      <label class="field span-12"><span>Review</span><textarea id="f-review" name="review" rows="3" placeholder="Optional. You can write this later."></textarea></label>
     </div>
-    <div class="form-group">
-      <label>Rating</label>
-      <input type="hidden" name="rating" id="rate-val" value="0">
-      <span class="stars" style="font-size:1.4rem;cursor:pointer" title="Click to rate">
-        <span>☆☆☆☆☆</span><span class="fill" id="rate-fill" style="width:0">★★★★★</span>
-        {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="document.getElementById('rate-val').value=this.dataset.v;document.getElementById('rate-fill').style.width=(this.dataset.v*20)+'%'" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
-      </span>
-      <button type="button" class="muted" style="background:none;border:0;padding:0;margin-left:.4rem;font-size:.75rem;color:var(--muted);cursor:pointer" onclick="document.getElementById('rate-val').value=0;document.getElementById('rate-fill').style.width=0">clear</button>
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn btn-primary">Add book</button>
+      <button class="btn btn-ghost" type="button" onclick="panel('add-card')">Cancel</button>
     </div>
-    <div class="form-group" style="margin-bottom:1rem">
-      <label>Review</label>
-      <textarea name="review" rows="2"></textarea>
-    </div>
-    <button>Add book</button>
   </form>
 </div>
 
-<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem">
-  <h2 id="book-count" style="margin:0">Books ({{ books | length }})</h2>
-  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-    <div class="search">
-      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
-      </svg>
-      <input type="search" id="q" placeholder="Search" autocomplete="off" aria-label="Filter books">
+<div class="layout">
+  <aside class="rail" aria-label="Filter and sort">
+    <div class="rail-group">
+      <div class="label">Progress</div>
+      <div class="rail-list" data-filter="progress">
+        <button type="button" data-value="all" aria-pressed="true"><span>All books</span><b class="num">{{ books | length }}</b></button>
+        <button type="button" data-value="reading" aria-pressed="false"><span>Reading</span><b class="num">{{ ns.reading }}</b></button>
+        <button type="button" data-value="finished" aria-pressed="false"><span>Finished</span><b class="num">{{ ns.finished }}</b></button>
+        <button type="button" data-value="unread" aria-pressed="false"><span>Not started</span><b class="num">{{ ns.unread }}</b></button>
+      </div>
     </div>
-    <div class="muted" style="display:flex;gap:.75rem;align-items:baseline">
-      {% for key, label in [('recent', 'Recent'), ('title', 'Title'), ('rating', 'Rating')] %}
-      <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}"
-         style="color:{{ 'var(--accent)' if sort == key else 'var(--muted)' }};font-weight:{{ 600 if sort == key else 400 }};text-decoration:none">
-        {{ label }}{% if sort == key %} {{ '↓' if dir == 'desc' else '↑' }}{% endif %}
+    <div class="rail-group">
+      <div class="label">Rating</div>
+      <div class="rail-list" data-filter="rating">
+        <button type="button" data-value="any" aria-pressed="true"><span>Any rating</span></button>
+        <button type="button" data-value="5" aria-pressed="false"><span>5 stars</span></button>
+        <button type="button" data-value="4" aria-pressed="false"><span>4 stars</span></button>
+        <button type="button" data-value="3" aria-pressed="false"><span>3 stars</span></button>
+        <button type="button" data-value="2" aria-pressed="false"><span>2 stars</span></button>
+        <button type="button" data-value="1" aria-pressed="false"><span>1 star</span></button>
+        <button type="button" data-value="none" aria-pressed="false"><span>Unrated</span></button>
+      </div>
+    </div>
+    <div class="rail-group">
+      <div class="label">Sort</div>
+      <div class="rail-list sort">
+        {% for key, text in [('recent', 'Recently read'), ('title', 'Title'), ('rating', 'Rating')] %}
+        <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}" {% if sort == key %}aria-current="true"{% endif %}>
+          <span>{{ text }}</span>
+          {% if sort == key %}<b class="num">{{ '↓' if dir == 'desc' else '↑' }}</b>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+
+  <div class="results">
+    {% if books %}
+    <div id="grid-view" class="grid">
+      {% for b in books %}
+      {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
+      {% set state = 'unread' if not b['pages_read'] else ('finished' if pct is not none and pct >= 100 else 'reading') %}
+      <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
+        <div class="cover">
+          <div class="cover-fallback">
+            <div class="initial">{{ b['title'][:1] | upper }}</div>
+            <div class="t">{{ b['title'] }}</div>
+            <div class="a">{{ b['author'] or '' }}</div>
+          </div>
+          <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="" loading="lazy"
+               onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
+        </div>
+        <div class="bm">
+          <div class="bm-row">
+            <span class="bm-title">{{ b['title'] }}</span>
+            {% if b['rating'] %}
+            <span class="rating" title="{{ b['rating'] }} out of 5"><svg class="icon icon-sm" aria-hidden="true" style="fill:currentColor"><use href="#i-star"/></svg><span class="num">{{ b['rating'] | round(1) }}</span></span>
+            {% endif %}
+          </div>
+          <div class="bm-author">{{ b['author'] or 'Unknown author' }}</div>
+          <div class="track{% if not pct %} quiet{% endif %}"><span style="width:{{ pct if pct else 0 }}%"></span></div>
+          <div class="bm-readout">
+            {% if pct is none %}<span class="num">—</span>
+            {% elif pct >= 100 %}<span class="num">finished</span>
+            {% else %}<span class="num">{{ pct }}%</span>{% endif %}
+            <span class="num">{{ b['total_seconds'] | read_hm if b['total_seconds'] else '' }}</span>
+          </div>
+        </div>
       </a>
       {% endfor %}
     </div>
+
+    <div id="shelf-view" hidden>
+      <div id="shelves"></div>
+    </div>
+
+    <div id="no-results" class="empty" hidden>
+      Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
+    </div>
+
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('unread' if not b['pages_read'] else ('finished' if b['total_pages'] and b['pages_read'] >= b['total_pages'] else 'reading')) | tojson }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    {% else %}
+    <div class="empty">
+      No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
+    </div>
+    {% endif %}
   </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 {% if books %}
-<div id="grid-view" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:1rem">
-  {% for b in books %}
-  <a href="/books/{{ b['id'] }}" class="grid-item" style="text-decoration:none;color:inherit">
-    <div class="cover" style="--ph:hsl {{ (b['title'] | length * 47) % 360 }},35%,88%;--ph-fg:hsl {{ (b['title'] | length * 47) % 360 }},45%,30%">
-      <div class="cover-fallback">
-        <div class="cover-initial">{{ b['title'][:1] | upper }}</div>
-        <div style="font-weight:600;font-size:.85rem;line-height:1.25">{{ b['title'] }}</div>
-        <div class="muted" style="font-size:.72rem;margin-top:.25rem">{{ b['author'] or '' }}</div>
-      </div>
-      <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="{{ b['title'] }}" loading="lazy"
-           onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
-    </div>
-    <div style="color:#e6a817;font-size:.85rem"><span class="stars"><span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span></span></div>
-    {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
-    <div class="muted" style="margin-top:.2rem;font-size:.75rem"><span style="{{ 'color:var(--accent);font-weight:600' if pct and pct >= 90 }}">{{ pct ~ '%' if pct is not none else '—' }}</span>{% if b['total_seconds'] %} / {{ b['total_seconds'] | read_hm }}{% endif %}</div>
-  </a>
-  {% endfor %}
-</div>
-
-<div id="shelf-view" style="display:none">
-  <div id="shelves"></div>
-</div>
-<script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
-{% else %}
-<p class="muted" style="margin-top:.5rem">No books yet. Use <strong>+ Add book</strong> or <strong>⬆ Import</strong> above.</p>
-{% endif %}
-
 <script>
-function panel(id, btn) {
-  const open = !document.getElementById(id).hidden;
-  document.getElementById('add-card').hidden = true;
-  document.getElementById('import-card').hidden = true;
-  document.querySelectorAll('.btn-ghost.on').forEach(b => b.classList.remove('on'));
-  if (!open) {
-    document.getElementById(id).hidden = false;
-    btn.classList.add('on');
+  const booksData = JSON.parse(document.getElementById('book-data').textContent);
+  const byId = new Map(booksData.map(b => [String(b.id), b]));
+  const state = { progress: 'all', rating: 'any', q: localStorage.getItem('athenaeum-q') || '' };
+  const q = document.getElementById('q');
+  q.value = state.q;
+
+  const SPINES = ['oklch(46% .06 %h)', 'oklch(38% .05 %h)', 'oklch(52% .07 %h)', 'oklch(42% .04 %h)', 'oklch(34% .06 %h)', 'oklch(56% .05 %h)'];
+
+  function matches(b) {
+    if (state.q && !(b.title.toLowerCase().includes(state.q) || (b.author || '').toLowerCase().includes(state.q))) return false;
+    if (state.progress !== 'all' && b.state !== state.progress) return false;
+    if (state.rating === 'none' && b.rating) return false;
+    if (state.rating !== 'any' && state.rating !== 'none' && Math.floor(b.rating) !== Number(state.rating)) return false;
+    return true;
   }
-}
-function buildShelves() {
-  const SPINES = ['62% .13 42', '55% .14 38', '48% .13 34', '58% .11 55', '50% .10 50', '43% .09 40'];
-  const books = JSON.parse(document.getElementById('book-data').textContent);
-  if (!books.length) return;
-  const maxPages = Math.max(...books.map(b => b.pages)) || 1;
-  const container = document.getElementById('shelves');
-  const GAP = 3;
-  const PAD = 4;
-  const usable = container.clientWidth - PAD * 2;
-  if (usable <= 0) return;
-  const shelves = [];
-  let cur = [], curW = 0;
-  for (const b of books) {
-    const px = Math.round(24 + Math.sqrt(b.pages) / Math.sqrt(maxPages) * 40);
-    b._w = px;
-    b._h = 240 + Math.round(((b.id * 7 + b.pages * 3) % 60) - 30);
-    if (cur.length && curW + GAP + px > usable) {
-      shelves.push(cur);
-      cur = [];
-      curW = 0;
-    }
-    cur.push(b);
-    curW += (cur.length > 1 ? GAP : 0) + px;
-  }
-  if (cur.length) shelves.push(cur);
-  container.innerHTML = '';
-  for (const row of shelves) {
-    const shelf = document.createElement('div');
-    shelf.className = 'bookshelf';
-    for (const b of row) {
-      const a = document.createElement('a');
-      a.href = '/books/' + b.id;
-      a.className = 'book-spine';
-      a.style.width = b._w + 'px';
-      a.style.height = b._h + 'px';
-      a.style.setProperty('--shade', SPINES[b.hue % SPINES.length]);
-      a.dataset.label = b.title + (b.author ? ' — ' + b.author : '');
-      a.title = b.title + (b.author ? ' — ' + b.author : '');
-      a.innerHTML = `<span class="spine-text">${b.title}${b.author ? ' • ' + b.author : ''}</span>`;
-      shelf.appendChild(a);
-    }
-    const group = document.createElement('div');
-    group.className = 'shelf-group';
-    group.appendChild(shelf);
-    const board = document.createElement('div');
-    board.className = 'shelf-board';
-    group.appendChild(board);
-    const caption = document.createElement('div');
-    caption.className = 'shelf-caption';
-    group.appendChild(caption);
-    shelf.addEventListener('mouseover', e => {
-      const s = e.target.closest('.book-spine');
-      if (s) caption.textContent = s.dataset.label;
+
+  function radial() {
+    const ids = new Set(booksData.filter(matches).map(b => String(b.id)));
+    document.querySelectorAll('#grid-view .book').forEach(el => { el.hidden = !ids.has(el.dataset.id); });
+    document.querySelectorAll('#shelves .book-spine').forEach(a => {
+      a.classList.toggle('hidden', !ids.has(a.dataset.id));
     });
-    shelf.addEventListener('mouseleave', () => caption.textContent = '');
-    container.appendChild(group);
-  }
-}
-function setView(showShelf) {
-  const grid = document.getElementById('grid-view');
-  const shelf = document.getElementById('shelf-view');
-  const opts = document.querySelectorAll('#view-toggle .view-opt');
-  grid.style.display = showShelf ? 'none' : 'grid';
-  shelf.style.display = showShelf ? 'block' : 'none';
-  opts[0].classList.toggle('on', !showShelf);
-  opts[1].classList.toggle('on', showShelf);
-  if (showShelf) setTimeout(() => { buildShelves(); applyFilter(); }, 50);
-  localStorage.setItem('athenaeum-shelf', showShelf ? '1' : '0');
-}
-function applyFilter() {
-  const q = (document.getElementById('q').value || '').trim().toLowerCase();
-  const books = JSON.parse(document.getElementById('book-data').textContent);
-  const matches = new Set();
-  for (const b of books) {
-    if (!q || b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q)) {
-      matches.add(b.id);
+    document.querySelectorAll('#shelves .shelf-group').forEach(g => {
+      g.hidden = !g.querySelector('.book-spine:not(.hidden)');
+    });
+    const none = document.getElementById('no-results');
+    if (none) none.hidden = ids.size > 0;
+    const count = document.getElementById('book-count');
+    if (count) count.textContent = (state.q || state.progress !== 'all' || state.rating !== 'any')
+      ? `${ids.size} of ${booksData.length} titles`
+      : `${booksData.length} titles`;
+    const chip = document.getElementById('filter-chip');
+    const chipLabel = document.getElementById('filter-chip-label');
+    if (chip) {
+      const parts = [];
+      if (state.q) parts.push(`“${state.q}”`);
+      if (state.progress !== 'all') parts.push(state.progress === 'unread' ? 'not started' : state.progress);
+      if (state.rating !== 'any') parts.push(state.rating === 'none' ? 'unrated' : state.rating + ' stars');
+      chip.hidden = parts.length === 0;
+      chipLabel.textContent = parts.join(' · ');
     }
   }
-  document.querySelectorAll('#grid-view > a').forEach((a, i) => {
-    const id = books[i] && books[i].id;
-    a.style.display = matches.has(id) ? '' : 'none';
-  });
-  document.querySelectorAll('#shelves .book-spine').forEach(s => {
-    const id = +s.href.split('/').pop();
-    s.classList.toggle('hidden', !matches.has(id));
-  });
-  document.querySelectorAll('#shelves .shelf-group').forEach(g => {
-    g.style.display = g.querySelector('.book-spine:not(.hidden)') ? '' : 'none';
-  });
-  const h2 = document.getElementById('book-count');
-  if (h2) {
-    const base = '{{ books | length }}';
-    h2.textContent = q ? `Books (${matches.size} of ${base})` : `Books (${base})`;
+
+  function setFilter(group, value) {
+    state[group] = value;
+    document.querySelectorAll(`[data-filter="${group}"] button`).forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.value === value));
+    });
+    radial();
   }
-  localStorage.setItem('athenaeum-q', q);
-}
-document.getElementById('q').addEventListener('input', applyFilter);
-const savedQ = localStorage.getItem('athenaeum-q');
-if (savedQ) { document.getElementById('q').value = savedQ; }
-if (document.getElementById('shelf-view').style.display === 'block') {
-  setTimeout(() => { buildShelves(); applyFilter(); }, 50);
-} else {
-  applyFilter();
-}
-if (localStorage.getItem('athenaeum-shelf') === '1') {
-  document.getElementById('grid-view').style.display = 'none';
-  document.getElementById('shelf-view').style.display = 'block';
-  document.querySelectorAll('#view-toggle .view-opt')[0].classList.remove('on');
-  document.querySelectorAll('#view-toggle .view-opt')[1].classList.add('on');
-  setTimeout(buildShelves, 50);
-}
+
+  function resetFilters() {
+    q.value = '';
+    state.q = '';
+    setFilter('progress', 'all');
+    setFilter('rating', 'any');
+    paintShelves();
+    radial();
+  }
+
+  document.querySelectorAll('[data-filter] button').forEach(btn => {
+    btn.addEventListener('click', () => setFilter(btn.closest('[data-filter]').dataset.filter, btn.dataset.value));
+  });
+
+  q.addEventListener('input', () => {
+    state.q = q.value.trim().toLowerCase();
+    localStorage.setItem('athenaeum-q', state.q);
+    radial();
+  });
+
+  document.addEventListener('keydown', e => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      q.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === q) {
+      q.value = '';
+      state.q = '';
+      localStorage.removeItem('athenaeum-q');
+      q.blur();
+      radial();
+    }
+  });
+
+  function buildShelves() {
+    const books = booksData;
+    const box = document.getElementById('shelves');
+    if (!books.length || !box.clientWidth) return;
+    const maxPages = Math.max(...books.map(b => b.pages)) || 1;
+    const GAP = 4, PAD = 6;
+    const usable = box.clientWidth - PAD * 2;
+    const rows = [];
+    let row = [], width = 0;
+    for (const b of books) {
+      b._w = Math.round(26 + Math.sqrt(b.pages) / Math.sqrt(maxPages) * 44);
+      b._h = 236 + Math.round((((b.id * 7 + b.pages * 3) % 60) - 30) * .8);
+      if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
+      row.push(b);
+      width += (row.length > 1 ? GAP : 0) + b._w;
+    }
+    if (row.length) rows.push(row);
+    box.innerHTML = '';
+    for (const r of rows) {
+      const group = document.createElement('div');
+      group.className = 'shelf-group';
+      const shelf = document.createElement('div');
+      shelf.className = 'shelf';
+      for (const b of r) {
+        const a = document.createElement('a');
+        a.href = '/books/' + b.id;
+        a.className = 'book-spine';
+        a.dataset.id = String(b.id);
+        a.dataset.label = b.title + (b.author ? ' — ' + b.author : '');
+        a.title = a.dataset.label;
+        a.style.width = b._w + 'px';
+        a.style.height = b._h + 'px';
+        a.style.setProperty('--spine', SPINES[b.hue % SPINES.length].replace('%h', (b.hue % 360) + ''));
+        a.innerHTML = '<span class="spine-text">' + b.title + (b.author ? ' · ' + b.author : '') + '</span>';
+        shelf.appendChild(a);
+      }
+      const board = document.createElement('div');
+      board.className = 'shelf-board';
+      const caption = document.createElement('div');
+      caption.className = 'shelf-caption num';
+      shelf.addEventListener('mouseover', e => {
+        const s = e.target.closest('.book-spine');
+        if (s) caption.textContent = s.dataset.label;
+      });
+      shelf.addEventListener('mouseleave', () => { caption.textContent = ''; });
+      group.append(shelf, board, caption);
+      box.appendChild(group);
+    }
+  }
+
+  function paintShelves() {
+    if (!shelvesBuilt) return;
+    buildShelves();
+    radial();
+  }
+
+  let shelvesBuilt = false;
+  function setView(shelf) {
+    document.getElementById('grid-view').hidden = shelf;
+    document.getElementById('shelf-view').hidden = !shelf;
+    document.getElementById('view-grid').setAttribute('aria-pressed', String(!shelf));
+    document.getElementById('view-shelf').setAttribute('aria-pressed', String(shelf));
+    localStorage.setItem('athenaeum-shelf', shelf ? '1' : '0');
+    if (shelf) {
+      shelvesBuilt = true;
+      buildShelves();
+      radial();
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
+  });
+
+  if (localStorage.getItem('athenaeum-shelf') === '1') setView(true);
+  radial();
+
+  function panel(id, btn) {
+    const el = document.getElementById(id);
+    const open = !el.hidden;
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
+    document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    if (!open) {
+      el.hidden = false;
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+      el.querySelector('input, textarea')?.focus({ preventScroll: true });
+    }
+  }
+
+
+  const rateRoot = document.querySelector('.stars-input');
+  if (rateRoot) {
+    const hidden = document.getElementById('rate-val');
+    const paint = v => {
+      hidden.value = v;
+      rateRoot.querySelectorAll('.star').forEach(star => {
+        const i = Number(star.dataset.star);
+        star.classList.toggle('on', i <= v);
+        star.classList.toggle('half', i - 0.5 === Number(v));
+      });
+      rateRoot.querySelectorAll('button').forEach(b => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.v) === Number(v)));
+      });
+    };
+    rateRoot.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => paint(Number(btn.dataset.v)));
+    });
+    paint(Number(hidden.value) || 0);
+  }
 </script>
-<style>
-.grid-item {
-  display: block;
-  text-align: center;
-  transition: transform .15s ease;
-}
-.grid-item:hover { text-decoration: none; }
-.grid-item .cover {
-  margin-bottom: .6rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,.08);
-  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
-}
-.grid-item:hover .cover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
-  filter: brightness(1.04) saturate(1.05);
-}
-.view-toggle {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  line-height: 1;
-  height: 2rem;
-}
-.search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 2rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  transition: border-color .15s, box-shadow .15s;
-}
-.search:hover { border-color: var(--muted); }
-.search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-.search-icon {
-  flex: 0 0 auto;
-  margin-left: .65rem;
-  margin-right: .35rem;
-  color: var(--muted);
-  transition: color .15s;
-}
-.search:focus-within .search-icon { color: var(--accent); }
-.search input {
-  border: 0 !important;
-  background: transparent !important;
-  outline: 0 !important;
-  box-shadow: none !important;
-  padding: 0 .65rem 0 0 !important;
-  width: 10rem;
-  font-size: .85rem;
-  height: 100%;
-  border-radius: 0 !important;
-  color: var(--text);
-}
-.search input::placeholder { color: var(--muted); }
-.search input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-left: .35rem;
-  border-radius: 50%;
-  background: var(--border);
-  cursor: pointer;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 3l6 6M9 3l-6 6' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>");
-  background-size: 8px 8px;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.search input::-webkit-search-cancel-button:hover { background-color: var(--muted); }
-.view-opt {
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: .9rem;
-  line-height: 1;
-  opacity: .45;
-  transition: opacity .15s, background .15s;
-  user-select: none;
-  border: none;
-  margin: 0;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.view-opt:hover { opacity: .7; }
-.view-opt.on {
-  opacity: 1;
-  background: var(--accent-light);
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-.bookshelf {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  padding: 1.5rem .25rem 0;
-  min-height: 16rem;
-}
-.shelf-board {
-  height: 2px;
-  background: var(--border);
-}
-.shelf-caption {
-  min-height: 1.9rem;
-  padding-top: .5rem;
-  font-size: .8rem;
-  line-height: 1.4;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.shelf-group {
-  margin-bottom: 1.25rem;
-}
-.book-spine {
-  flex: 0 0 auto;
-  background: oklch(var(--shade));
-  color: oklch(94% .02 60);
-  border-radius: 2px 2px 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  position: relative;
-  transition: transform .15s ease;
-  cursor: pointer;
-  overflow: hidden;
-}
-.book-spine:hover {
-  text-decoration: none;
-  transform: translateY(-4px);
-  z-index: 1;
-}
-.book-spine.hidden { display: none; }
-.spine-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-family: 'Merriweather', Georgia, serif;
-  font-weight: 700;
-  font-size: .72rem;
-  letter-spacing: .02em;
-  line-height: 1.15;
-  padding: .75rem .25rem;
-  height: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@media (max-width: 480px) {
-  #grid-view { grid-template-columns: repeat(2, 1fr) !important; }
-}
-</style>
+{% endif %}
 {% endblock %}

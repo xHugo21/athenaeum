@@ -1,185 +1,257 @@
 {% extends "base.html" %}
 {% block title %}{{ b['title'] }} · athenaeum{% endblock %}
 {% block content %}
-{% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
+<style>
+  .book-layout { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 40px; align-items: start; }
+  .cover-col { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 10px; }
+  .cover-col .cover { border-radius: var(--r); }
+  .cover-tools { display: flex; gap: 6px; }
+  .book-main { min-width: 0; }
+  .book-main h1 { font-size: 26px; line-height: 1.2; }
+  .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--text-2); }
+  .meta .sep { color: var(--line-2); }
+  .meta a { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
+  .meta a:hover { color: var(--text); }
+  .rate-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .rate-row .of { font-size: 12px; color: var(--muted); }
+  .progress-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .progress-head .pct { font-size: 13px; font-weight: 500; }
+  .progress-head .pages { font-size: 12px; color: var(--muted); }
+  .progress-block .track { height: 5px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px 24px; margin-top: 22px; }
+  .fact .v { font-size: 17px; font-weight: 500; letter-spacing: -.01em; margin-top: 2px; }
+  .fact .s { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 560px; }
+  .edit-form .wide { grid-column: span 2; }
+  .hl-list { display: flex; flex-direction: column; }
+  .hl { padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .hl:last-child { border-bottom: 0; }
+  .hl-quote { display: flex; gap: 12px; }
+  .hl-swatch { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 7px; border-radius: 2px; background: var(--hl, var(--accent)); }
+  .hl-text { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; }
+  .hl-note { font-size: 13px; line-height: 1.6; color: var(--text-2); margin: 6px 0 0 20px; white-space: pre-wrap; }
+  .hl-meta { display: flex; align-items: center; gap: 10px; margin: 8px 0 0 20px; font-size: 12px; color: var(--muted); }
+  .hl-meta a { color: var(--muted); }
+  .hl-meta a:hover { color: var(--text); }
+  .bm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .bm-row:last-child { border-bottom: 0; }
+  .bm-row .n { font-size: 12px; color: var(--muted); }
+  .bm-row .t { font-size: 13px; color: var(--text-2); }
+  .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+  @media (max-width: 760px) {
+    .book-layout { grid-template-columns: 1fr; gap: 24px; }
+    .cover-col { position: static; flex-direction: row; align-items: flex-start; gap: 16px; }
+    .cover-col .cover { width: 128px; flex: 0 0 auto; }
+    .cover-col .cover-tools { flex-direction: column; }
+    .edit-form { grid-template-columns: 1fr; }
+    .edit-form .wide { grid-column: span 1; }
+    .book-main h1 { font-size: 22px; }
+  }
+</style>
 
-<div style="display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:2rem">
-  <div style="flex:0 0 auto;width:14.7rem">
-    <div class="cover" style="border-radius:var(--radius);box-shadow:var(--shadow-md);position:relative" onmouseenter="this.querySelectorAll('.cover-upload').forEach(e=>e.style.opacity=1)" onmouseleave="this.querySelectorAll('.cover-upload').forEach(e=>e.style.opacity=0)">
-      <div style="padding:1.25rem;text-align:center">
-        <div style="font-family:'Merriweather',Georgia,serif;font-weight:700;font-size:1.05rem;line-height:1.4;color:var(--text)">{{ b['title'] }}</div>
-        <div style="font-size:.85rem;margin-top:.4rem">{{ b['author'] or '' }}</div>
+{% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
+{% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int if b['total_pages'] else none %}
+
+<div class="page-head">
+  <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
+  <div class="actions">
+    <a class="btn" href="/books/{{ b['id'] }}/highlights.md" download>
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export highlights
+    </a>
+  </div>
+</div>
+
+<div class="book-layout">
+  <div class="cover-col">
+    <div class="cover">
+      <div class="cover-fallback">
+        <div class="initial">{{ b['title'][:1] | upper }}</div>
+        <div class="t">{{ b['title'] }}</div>
+        <div class="a">{{ b['author'] or '' }}</div>
       </div>
-      <img src="{{ cover_url }}" alt="{{ b['title'] }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"
-           onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
-      <form method="post" action="/books/{{ b['id'] }}/cover" enctype="multipart/form-data" class="cover-upload" style="position:absolute;bottom:0;left:0;right:0;opacity:0;transition:opacity .2s;z-index:1">
-        <label style="display:block;cursor:pointer;padding:.5rem;background:rgba(0,0,0,.6);color:#fff;text-align:center;font-size:.75rem">
+      <img src="{{ cover_url }}" alt="Cover of {{ b['title'] }}" onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
+    </div>
+    <div class="cover-tools">
+      <form method="post" action="/books/{{ b['id'] }}/cover" enctype="multipart/form-data" style="flex:1">
+        <label class="btn sm" style="width:100%;cursor:pointer">
           Change cover
           <input type="file" name="cover" accept="image/*" hidden onchange="this.form.submit()">
         </label>
       </form>
       {% if custom_cover %}
-      <form method="post" action="/books/{{ b['id'] }}/cover/remove" class="cover-upload" style="position:absolute;top:.4rem;right:.4rem;z-index:2;opacity:0;transition:opacity .2s">
-        <button type="submit" onclick="return confirm('Remove custom cover?')" title="Remove custom cover" style="padding:0;background:none;color:#fff;font-size:1.1rem;border:0;cursor:pointer;line-height:1;text-shadow:0 0 4px rgba(0,0,0,.8),0 1px 2px rgba(0,0,0,.6)">✕</button>
+      <form method="post" action="/books/{{ b['id'] }}/cover/remove" onsubmit="return confirm('Remove the uploaded cover?')">
+        <button class="btn sm btn-ghost" type="submit" title="Remove uploaded cover" aria-label="Remove uploaded cover">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
       </form>
       {% endif %}
     </div>
   </div>
 
-  <div class="headrow" style="flex:1;min-width:14rem;display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;flex-wrap:wrap">
-    <div style="flex:1;min-width:0">
+  <div class="book-main">
     <div id="hdr-view">
       <h1>{{ b['title'] }}</h1>
-      <p class="muted" style="margin-bottom:1rem">
-        {{ b['author'] or 'Unknown author' }}
-        {% if b['isbn'] %}
-        · <a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" style="color:var(--muted);text-decoration:underline">{{ b['isbn'] }}</a>
-        {% endif %}
-        · <a href="#" onclick="var v=document.getElementById('hdr-view'),e=document.getElementById('hdr-edit');v.hidden=true;e.hidden=false;return false">Edit</a>
+      <p class="meta">
+        <span>{{ b['author'] or 'Unknown author' }}</span>
+        {% if b['isbn'] %}<span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a>{% endif %}
+        <span class="sep">·</span>
+        <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
       </p>
     </div>
 
-    <form id="hdr-edit" method="post" action="/books/{{ b['id'] }}/edit" hidden style="margin-bottom:1rem">
-      <div style="display:grid;gap:.4rem;max-width:32rem">
-        <label>Title <input name="title" value="{{ b['title'] }}" required></label>
-        <label>Author <input name="author" value="{{ b['author'] or '' }}"></label>
-        <label>ISBN <input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="e.g. 9780140328721"></label>
-        <div style="display:flex;gap:.5rem">
-          <label style="flex:1">Pages read <input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
-          <label style="flex:1">Total pages <input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
-        </div>
-        <div>
-          <button>Save</button>
-          <button type="button" onclick="var v=document.getElementById('hdr-view'),e=document.getElementById('hdr-edit');e.hidden=true;v.hidden=false;return false">Cancel</button>
-        </div>
+    <form id="hdr-edit" method="post" action="/books/{{ b['id'] }}/edit" hidden class="edit-form" style="margin-top:14px">
+      <label class="field wide"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
+      <label class="field"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
+      <label class="field"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="9780140328721"></label>
+      <label class="field"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
+      <label class="field"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
+      <div class="form-actions wide">
+        <button class="btn btn-primary sm">Save</button>
+        <button class="btn sm btn-ghost" type="button" onclick="document.getElementById('hdr-edit').hidden=true;document.getElementById('hdr-view').hidden=false">Cancel</button>
       </div>
     </form>
 
-    <form id="rf" method="post" action="/books/{{ b['id'] }}/rate" style="margin-bottom:.75rem">
-      <input type="hidden" name="rating" value="{{ b['rating'] or 0 }}">
+    {% set value = b['rating'] or 0 %}
+    <form id="rf" method="post" action="/books/{{ b['id'] }}/rate">
+      <input type="hidden" name="rating" id="rate-val" value="{{ b['rating'] or 0 }}">
       <input type="hidden" name="review" value="{{ b['review'] or '' }}">
-      <div class="stars" style="font-size:1.4rem;cursor:pointer" title="Click to rate">
-        <span>☆☆☆☆☆</span><span class="fill" style="width:{{ (b['rating'] or 0) / 5 * 100 }}%">★★★★★</span>
-        {% for i in range(1, 11) %}<span data-v="{{ i / 2 }}" onclick="var f=document.getElementById('rf');f.rating.value=this.dataset.v;f.submit()" style="position:absolute;top:0;left:{{ (i - 1) * 10 }}%;width:10%;height:100%"></span>{% endfor %}
+      <div class="rate-row">
+        {% include "_stars.html" %}
+        <span class="of" id="rate-label">{{ (b['rating'] | round(1)) if b['rating'] else 'Not rated' }}</span>
+        {% if b['rating'] %}<button class="linkbtn" type="submit" onclick="document.getElementById('rate-val').value=0" style="font-size:12px">Clear</button>{% endif %}
       </div>
-      {% if b['rating'] %}<a href="#" onclick="var f=document.getElementById('rf');f.rating.value=0;f.submit();return false" class="muted" style="font-size:.75rem;margin-left:.4rem">clear</a>{% endif %}
     </form>
 
-    </div>
-    {% if b['total_pages'] and b['pages_read'] %}
-    {% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int %}
-    <div style="flex:0 0 auto;text-align:center;padding-top:.25rem">
-      <svg width="88" height="88" viewBox="0 0 88 88">
-        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--border)" stroke-width="6"/>
-        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="{{ (pct / 100 * 238.76) | round(2) }} 999" stroke-linecap="round" transform="rotate(-90 44 44)"/>
-        <text x="44" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" dominant-baseline="central">{{ pct }}%</text>
-      </svg>
-      <div class="muted" style="font-size:.75rem;margin-top:-.25rem">{{ b['pages_read'] }} / {{ b['total_pages'] }}</div>
-    </div>
-    {% endif %}
-    {% if b['total_seconds'] or agg and agg['n'] %}
-    <div class="card" style="flex:1 1 100%;margin-bottom:1rem">
-      <div class="stat-grid">
-        {% if b['total_seconds'] %}
-        <div>
-          <div class="stat-label">Time read</div>
-          <div class="stat-value">{{ b['total_seconds'] | read_hm }}</div>
-        </div>
-        {% endif %}
-        {% if agg and agg['n'] %}
-        <div>
-          <div class="stat-label">Sessions</div>
-          <div class="stat-value">{{ sessions_n }}</div>
-        </div>
-        <div>
-          <div class="stat-label">Days read</div>
-          <div class="stat-value">{{ agg['n'] }}</div>
-        </div>
-        <div>
-          <div class="stat-label">Avg/day</div>
-          <div class="stat-value">{{ ((agg['secs'] or 0) // agg['n']) | read_hm }}</div>
-        </div>
-        <div>
-          <div class="stat-label">Best day</div>
-          <div class="stat-value">{{ (best['seconds'] or 0) | read_hm }}</div>
-          <div class="muted" style="font-size:.75rem">{{ best['day'] | day_fmt }}</div>
-        </div>
-        <div>
-          <div class="stat-label">Last read</div>
-          <div class="stat-value" style="font-size:1rem;padding-top:.35rem">{{ b['last_read_at'] | ts_date }}</div>
-        </div>
-        {% endif %}
+    <div class="progress-block">
+      <div class="progress-head">
+        <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
+        <span class="pages num">{% if b['total_pages'] %}{{ b['pages_read'] or 0 }} / {{ b['total_pages'] }} pages{% endif %}</span>
       </div>
+      <div class="track"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
     </div>
-    {% endif %}
+
+    <div class="facts">
+      {% if b['total_seconds'] %}
+      <div class="fact"><div class="label">Time read</div><div class="v num">{{ b['total_seconds'] | read_hm }}</div></div>
+      {% endif %}
+      {% if agg and agg['n'] %}
+      <div class="fact"><div class="label">Sessions</div><div class="v num">{{ sessions_n }}</div></div>
+      <div class="fact"><div class="label">Days read</div><div class="v num">{{ agg['n'] }}</div></div>
+      <div class="fact"><div class="label">Average a day</div><div class="v num">{{ ((agg['secs'] or 0) // agg['n']) | read_hm }}</div></div>
+      {% if best %}
+      <div class="fact"><div class="label">Best day</div><div class="v num">{{ (best['seconds'] or 0) | read_hm }}</div><div class="s">{{ best['day'] | day_fmt }}</div></div>
+      {% endif %}
+      {% endif %}
+      {% if b['last_read_at'] %}
+      <div class="fact"><div class="label">Last read</div><div class="v num" style="font-size:15px">{{ b['last_read_at'] | ts_date }}</div></div>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
-    <h2 style="margin:0">Review</h2>
-    <a href="#" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true;return false">{{ 'Edit' if b['review'] else 'Write a review' }}</a>
+<section class="section">
+  <div class="section-head">
+    <h2>Review</h2>
+    <button class="linkbtn" type="button" id="review-edit-btn" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true">
+      {{ 'Edit review' if b['review'] else 'Write a review' }}
+    </button>
   </div>
-  <div id="rv" class="{{ '' if b['review'] else 'muted' }}" style="white-space:pre-wrap;line-height:1.6">{{ b['review'] or 'No review yet.' }}</div>
+  <div id="rv" class="{{ 'prose' if b['review'] else 'empty' }}">{{ b['review'] or 'No review yet.' }}</div>
   <form id="rvf" method="post" action="/books/{{ b['id'] }}/rate" hidden>
     <input type="hidden" name="rating" value="{{ b['rating'] or 0 }}">
-    <textarea name="review" rows="5" style="width:100%" placeholder="Your review">{{ b['review'] or '' }}</textarea>
-    <button style="margin-top:.5rem">Save</button>
+    <label class="field"><span>Your review</span>
+      <textarea name="review" rows="6" placeholder="What did you make of it?">{{ b['review'] or '' }}</textarea>
+    </label>
+    <div class="form-actions" style="margin-top:10px">
+      <button class="btn btn-primary sm">Save review</button>
+      <button class="btn sm btn-ghost" type="button" onclick="document.getElementById('rvf').hidden=true;document.getElementById('rv').hidden=false;document.getElementById('review-edit-btn').hidden=false">Cancel</button>
+    </div>
   </form>
-</div>
+</section>
 
 {% set hls = anns | rejectattr('type', 'equalto', 'bookmark') | list %}
 {% set bms = anns | selectattr('type', 'equalto', 'bookmark') | list %}
-<div class="card" style="margin-top:1rem" id="highlights">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
-    <h2 style="margin-top:0">Highlights</h2>
-    <span style="display:flex;gap:1rem">
-      <a href="/books/{{ b['id'] }}/highlights/edit">+ Add</a>
-      <a href="/books/{{ b['id'] }}/highlights.md" download title="Download as Markdown">↓ Export</a>
-    </span>
-  </div>
-  {% for a in hls %}
-  <div style="border-left:3px solid {{ a['color'] or 'var(--accent)' }};padding:.35rem .75rem;margin-bottom:.75rem">
-    {% if a['text'] %}<div style="white-space:pre-wrap;line-height:1.5">{{ a['text'] }}</div>{% endif %}
-    {% if a['note'] %}<div class="muted" style="white-space:pre-wrap;margin-top:.25rem">{{ a['note'] }}</div>{% endif %}
-    <div class="muted" style="font-size:.75rem;margin-top:.25rem">
-      {% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}
-      · <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
+<section class="section" id="highlights">
+  <div class="section-head">
+    <h2>Highlights <span class="count num">{{ hls | length }}</span></h2>
+    <div class="actions">
+      <a class="btn sm" href="/books/{{ b['id'] }}/highlights/edit">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add
+      </a>
     </div>
+  </div>
+  {% if hls %}
+  <div class="hl-list">
+    {% for a in hls %}
+    <article class="hl" style="--hl:{{ a['color'] or 'var(--accent)' }}">
+      <div class="hl-quote">
+        <span class="hl-swatch" aria-hidden="true"></span>
+        <p class="hl-text">{{ a['text'] or '' }}</p>
+      </div>
+      {% if a['note'] %}<p class="hl-note">{{ a['note'] }}</p>{% endif %}
+      <div class="hl-meta num">
+        {% if a['chapter'] %}<span>{{ a['chapter'] }}</span><span>·</span>{% endif %}
+        <span>p. {{ a['pageno'] or '?' }}</span>
+        <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
+      </div>
+    </article>
+    {% endfor %}
   </div>
   {% else %}
-  <p class="muted">No highlights yet.</p>
-  {% endfor %}
-</div>
+  <div class="empty">No highlights yet. They arrive with a KOReader sync, or you can <a href="/books/{{ b['id'] }}/highlights/edit">add one</a>.</div>
+  {% endif %}
+</section>
 
 {% if bms %}
-<div class="card" style="margin-top:1rem">
-  <h2 style="margin-top:0">Bookmarks</h2>
+<section class="section">
+  <div class="section-head"><h2>Bookmarks <span class="count num">{{ bms | length }}</span></h2></div>
   {% for a in bms %}
-  <div style="padding:.35rem .75rem;margin-bottom:.75rem">
-    <div class="muted" style="font-size:.8rem">
-      {% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}
-      · <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
+  <div class="bm-row">
+    <div>
+      <div class="n num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</div>
+      {% if a['note'] %}<div class="t" style="margin-top:3px;white-space:pre-wrap">{{ a['note'] }}</div>{% endif %}
     </div>
-    {% if a['note'] %}<div style="white-space:pre-wrap;line-height:1.5">{{ a['note'] }}</div>{% endif %}
+    <a class="linkbtn" href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
   </div>
   {% endfor %}
-</div>
+</section>
 {% endif %}
 
-<div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-  <a href="/" class="btn btn-ghost">← Back to library</a>
-  <form class="inline" method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book?')">
-    <button class="btn-danger" title="Delete book">🗑 Delete book</button>
+<div class="danger-zone">
+  <a class="btn btn-ghost" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Back to library</a>
+  <form method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book and its reading history?')">
+    <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete book</button>
   </form>
 </div>
-<style>
-@media (max-width: 480px) {
-  .cover-upload { opacity: 1 !important; }
-  form input[name="title"], form input[name="author"], form input[name="isbn"] { width: 100%; }
-  #rf .stars { font-size: 1.7rem; }
-  .stat-value { font-size: 1.1rem; }
-  div[style*="display:flex"][style*="flex-wrap:wrap"]:first-of-type { justify-content: center; }
-}
-</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const rateRoot = document.querySelector('.stars-input');
+  if (rateRoot) {
+    const hidden = document.getElementById('rate-val');
+    const label = document.getElementById('rate-label');
+    let committed = Number(rateRoot.dataset.value) || 0;
+    const paint = (v, commit) => {
+      if (commit) { committed = v; hidden.value = v; }
+      rateRoot.querySelectorAll('.star').forEach(star => {
+        const i = Number(star.dataset.star);
+        star.classList.toggle('on', i <= v);
+        star.classList.toggle('half', i - 0.5 === Number(v));
+      });
+      rateRoot.querySelectorAll('button').forEach(b => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.v) === Number(v)));
+      });
+      label.textContent = v ? Number(v).toFixed(1).replace('.0', '') + ' / 5' : 'Not rated';
+    };
+    rateRoot.querySelectorAll('button').forEach(btn => {
+      const v = Number(btn.dataset.v);
+      btn.addEventListener('click', () => { paint(v, true); document.getElementById('rf').submit(); });
+      btn.addEventListener('mouseenter', () => paint(v, false));
+    });
+    rateRoot.addEventListener('mouseleave', () => paint(committed, false));
+    paint(committed, false);
+  }
+</script>
 {% endblock %}

@@ -1,39 +1,54 @@
 {% extends "base.html" %}
-{% block title %}TBR · athenaeum{% endblock %}
+{% block title %}To read · athenaeum{% endblock %}
 {% block content %}
-<h2 style="margin-top:0">To be read</h2>
-<form class="form-row" method="post" action="/tbr">
-  <div class="form-group" style="flex:2;min-width:12rem;margin-bottom:0">
-    <label for="title">Title</label>
-    <input id="title" name="title" required style="width:100%">
-  </div>
-  <div class="form-group" style="flex:2;min-width:12rem;margin-bottom:0">
-    <label for="author">Author</label>
-    <input id="author" name="author" style="width:100%">
-  </div>
-  <button type="submit">Add</button>
-</form>
-{% if books %}
-<ul class="tbr">
-  {% for b in books %}
-  <li>
-    <span class="tbr-title">{{ b['title'] }}</span>
-    {% if b['author'] %}<span class="muted">{{ b['author'] }}</span>{% endif %}
-    <form class="inline tbr-remove" method="post" action="/tbr/{{ b['id'] }}/delete">
-      <button class="btn-ghost" type="submit" title="Remove">✕</button>
-    </form>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="muted" style="margin-top:1.25rem">No books on your list yet.</p>
-{% endif %}
 <style>
-.tbr { list-style: none; padding: 0; margin: 1.25rem 0 0; }
-.tbr li { display: flex; align-items: baseline; gap: .6rem; padding: .7rem .25rem; border-bottom: 1px solid var(--border); }
-.tbr li:first-child { border-top: 1px solid var(--border); }
-.tbr-title { font-weight: 600; }
-.tbr-remove { margin-left: auto; }
-.tbr-remove button { height: 2rem; padding: 0 .6rem; line-height: 1; }
+  .add-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
+  .add-row .field { flex: 1 1 220px; }
+  .add-row .btn { flex: 0 0 auto; }
+  .tbr-list { border-top: 1px solid var(--line); margin-top: 20px; }
+  .tbr-item {
+    display: flex; align-items: center; gap: 16px;
+    padding: 13px 0; border-bottom: 1px solid var(--line);
+  }
+  .tbr-item .idx { font-size: 12px; color: var(--muted); width: 22px; flex: 0 0 auto; }
+  .tbr-item .t { font-size: 14px; font-weight: 500; }
+  .tbr-item .a { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .tbr-item form { margin-left: auto; }
+  .tbr-item .iconbtn:hover { color: var(--danger); background: var(--danger-soft); }
+  @media (max-width: 560px) {
+    .add-row .field { flex: 1 1 100%; }
+    .add-row .btn { width: 100%; }
+  }
 </style>
+
+<div class="page-head">
+  <div class="title"><h1>To read</h1><span class="count num">{{ books | length }} queued</span></div>
+</div>
+
+<form class="add-row" method="post" action="/tbr">
+  <label class="field"><span>Title</span><input id="tbr-title" name="title" required placeholder="What's next?"></label>
+  <label class="field"><span>Author</span><input id="tbr-author" name="author" placeholder="Optional"></label>
+  <button class="btn btn-primary" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add to list</button>
+</form>
+
+{% if books %}
+<div class="tbr-list">
+  {% for b in books %}
+  <div class="tbr-item">
+    <span class="idx num">{{ '%02d' % loop.index }}</span>
+    <div>
+      <div class="t">{{ b['title'] }}</div>
+      {% if b['author'] %}<div class="a">{{ b['author'] }}</div>{% endif %}
+    </div>
+    <form method="post" action="/tbr/{{ b['id'] }}/delete">
+      <button class="iconbtn" type="submit" title="Remove from list" aria-label="Remove {{ b['title'] }} from the list">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty" style="margin-top:20px">Nothing queued. Add the next book you mean to read, or pull one across from a finished title.</div>
+{% endif %}
 {% endblock %}

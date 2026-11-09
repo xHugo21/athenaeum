@@ -1,40 +1,55 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit' if a else 'Add' }} highlight · {{ b['title'] }}{% endblock %}
 {% block content %}
-<h1 style="font-size:1.35rem">{{ 'Edit' if a else 'Add' }} highlight</h1>
-<p class="muted" style="margin-bottom:1rem">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
-<form method="post" action="/books/{{ b['id'] }}/highlights/edit">
+<style>
+  .hl-form { max-width: 620px; display: flex; flex-direction: column; gap: 16px; }
+  .hl-form textarea.quote { min-height: 120px; font-size: 14px; line-height: 1.65; }
+  .hl-form .row { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .hl-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  .hl-actions form { margin-left: auto; }
+  @media (max-width: 560px) { .hl-form .row { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page-head">
+  <a class="back" href="/books/{{ b['id'] }}#highlights"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>{{ b['title'] }}</a>
+</div>
+
+<div style="margin-bottom:22px">
+  <h1 style="font-size:20px">{{ 'Edit highlight' if a else 'Add highlight' }}</h1>
+  <p class="muted" style="font-size:13px;margin-top:4px">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
+</div>
+
+<form class="hl-form" method="post" action="/books/{{ b['id'] }}/highlights/edit">
   {% if a %}
   <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
   <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
   {% endif %}
-  <div class="form-group">
-    <label for="text">Quote</label>
-    <textarea id="text" name="text" rows="4" placeholder="Highlighted passage">{{ a.get('text') or '' }}</textarea>
+  <label class="field"><span>Quote</span>
+    <textarea class="quote" name="text" placeholder="The passage you want to keep">{{ a.get('text') or '' }}</textarea>
+  </label>
+  <label class="field"><span>Note</span>
+    <textarea name="note" rows="2" placeholder="Optional thought of your own">{{ a.get('note') or '' }}</textarea>
+  </label>
+  <div class="row">
+    <label class="field"><span>Page</span>
+      <input name="pageno" type="number" min="0" inputmode="numeric" value="{{ a.get('pageno') or '' }}">
+    </label>
+    <label class="field"><span>Chapter</span>
+      <input name="chapter" value="{{ a.get('chapter') or '' }}">
+    </label>
   </div>
-  <div class="form-group">
-    <label for="note">Note</label>
-    <textarea id="note" name="note" rows="2" placeholder="Optional note">{{ a.get('note') or '' }}</textarea>
+  <p class="hint">Leave the quote empty to save a bookmark instead.</p>
+  <div class="hl-actions">
+    <button class="btn btn-primary" type="submit">Save highlight</button>
+    <a class="btn btn-ghost" href="/books/{{ b['id'] }}#highlights">Cancel</a>
   </div>
-  <div class="form-row">
-    <div class="form-group" style="margin:0">
-      <label for="pageno">Page</label>
-      <input id="pageno" name="pageno" type="number" min="0" style="width:6rem" value="{{ a.get('pageno') or '' }}">
-    </div>
-    <div class="form-group" style="margin:0;flex:1">
-      <label for="chapter">Chapter</label>
-      <input id="chapter" name="chapter" style="width:100%" value="{{ a.get('chapter') or '' }}">
-    </div>
-  </div>
-  <p class="muted" style="margin-bottom:.75rem">Leave the quote empty to save a bookmark.</p>
-  <button>Save</button>
-  <a href="/books/{{ b['id'] }}#highlights" class="btn btn-ghost">Cancel</a>
 </form>
 {% if a %}
-<form method="post" action="/books/{{ b['id'] }}/highlights/delete" onsubmit="return confirm('Delete this highlight?')" style="margin-top:1.5rem">
+<form method="post" action="/books/{{ b['id'] }}/highlights/delete" onsubmit="return confirm('Delete this highlight?')" style="max-width:620px;margin-top:14px;padding-top:16px;border-top:1px solid var(--line)">
   <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
   <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
-  <button class="btn-danger">Delete</button>
+  <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete highlight</button>
 </form>
 {% endif %}
 {% endblock %}

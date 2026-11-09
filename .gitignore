@@ -4,3 +4,7 @@ __pycache__/
 .venv/
 covers/
 seed.py
+
+.impeccable/
+PRODUCT.md
+DESIGN.md

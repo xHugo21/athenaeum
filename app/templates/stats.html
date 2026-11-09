@@ -1,213 +1,179 @@
 {% extends "base.html" %}
 {% block title %}Stats · athenaeum{% endblock %}
 {% block content %}
-<h2 style="margin-top:0">Statistics</h2>
+<style>
+  .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
+  .chart h2 { font-size: 14px; }
+  .chart .cap { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .bars { display: flex; align-items: flex-end; gap: 5px; margin-top: 18px; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
+  .col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; position: relative; }
+  .plot { height: 132px; display: flex; align-items: flex-end; }
+  .bar { width: 100%; border-radius: 2px 2px 0 0; background: var(--accent); opacity: .9; }
+  .col:hover .bar { opacity: 1; }
+  .col > span { font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; }
+  .col > b { font-size: 11px; font-weight: 400; color: var(--muted); text-align: center; height: 15px; white-space: nowrap; }
+  .col.zero .bar { background: var(--surface-3); }
+  .streaks { display: flex; align-items: flex-end; gap: 56px; }
+  .streak .n { font-size: 40px; font-weight: 500; letter-spacing: -.03em; line-height: 1; }
+  .streak.current .n { color: var(--accent-strong); }
+  .streak.best .n { color: var(--text); }
+  .streak .c { margin-top: 7px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .heat-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+  .heat-inner { overflow: hidden; }
+  .heat-inner { min-width: 0; }
+  .heat { display: flex; gap: 3px; margin-top: 16px; }
+  .heat .wk { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .heat .d { aspect-ratio: 1; width: 100%; border-radius: 2px; background: var(--surface-2); }
+  .heat .d.off { background: transparent; }
+  .heat-months { display: flex; gap: 3px; margin-top: 6px; }
+  .heat-months > div { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: visible; }
+  .heat-months .short { display: none; }
+  .legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); display: block; }
+  .ranked td { padding: 10px 12px; }
+  .ranked td:first-child { width: 28px; color: var(--muted); font-size: 12px; }
+  .ranked .t { display: flex; align-items: baseline; gap: 10px; }
+  .ranked .t a { color: var(--text); font-weight: 500; }
+  .ranked .t a:hover { color: var(--accent-strong); text-decoration: none; }
+  .ranked .au { font-size: 12px; color: var(--muted); }
+  .ranked .tbar { height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 7px; overflow: hidden; }
+  .ranked .tbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .ranked td:last-child { text-align: right; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; right: 0; bottom: calc(100% + 7px);
+    background: var(--text); color: var(--bg);
+    padding: 4px 7px; border-radius: 4px;
+    font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .1s ease; z-index: 5;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+  @media (max-width: 820px) {
+    .heat-scroll { mask-image: linear-gradient(90deg, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); }
+    .heat-months .full { display: none; }
+    .heat-months .short { display: inline; }
+    .heat-inner { min-width: 620px; }
+    .heat-inner .heat { gap: 3px; }
+    .chart-grid { grid-template-columns: 1fr; gap: 28px; }
+    .streaks { gap: 36px; }
+    .streak .n { font-size: 32px; }
+    .heat { gap: 2px; }
+    .heat .wk { gap: 2px; }
+  }
+</style>
+
+<div class="page-head">
+  <div class="title"><h1>Stats</h1><span class="count">all time</span></div>
+</div>
+
 {% if not totals['n'] %}
-<p class="muted">No books yet. Import KOReader stats from the <a href="/">library</a> first.</p>
+<div class="empty">No books yet. <a href="/">Import your KOReader statistics</a> first.</div>
 {% else %}
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1.25rem;margin-bottom:1.5rem">
-  <div class="metric">
-    <div class="metric-value">{{ totals['secs'] | read_hm }}</div>
-    <div class="metric-label">time read</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value">{{ totals['pages'] | int }}</div>
-    <div class="metric-label">pages read</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value">{% if best %}{{ best[0] }}{% else %}–{% endif %}</div>
-    <div class="metric-label">{% if best %}most pages in a day<span class="metric-sub">{{ best[1] }}</span>{% else %}most pages in a day{% endif %}</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value">{% if longest %}{{ longest[0] | read_hm }}{% else %}–{% endif %}</div>
-    <div class="metric-label">{% if longest %}longest daily reading<span class="metric-sub">{{ longest[1] }}</span>{% else %}longest daily reading{% endif %}</div>
-  </div>
+<div class="summary" style="border-bottom:0;padding-bottom:0;margin-bottom:8px">
+  <div><div class="label">Time read</div><div class="v num">{{ totals['secs'] | read_hm }}</div></div>
+  <div><div class="label">Pages read</div><div class="v num">{{ totals['pages'] | comma }}</div></div>
+  <div><div class="label">Most pages in a day</div><div class="v num">{% if best %}{{ best[0] }}{% else %}—{% endif %}{% if best %}<small>{{ best[1] }}</small>{% endif %}</div></div>
+  <div><div class="label">Longest daily reading</div><div class="v num">{% if longest %}{{ longest[0] | read_hm }}{% else %}—{% endif %}{% if longest %}<small>{{ longest[1] }}</small>{% endif %}</div></div>
 </div>
 
-<div class="card hero-streak">
-  <div class="streak-pair">
-    <div>
-      <div class="streak-num">{{ cur_streak }}</div>
-      <div class="streak-cap">day{{ 's' if cur_streak != 1 }} &middot; current streak</div>
+<section class="section">
+  <div class="streaks">
+    <div class="streak current">
+      <div class="n num">{{ cur_streak }}</div>
+      <div class="c">{{ 'day' if cur_streak == 1 else 'days' }} · current streak</div>
     </div>
-    <div class="streak-divider"></div>
-    <div>
-      <div class="streak-num best">{{ best_streak }}</div>
-      <div class="streak-cap">day{{ 's' if best_streak != 1 }} &middot; best streak</div>
+    <div class="streak best">
+      <div class="n num">{{ best_streak }}</div>
+      <div class="c">{{ 'day' if best_streak == 1 else 'days' }} · best streak</div>
     </div>
   </div>
-</div>
+</section>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem;margin-bottom:1rem">
-  <div class="card">
-    <h2 style="margin-top:0">Monthly reading</h2>
-    <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
-      {% for label, secs in month_bars %}
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ secs | read_hm }}">
-        <div class="bar" style="width:100%;height:{{ (secs / max_month * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
-        <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
+<section class="section">
+  <div class="chart-grid">
+    <div class="chart">
+      <h2>Monthly reading</h2>
+      <div class="cap">Hours read per month, last twelve months</div>
+      <div class="bars">
+        {% for label, secs in month_bars %}
+        <div class="col{% if not secs %} zero{% endif %}" data-tip="{{ label }} · {{ secs | read_hm }}">
+          <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
+          <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
-  </div>
-  <div class="card">
-    <h2 style="margin-top:0">Average read time per day</h2>
-    <div style="display:flex;align-items:flex-end;gap:3px;height:8rem">
-      {% for label, secs in wd_bars %}
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end" data-tip="{{ label }}: {{ secs | read_hm }}">
-        <div class="bar" style="width:100%;height:{{ (secs / max_wd * 100) | round(1) }}%;min-height:{{ '2px' if secs else '0' }}"></div>
-        <span class="muted" style="font-size:.6rem;white-space:nowrap">{{ label }}</span>
+    <div class="chart">
+      <h2>Average per weekday</h2>
+      <div class="cap">When the reading actually happens</div>
+      <div class="bars">
+        {% for label, secs in wd_bars %}
+        <div class="col{% if not secs %} zero{% endif %}" data-tip="{{ label }} · {{ secs | read_hm }}">
+          <b class="num">{% if secs %}{{ (secs / 60) | round(0) | int }}m{% endif %}</b>
+          <div class="plot"><div class="bar" style="height:{{ (secs / max_wd * 100) | round(1) }}%"></div></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
-</div>
+</section>
 
-<div class="card" style="margin-bottom:1.5rem">
-  <h2 style="margin-top:0">Reading activity</h2>
-  <div style="display:flex;gap:3px">
+{% set hc = namespace(days=0) %}
+{% for wk, name in weeks %}{% for day in wk %}{% if day %}{% set hc.days = hc.days + 1 %}{% endif %}{% endfor %}{% endfor %}
+<section class="section">
+  <div class="section-head">
+    <div>
+      <h2>Reading activity</h2>
+      <div class="cap" style="font-size:12px;color:var(--muted);margin-top:2px">{{ hc.days }} days read in the last twelve months · darker means more time</div>
+    </div>
+  </div>
+  <div class="heat-scroll">
+  <div class="heat-inner">
+  <div class="heat">
     {% for wk, name in weeks %}
-    <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+    <div class="wk">
       {% for day in wk %}
-      {% if day %}
-      <div class="day-cell" data-tip="{{ day[0] }}: {{ (day[1] / 60) | round(0) }} min, {{ day[2] }} pages"
-           style="aspect-ratio:1;width:100%;border-radius:3px;background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, transparent)"></div>
-      {% else %}
-      <div style="aspect-ratio:1;width:100%;border-radius:3px;background:var(--border);opacity:.35"></div>
-      {% endif %}
+        {% if day %}
+        <div class="d" data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages" title="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+             style="background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, var(--surface-2))"></div>
+        {% else %}
+        <div class="d off"></div>
+        {% endif %}
       {% endfor %}
     </div>
     {% endfor %}
   </div>
-  <div style="display:flex;gap:3px;margin-top:.35rem">
-    {% for wk, name in weeks %}
-    <div style="flex:1;min-width:0;position:relative;height:.9rem">
-      {% if name %}<span class="muted" style="position:absolute;left:0;white-space:nowrap;font-size:.65rem">{{ name }}</span>{% endif %}
-    </div>
-    {% endfor %}
+  <div class="heat-months">
+    {% for wk, name in weeks %}<div>{% if name %}<span class="full">{{ name }}</span><span class="short">{{ name[:3] }}</span>{% endif %}</div>{% endfor %}
   </div>
-  <div class="muted" style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end;margin-top:.5rem;font-size:.75rem">
+  </div>
+  </div>
+  <div class="legend">
     less
-    {% for i in range(1, 5) %}<span class="lg on" style="background:color-mix(in srgb, var(--accent) {{ i * 25 }}%, transparent);opacity:1"></span>{% endfor %}
-    <span class="lg"></span> more
+    {% for i in range(1, 5) %}<i style="background:color-mix(in srgb, var(--accent) {{ i * 25 }}%, var(--surface-2))"></i>{% endfor %}
+    more
   </div>
-</div>
+</section>
 
-<div class="card">
-  <h2 style="margin-top:0">Most time per book</h2>
+<section class="section">
+  <div class="section-head"><h2>Most time per book</h2></div>
   {% set top_secs = top[0]['total_seconds'] if top else 0 %}
   <table class="ranked">
     {% for b in top %}
-    {% set pct = ((b['total_seconds'] or 0) / top_secs * 100) if top_secs else 0 %}
+    {% set ratio = ((b['total_seconds'] or 0) / top_secs * 100) if top_secs else 0 %}
     <tr>
-      <td class="rank">{{ loop.index }}</td>
+      <td class="num">{{ loop.index }}</td>
       <td>
-        <div class="rank-bar"><span style="width:{{ pct | round(0) | int }}%"></span></div>
-        <a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %} <span class="muted">— {{ b['author'] }}</span>{% endif %}
+        <div class="t"><a href="/books/{{ b['id'] }}">{{ b['title'] }}</a>{% if b['author'] %}<span class="au">{{ b['author'] }}</span>{% endif %}</div>
+        <div class="tbar"><span style="width:{{ ratio | round(0) | int }}%"></span></div>
       </td>
-      <td style="text-align:right">{{ b['total_seconds'] | read_hm }}</td>
+      <td class="num">{{ b['total_seconds'] | read_hm }}</td>
     </tr>
     {% endfor %}
   </table>
-</div>
+</section>
 {% endif %}
-<style>
-.metric {
-  position: relative;
-  padding: 1.1rem 1.25rem;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  transition: transform .15s, box-shadow .15s;
-}
-.metric:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.metric::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 1rem; bottom: 1rem;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--accent);
-  opacity: .55;
-}
-.metric-value {
-  font-family: 'Merriweather', Georgia, serif;
-  font-weight: 700;
-  font-size: 2rem;
-  line-height: 1.1;
-  color: var(--text);
-  letter-spacing: -.01em;
-}
-.metric-unit { font-size: 1.1rem; opacity: .75; margin-left: .15rem; }
-.metric-label {
-  font-size: .72rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-  margin-top: .35rem;
-  font-weight: 600;
-  display: block;
-}
-.metric-sub {
-  display: block;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--muted);
-  font-size: .78rem;
-  margin-top: .2rem;
-  opacity: .8;
-}
-.hero-streak {
-  margin-bottom: 1.25rem;
-  padding: 1.5rem 1.75rem;
-}
-.streak-pair {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
-.streak-num {
-  font-family: 'Merriweather', Georgia, serif;
-  font-weight: 700;
-  font-size: 3.5rem;
-  line-height: 1;
-  color: var(--accent);
-  letter-spacing: -.02em;
-}
-.streak-num.best { color: var(--text); opacity: .7; }
-.streak-cap {
-  font-size: .78rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-  margin-top: .5rem;
-  font-weight: 600;
-}
-.streak-divider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
-}
-[data-tip]{position:relative}
-[data-tip]::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
-[data-tip]:hover::after{opacity:1}
-.day-cell{position:relative}
-.day-cell::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--text);color:var(--bg);padding:.3rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:10}
-.day-cell:hover::after{opacity:1}
-table.ranked td { padding: .45rem .6rem; vertical-align: middle; }
-table.ranked td.rank { width: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; }
-.rank-bar { display: inline-block; width: 4rem; height: .4rem; background: var(--border); border-radius: 2px; vertical-align: middle; margin-right: .6rem; }
-.rank-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
-@media (max-width: 480px) {
-  .metric { padding: .9rem 1rem; }
-  .metric-value { font-size: 1.5rem; }
-  .streak-num { font-size: 2.5rem; }
-  .streak-pair { gap: 1.5rem; }
-  table.ranked .rank-bar { width: 2.5rem; margin-right: .4rem; }
-  td, th { padding: .45rem .35rem; }
-}
-</style>
 {% endblock %}

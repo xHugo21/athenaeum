@@ -257,9 +257,10 @@ def test_stats_streaks(tmp_path, monkeypatch):
         con.close()
         r = client.get("/stats")
         assert r.status_code == 200
-        assert "Monthly reading" in r.text and "Average read time per day" in r.text
-        assert 'class="streak-num">3<' in r.text and "current streak" in r.text
-        assert 'class="streak-num best">3<' in r.text
+        assert "Monthly reading" in r.text and "Average per weekday" in r.text
+        import re
+        assert re.search(r'class="streak current">\s*<div class="n num">3<', r.text)
+        assert re.search(r'class="streak best">\s*<div class="n num">3<', r.text)
 
 
 def test_highlights_export(tmp_path, monkeypatch):
@@ -347,7 +348,7 @@ def test_book_page_shows_sessions_and_days(tmp_path, monkeypatch):
         assert r.status_code == 200
 
     def stat(label):
-        m = re.search(r'stat-label">' + label + r'</div>\s*<div class="stat-value"[^>]*>([^<]+)<', r.text)
+        m = re.search(r'class="label">' + label + r'</div>\s*<div class="v num"[^>]*>([^<]+)<', r.text)
         return m.group(1) if m else None
 
     assert stat("Sessions") == "3", "sessions must count session rows, not days"
