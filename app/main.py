@@ -151,7 +151,8 @@ def check_token(token: str) -> bool:
 
 @app.middleware("http")
 async def auth(request: Request, call_next):
-    if PASSWORD and request.url.path not in ("/login", "/api/plugin/device", "/api/plugin/import"):
+    path = request.url.path
+    if PASSWORD and path not in ("/login", "/api/plugin/device", "/api/plugin/import") and not path.startswith("/static/"):
         token = request.cookies.get(SESSION_COOKIE, "")
         if not check_token(token):
             return RedirectResponse("/login", 303)

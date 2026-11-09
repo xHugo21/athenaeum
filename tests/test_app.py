@@ -484,3 +484,16 @@ def test_db_is_wal_and_survives_concurrent_writes(tmp_path, monkeypatch):
     assert errors == []
     with db() as con:
         assert con.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 10
+
+
+def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    import app.main as main
+
+    monkeypatch.setattr(main, "PASSWORD", "secret")
+    with TestClient(app) as client:
+        assert client.get("/static/manifest.webmanifest").status_code == 200
+        assert client.get("/static/apple-touch-icon-180.png").status_code == 200
+        r = client.get("/", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/login"
+        assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 303
