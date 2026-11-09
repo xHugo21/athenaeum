@@ -11,12 +11,10 @@
 </div>
 
 <div align="center">
-<img width="80%" alt="screenshot1" src="https://github.com/user-attachments/assets/e107e845-0bab-426c-af97-9541952be6ba" />
-<br /><br />
-<img width="80%" alt="screenshot2" src="https://github.com/user-attachments/assets/29bb7186-5fed-471f-9a5c-39e75207bdbb" />
-<br /><br />
-<img width="80%" alt="screenshot3" src="https://github.com/user-attachments/assets/1ed5e86d-6eea-40ed-98b9-7b2050473bc5" />
+<img width="90%" alt="Walkthrough of athenaeum: searching the library, opening a book, browsing the shelf view, reading the stats page, and switching to dark mode" src="assets/demo.gif" />
+<p><sub>20-second tour &middot; <a href="assets/demo.mp4">full-quality MP4 (1.6&nbsp;MB)</a></sub></p>
 </div>
+
 ## Run locally
 
 ```sh
