@@ -48,9 +48,9 @@
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
   @media (max-width: 760px) {
     .book-layout { grid-template-columns: 1fr; gap: 24px; }
-    .cover-col { position: static; flex-direction: row; align-items: flex-start; gap: 16px; }
-    .cover-col .cover { width: 128px; flex: 0 0 auto; }
-    .cover-col .cover-tools { flex-direction: column; }
+    .cover-col { position: static; flex-direction: column; gap: 10px; }
+    .cover-col .cover { width: 100%; max-width: none; }
+    .cover-col .cover-tools { flex-direction: row; }
     .edit-form { grid-template-columns: 1fr; }
     .edit-form .wide { grid-column: span 1; }
     .book-main h1 { font-size: 22px; }

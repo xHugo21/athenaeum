@@ -425,7 +425,7 @@ def test_manual_book_is_read_and_can_be_unmarked(tmp_path, monkeypatch):
         assert "Mark as unread" in book and 'class="tag">read<' in book
 
         client.post("/books/1/finished", data={"finished": 0}, follow_redirects=False)
-        assert 'data-state="unread"' in client.get("/").text
+        assert 'data-state="reading"' in client.get("/").text
         assert "Mark as read" in client.get("/books/1").text
 
 

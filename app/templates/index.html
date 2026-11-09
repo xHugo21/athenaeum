@@ -113,13 +113,12 @@
   }
 </style>
 {% set rated = books | selectattr('rating') | list %}
-{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0, unread=0) %}
+{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0) %}
 {% for b in books %}
   {% set ns.secs = ns.secs + (b['total_seconds'] or 0) %}
   {% set ns.pages = ns.pages + (b['pages_read'] or 0) %}
   {% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
   {% if done %}{% set ns.finished = ns.finished + 1 %}
-  {% elif not b['pages_read'] %}{% set ns.unread = ns.unread + 1 %}
   {% else %}{% set ns.reading = ns.reading + 1 %}{% endif %}
 {% endfor %}
 {% for b in rated %}{% set ns.stars = ns.stars + (b['rating'] or 0) %}{% endfor %}
@@ -213,7 +212,6 @@
         <button type="button" data-value="all" aria-pressed="true"><span>All books</span><b class="num">{{ books | length }}</b></button>
         <button type="button" data-value="reading" aria-pressed="false"><span>Reading</span><b class="num">{{ ns.reading }}</b></button>
         <button type="button" data-value="finished" aria-pressed="false"><span>Finished</span><b class="num">{{ ns.finished }}</b></button>
-        <button type="button" data-value="unread" aria-pressed="false"><span>Not started</span><b class="num">{{ ns.unread }}</b></button>
       </div>
     </div>
     <div class="rail-group">
@@ -247,7 +245,7 @@
       {% for b in books %}
       {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
       {% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
-      {% set state = 'finished' if done else ('unread' if not b['pages_read'] else 'reading') %}
+      {% set state = 'finished' if done else 'reading' %}
       <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
         <div class="cover">
           <div class="cover-fallback">
@@ -286,7 +284,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('finished' if (b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages'])) else ('unread' if not b['pages_read'] else 'reading')) | tojson }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('finished' if (b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages'])) else 'reading') | tojson }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -335,7 +333,7 @@
     if (chip) {
       const parts = [];
       if (state.q) parts.push(`“${state.q}”`);
-      if (state.progress !== 'all') parts.push(state.progress === 'unread' ? 'not started' : state.progress);
+      if (state.progress !== 'all') parts.push(state.progress);
       if (state.rating !== 'any') parts.push(state.rating === 'none' ? 'unrated' : state.rating + ' stars');
       chip.hidden = parts.length === 0;
       chipLabel.textContent = parts.join(' · ');
