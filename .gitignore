@@ -8,3 +8,4 @@ seed.py
 .impeccable/
 PRODUCT.md
 DESIGN.md
+*.db-*

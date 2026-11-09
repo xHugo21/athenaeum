@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import threading
 
 from app.koreader import parse_koreader
 from app.main import app  # ensures import works
@@ -452,3 +453,34 @@ def test_migrate_marks_manual_books_read(tmp_path, monkeypatch):
     con.commit()
     rows = dict(con.execute("SELECT title, finished FROM books").fetchall())
     assert rows == {"manual": 1, "synced": 0}
+
+
+def test_db_is_wal_and_survives_concurrent_writes(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from app.main import db
+
+    with TestClient(app):
+        pass
+    with db() as con:
+        assert con.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert con.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+        assert con.execute("PRAGMA synchronous").fetchone()[0] == 1
+
+    errors = []
+
+    def writer(i):
+        try:
+            with db() as con:
+                con.execute("INSERT INTO tbr (title, added_at) VALUES (?, ?)", (f"book {i}", i))
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=writer, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    with db() as con:
+        assert con.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 10
