@@ -40,12 +40,27 @@
   .book .track { margin-top: 9px; }
   .bm-readout { display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: var(--muted); }
   .shelf-group { margin-bottom: 18px; }
-  .shelf { display: flex; align-items: flex-end; gap: 4px; padding: 18px 4px 0; min-height: 220px; }
+  .shelf { display: flex; align-items: flex-end; gap: 0; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
-    flex: 0 0 auto; background: var(--spine); border-radius: 2px 2px 0 0;
+    flex: 0 0 auto;
+    background:
+      linear-gradient(to right,
+        rgba(255, 255, 255, .13) 0,
+        rgba(255, 255, 255, 0) 10px,
+        rgba(0, 0, 0, 0) calc(100% - 4px),
+        rgba(0, 0, 0, .3) 100%),
+      var(--spine);
+    border-radius: 2px 2px 0 0;
     display: flex; align-items: flex-start; justify-content: center; overflow: hidden;
-    position: relative; transition: transform .16s ease; cursor: pointer;
+    position: relative; cursor: pointer;
+    transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
   }
+  .shelf:hover .book-spine { filter: saturate(.5) brightness(.84); }
+  .shelf .book-spine:hover {
+    filter: none; transform: translateY(-6px); z-index: 1;
+    box-shadow: 0 12px 20px -12px rgba(17, 17, 19, .5);
+  }
+  .shelf .book-spine:focus-visible { filter: none; outline-offset: -2px; }
   .book-spine.centered { align-items: center; }
   .book-spine.clipped .spine-text {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
@@ -56,11 +71,20 @@
   .spine-text {
     writing-mode: vertical-rl; text-orientation: mixed;
     box-sizing: border-box; max-height: 100%; padding: 18px 0 22px;
-    font-size: 11px; font-weight: 500; line-height: 1.2; letter-spacing: .01em;
+    font-size: 11.5px; font-weight: 500; line-height: 1.2; letter-spacing: 0;
     color: rgba(255, 255, 255, .93);
     white-space: nowrap; overflow: hidden;
   }
-  .shelf-board { height: 1px; background: var(--line-2); }
+  .spine-text .sa {
+    margin-inline-start: 10px;
+    font-size: 9.5px; font-weight: 400; letter-spacing: .13em; text-transform: uppercase;
+    color: rgba(255, 255, 255, .66);
+  }
+  .shelf-board {
+    height: 3px; border-radius: 0 0 2px 2px;
+    background: linear-gradient(to bottom, var(--line-2), var(--line));
+    box-shadow: 0 4px 8px -5px rgba(17, 17, 19, .35);
+  }
   .shelf-caption { min-height: 20px; padding-top: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) {
@@ -281,7 +305,7 @@
   const q = document.getElementById('q');
   q.value = state.q;
 
-  const SPINES = ['oklch(46% .06 %h)', 'oklch(38% .05 %h)', 'oklch(52% .07 %h)', 'oklch(42% .04 %h)', 'oklch(34% .06 %h)', 'oklch(56% .05 %h)'];
+  const CLOTH = ['#5d2a2f', '#24463a', '#26364f', '#7d5f27', '#4a3050', '#37414d', '#4a5138', '#63392f'];
 
   function matches(b) {
     if (state.q && !(b.title.toLowerCase().includes(state.q) || (b.author || '').toLowerCase().includes(state.q))) return false;
@@ -364,7 +388,7 @@
     const books = booksData;
     const box = document.getElementById('shelves');
     if (!books.length || !box.clientWidth) return;
-    const GAP = 4, PAD = 6;
+    const GAP = 0, PAD = 6;
     const usable = box.clientWidth - PAD * 2;
     const rows = [];
     let row = [], width = 0;
@@ -403,8 +427,19 @@
         a.title = a.dataset.label;
         a.style.width = b._w + 'px';
         a.style.height = b._h + 'px';
-        a.style.setProperty('--spine', SPINES[b.hue % SPINES.length].replace('%h', (b.hue % 360) + ''));
-        a.innerHTML = '<span class="spine-text">' + b.title + (b.author ? ' · ' + b.author : '') + '</span>';
+        a.style.setProperty('--spine', CLOTH[b.hue % CLOTH.length]);
+        const text = document.createElement('span');
+        text.className = 'spine-text';
+        const title = document.createElement('span');
+        title.textContent = b.title;
+        text.appendChild(title);
+        if (b.author) {
+          const author = document.createElement('span');
+          author.className = 'sa';
+          author.textContent = b.author;
+          text.appendChild(author);
+        }
+        a.appendChild(text);
         shelf.appendChild(a);
       }
       const board = document.createElement('div');
