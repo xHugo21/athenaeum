@@ -43,15 +43,22 @@
   .shelf { display: flex; align-items: flex-end; gap: 4px; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
     flex: 0 0 auto; background: var(--spine); border-radius: 2px 2px 0 0;
-    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    display: flex; align-items: flex-start; justify-content: center; overflow: hidden;
     position: relative; transition: transform .16s ease; cursor: pointer;
+  }
+  .book-spine.centered { align-items: center; }
+  .book-spine.clipped .spine-text {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
   }
   .book-spine:hover { transform: translateY(-4px); z-index: 1; text-decoration: none; }
   .book-spine.hidden { display: none; }
   .spine-text {
-    writing-mode: vertical-rl; font-size: 11px; font-weight: 500; letter-spacing: .01em;
-    color: rgba(255, 255, 255, .93); padding: 10px 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    box-sizing: border-box; max-height: 100%; padding: 18px 0 22px;
+    font-size: 11px; font-weight: 500; line-height: 1.2; letter-spacing: .01em;
+    color: rgba(255, 255, 255, .93);
+    white-space: nowrap; overflow: hidden;
   }
   .shelf-board { height: 1px; background: var(--line-2); }
   .shelf-caption { min-height: 20px; padding-top: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -357,13 +364,24 @@
     const books = booksData;
     const box = document.getElementById('shelves');
     if (!books.length || !box.clientWidth) return;
-    const maxPages = Math.max(...books.map(b => b.pages)) || 1;
     const GAP = 4, PAD = 6;
     const usable = box.clientWidth - PAD * 2;
     const rows = [];
     let row = [], width = 0;
+
+    const logPages = b => Math.log(Math.max(1, b.pages || 0));
+    const sorted = books.map(logPages).sort((a, b) => a - b);
+    const at = q => sorted[Math.min(sorted.length - 1, Math.round((sorted.length - 1) * q))];
+    let lo = at(0.1), hi = at(0.9);
+    if (hi - lo < 0.3) {
+      const mid = (lo + hi) / 2;
+      lo = mid - 0.15;
+      hi = mid + 0.15;
+    }
+
     for (const b of books) {
-      b._w = Math.round(26 + Math.sqrt(b.pages) / Math.sqrt(maxPages) * 44);
+      const t = (logPages(b) - lo) / (hi - lo);
+      b._w = Math.round(Math.min(92, 30 + Math.max(0, t) * 44 + Math.max(0, t - 1) * 16));
       b._h = 236 + Math.round((((b.id * 7 + b.pages * 3) % 60) - 30) * .8);
       if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
       row.push(b);
@@ -400,6 +418,9 @@
       shelf.addEventListener('mouseleave', () => { caption.textContent = ''; });
       group.append(shelf, board, caption);
       box.appendChild(group);
+      shelf.querySelectorAll('.book-spine').forEach(a => {
+        a.classList.add(a.firstElementChild.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
+      });
     }
   }
 
