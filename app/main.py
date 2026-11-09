@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import mimetypes
 import os
 import re
 import secrets
@@ -16,6 +17,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .koreader import norm, parse_koreader
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 DB_PATH = os.environ.get("ATHENAEUM_DB", "athenaeum.db")
 PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
