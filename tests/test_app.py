@@ -171,6 +171,7 @@ def test_stats_page(tmp_path, monkeypatch):
         assert "The Hobbit" in r.text
         assert "3m" in r.text
         assert "Time of day" in r.text and "· peak" in r.text
+        assert "Highlights by month" not in r.text, "no annotations, no dial"
         assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
         client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)
@@ -247,6 +248,9 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
     with TestClient(app) as client:
         r = client.get("/books/1")
         assert "Call me Ishmael" in r.text
+        r = client.get("/stats")
+        assert "Highlights by month" in r.text, "annotations must reach the stats dial"
+        assert "Time of day" in r.text
 
 
 def test_stats_streaks(tmp_path, monkeypatch):

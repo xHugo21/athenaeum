@@ -101,23 +101,20 @@
 </section>
 
 <section class="section">
-  <div class="chart">
-    <h2>Monthly reading</h2>
-    <div class="cap">Hours read per month, last twelve months</div>
-    <div class="bars">
-      {% for label, secs in month_bars %}
-      <div class="col{% if not secs %} zero{% endif %}">
-        <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
-        <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
-        <span>{{ label }}</span>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<section class="section">
   <div class="chart-grid">
+    <div class="chart">
+      <h2>Monthly reading</h2>
+      <div class="cap">Hours read per month, last twelve months</div>
+      <div class="bars">
+        {% for label, secs in month_bars %}
+        <div class="col{% if not secs %} zero{% endif %}">
+          <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
+          <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
     <div class="chart">
       <h2>Average per weekday</h2>
       <div class="cap">When the reading actually happens</div>
@@ -131,11 +128,23 @@
         {% endfor %}
       </div>
     </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="chart-grid">
     {% if hour_clock.slices %}
     <div class="chart">
       <h2>Time of day</h2>
       <div class="cap">Hours read at each hour, all time · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
       {{ clock_svg(hour_clock) }}
+    </div>
+    {% endif %}
+    {% if marks_clock.slices %}
+    <div class="chart">
+      <h2>Highlights by month</h2>
+      <div class="cap">Highlights and bookmarks per calendar month, all time · peak {{ peak_month }} with {{ peak_marks }}</div>
+      {{ clock_svg(marks_clock) }}
     </div>
     {% endif %}
   </div>

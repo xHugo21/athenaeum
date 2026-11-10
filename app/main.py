@@ -271,6 +271,9 @@ def stats(request: Request):
             "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) FROM sessions GROUP BY 1"
         ):
             hour_secs[h] = secs
+        month_marks = [0] * 12
+        for m, n in con.execute("SELECT CAST(strftime('%m', datetime) AS INTEGER), COUNT(*) FROM annotations GROUP BY 1"):
+            month_marks[m - 1] = n
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
@@ -292,6 +295,14 @@ def stats(request: Request):
         [f"{h:02d}:00 – {h + 1:02d}:00 · {read_hm(s)}" for h, s in enumerate(hour_secs)],
         [(h, f"{h:02d}") for h in range(0, 24, 3)],
     )
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    marks_clock = clock(
+        month_marks,
+        [f"{m} · {n} {'mark' if n == 1 else 'marks'}" for m, n in zip(month_names, month_marks)],
+        list(enumerate(month_names)),
+    )
+    peak_marks = max(month_marks)
+    peak_month = month_names[month_marks.index(peak_marks)]
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
@@ -344,6 +355,9 @@ def stats(request: Request):
             "month_bars": month_bars,
             "wd_bars": wd_bars,
             "hour_clock": hour_clock,
+            "marks_clock": marks_clock,
+            "peak_month": peak_month,
+            "peak_marks": peak_marks,
             "max_month": max_month,
             "max_wd": max_wd,
             "max_hour": max_hour,
