@@ -97,7 +97,7 @@
       <div class="cap">Hours read per month, last twelve months</div>
       <div class="bars">
         {% for label, secs in month_bars %}
-        <div class="col{% if not secs %} zero{% endif %}" data-tip="{{ label }} · {{ secs | read_hm }}">
+        <div class="col{% if not secs %} zero{% endif %}">
           <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
           <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
           <span>{{ label }}</span>
@@ -110,7 +110,7 @@
       <div class="cap">When the reading actually happens</div>
       <div class="bars">
         {% for label, secs in wd_bars %}
-        <div class="col{% if not secs %} zero{% endif %}" data-tip="{{ label }} · {{ secs | read_hm }}">
+        <div class="col{% if not secs %} zero{% endif %}">
           <b class="num">{% if secs %}{{ (secs / 60) | round(0) | int }}m{% endif %}</b>
           <div class="plot"><div class="bar" style="height:{{ (secs / max_wd * 100) | round(1) }}%"></div></div>
           <span>{{ label }}</span>
