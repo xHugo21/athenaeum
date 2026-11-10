@@ -104,11 +104,11 @@
   <div class="chart-grid">
     <div class="chart">
       <h2>Monthly reading</h2>
-      <div class="cap">Hours read per month, last twelve months</div>
+      <div class="cap">Minutes per reading day, last twelve months</div>
       <div class="bars">
         {% for label, secs in month_bars %}
         <div class="col{% if not secs %} zero{% endif %}">
-          <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
+          <b class="num">{% if secs %}{{ (secs / 60) | round(0) | int }}m{% endif %}</b>
           <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
           <span>{{ label }}</span>
         </div>
@@ -117,7 +117,7 @@
     </div>
     <div class="chart">
       <h2>Average per weekday</h2>
-      <div class="cap">When the reading actually happens</div>
+      <div class="cap">Minutes per reading day, all time</div>
       <div class="bars">
         {% for label, secs in wd_bars %}
         <div class="col{% if not secs %} zero{% endif %}">
@@ -143,7 +143,7 @@
     {% if season_clock.slices %}
     <div class="chart">
       <h2>Seasonality</h2>
-      <div class="cap">Hours read per calendar month, all years · peak {{ peak_month }} with {{ (peak_season / 3600) | round(0) | int }}h</div>
+      <div class="cap">Minutes per reading day, by calendar month · peak {{ peak_month }} with {{ (peak_season / 60) | round(0) | int }}m</div>
       {{ clock_svg(season_clock) }}
     </div>
     {% endif %}

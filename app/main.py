@@ -279,9 +279,10 @@ def stats(request: Request):
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
-    month_secs, wd_secs, wd_count = {}, [0] * 7, [0] * 7
+    month_secs, read_days, wd_secs, wd_count = {}, {}, [0] * 7, [0] * 7
     for r in days:
         month_secs[r["day"][:7]] = month_secs.get(r["day"][:7], 0) + r["seconds"]
+        read_days[r["day"][:7]] = read_days.get(r["day"][:7], 0) + 1
         wd = date.fromisoformat(r["day"]).weekday()
         wd_secs[wd] += r["seconds"]
         wd_count[wd] += 1
@@ -290,7 +291,10 @@ def stats(request: Request):
         months.append(m)
         m = (m - timedelta(days=1)).replace(day=1)
     months.reverse()
-    month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
+    month_bars = []
+    for mo in months:
+        key = mo.isoformat()[:7]
+        month_bars.append((mo.strftime("%b"), month_secs.get(key, 0) // read_days[key] if read_days.get(key) else 0))
     wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
     hour_clock = clock(
         hour_secs,
@@ -298,13 +302,14 @@ def stats(request: Request):
         [(h, f"{h:02d}") for h in range(0, 24, 3)],
     )
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    season_secs = [month_secs_all[i] // month_days[i] if month_days[i] else 0 for i in range(12)]
     season_clock = clock(
-        month_secs_all,
-        [f"{m} · {read_hm(s)} over {n} {'day' if n == 1 else 'days'}" for m, s, n in zip(month_names, month_secs_all, month_days)],
+        season_secs,
+        [f"{m} · {read_hm(s)} per reading day, {n} {'day' if n == 1 else 'days'}" for m, s, n in zip(month_names, season_secs, month_days)],
         list(enumerate(month_names)),
     )
-    peak_season = max(month_secs_all)
-    peak_month = month_names[month_secs_all.index(peak_season)]
+    peak_season = max(season_secs)
+    peak_month = month_names[season_secs.index(peak_season)]
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
