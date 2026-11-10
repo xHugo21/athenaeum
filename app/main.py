@@ -264,8 +264,7 @@ def stats(request: Request):
     months.reverse()
     month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    busiest = max(zip(wd_secs, day_names), default=(0, "—"))
-    quietest = min(((s, d) for s, d in zip(wd_secs, day_names) if s), default=busiest)
+    wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(day_names)]
     peak_hour = hour_secs.index(max(hour_secs))
     max_hour = hour_secs[peak_hour] or 1
     xs = [(i + 0.5) * 100 / 24 for i in range(24)]
@@ -287,6 +286,7 @@ def stats(request: Request):
         best_streak = max(best_streak, run)
         prev = dd
     max_month = max((s for _, s in month_bars), default=0) or 1
+    max_wd = max(s for _, s in wd_bars) or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
     d = date.today() - timedelta(days=364)
@@ -324,8 +324,8 @@ def stats(request: Request):
             "peak_hour": peak_hour,
             "profile": profile,
             "profile_area": profile_area,
-            "busiest": busiest,
-            "quietest": quietest,
+            "wd_bars": wd_bars,
+            "max_wd": max_wd,
             "cur_streak": cur_streak,
             "best_streak": best_streak,
         },

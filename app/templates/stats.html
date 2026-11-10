@@ -2,6 +2,7 @@
 {% block title %}Stats · athenaeum{% endblock %}
 {% block content %}
 <style>
+  .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
   .chart h2 { font-size: 14px; }
   .chart .cap { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .bars { display: flex; align-items: flex-end; gap: 5px; margin-top: 18px; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
@@ -42,7 +43,6 @@
   .profile .line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
   .profile .fill { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
   .profile-hours { display: grid; grid-template-columns: repeat(24, 1fr); margin-top: 6px; font-size: 11px; color: var(--muted); text-align: center; }
-  .profile-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
   .tip {
     position: fixed; z-index: 20; left: 0; top: 0;
     background: var(--text); color: var(--bg);
@@ -57,6 +57,7 @@
     .heat-months .short { display: inline; }
     .heat-inner { min-width: 620px; }
     .heat-inner .heat { gap: 3px; }
+    .chart-grid { grid-template-columns: 1fr; gap: 28px; }
     .streaks { gap: 36px; }
     .streak .n { font-size: 32px; }
     .heat { gap: 2px; }
@@ -92,17 +93,32 @@
 </section>
 
 <section class="section">
-  <div class="chart">
-    <h2>Monthly reading</h2>
-    <div class="cap">Hours read per month, last twelve months</div>
-    <div class="bars">
-      {% for label, secs in month_bars %}
-      <div class="col{% if not secs %} zero{% endif %}">
-        <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
-        <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
-        <span>{{ label }}</span>
+  <div class="chart-grid">
+    <div class="chart">
+      <h2>Monthly reading</h2>
+      <div class="cap">Hours read per month, last twelve months</div>
+      <div class="bars">
+        {% for label, secs in month_bars %}
+        <div class="col{% if not secs %} zero{% endif %}">
+          <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
+          <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+    </div>
+    <div class="chart">
+      <h2>Average per weekday</h2>
+      <div class="cap">When the reading actually happens</div>
+      <div class="bars">
+        {% for label, secs in wd_bars %}
+        <div class="col{% if not secs %} zero{% endif %}">
+          <b class="num">{% if secs %}{{ (secs / 60) | round(0) | int }}m{% endif %}</b>
+          <div class="plot"><div class="bar" style="height:{{ (secs / max_wd * 100) | round(1) }}%"></div></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </section>
@@ -119,7 +135,6 @@
     <div class="profile-hours">
       {% for h in range(24) %}<span>{% if h % 6 == 0 %}{{ '%02d' % h }}{% endif %}</span>{% endfor %}
     </div>
-    <p class="profile-note">Busiest weekday {{ busiest[1] }} ({{ busiest[0] | read_hm }}), quietest {{ quietest[1] }} ({{ quietest[0] | read_hm }}).</p>
     {% endif %}
   </div>
 </section>
