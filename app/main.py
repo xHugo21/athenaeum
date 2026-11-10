@@ -243,6 +243,11 @@ def stats(request: Request):
         top = con.execute(
             "SELECT id, title, author, total_seconds FROM books WHERE total_seconds > 0 ORDER BY total_seconds DESC LIMIT 5"
         ).fetchall()
+        hour_secs = [0] * 24
+        for h, secs in con.execute(
+            "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) FROM sessions GROUP BY 1"
+        ):
+            hour_secs[h] = secs
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
@@ -275,6 +280,8 @@ def stats(request: Request):
         prev = dd
     max_month = max((s for _, s in month_bars), default=0) or 1
     max_wd = max(s for _, s in wd_bars) or 1
+    peak_hour = hour_secs.index(max(hour_secs))
+    max_hour = hour_secs[peak_hour] or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
     d = date.today() - timedelta(days=364)
@@ -310,6 +317,9 @@ def stats(request: Request):
             "wd_bars": wd_bars,
             "max_month": max_month,
             "max_wd": max_wd,
+            "max_hour": max_hour,
+            "peak_hour": peak_hour,
+            "hour_bars": list(enumerate(hour_secs)) if any(hour_secs) else [],
             "cur_streak": cur_streak,
             "best_streak": best_streak,
         },

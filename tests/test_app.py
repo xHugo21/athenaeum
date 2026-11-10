@@ -170,6 +170,7 @@ def test_stats_page(tmp_path, monkeypatch):
         assert r.status_code == 200
         assert "The Hobbit" in r.text
         assert "3m" in r.text
+        assert "Time of day" in r.text and "· peak" in r.text
         assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
         client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)

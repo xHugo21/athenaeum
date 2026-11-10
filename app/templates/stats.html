@@ -39,6 +39,8 @@
   .ranked .tbar { height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 7px; overflow: hidden; }
   .ranked .tbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   .ranked td:last-child { text-align: right; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+  .hours { gap: 4px; }
+  .hours .col > span { font-size: 10px; }
   .tip {
     position: fixed; z-index: 20; left: 0; top: 0;
     background: var(--text); color: var(--bg);
@@ -118,6 +120,24 @@
     </div>
   </div>
 </section>
+
+{% if hour_bars %}
+<section class="section">
+  <div class="chart">
+    <h2>Time of day</h2>
+    <div class="cap">Hours read at each hour of the day, all time · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
+    <div class="bars hours">
+      {% for hour, secs in hour_bars %}
+      <div class="col{% if not secs %} zero{% endif %}">
+        <b></b>
+        <div class="plot"><div class="bar" style="height:{{ (secs / max_hour * 100) | round(1) }}%"></div></div>
+        <span>{% if hour % 3 == 0 %}{{ '%02d' % hour }}{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% set hc = namespace(days=0) %}
 {% for wk, name in weeks %}{% for day in wk %}{% if day %}{% set hc.days = hc.days + 1 %}{% endif %}{% endfor %}{% endfor %}
