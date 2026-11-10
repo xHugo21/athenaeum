@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Stats · athenaeum{% endblock %}
 {% block content %}
+{% macro clock_svg(c) %}
+<svg class="clock" viewBox="0 0 240 240" role="img">
+  {% for s in c.spokes %}<line class="spoke" x1="120" y1="120" x2="{{ s.x }}" y2="{{ s.y }}"/>{% endfor %}
+  {% for s in c.slices %}<path class="slice" d="{{ s.d }}" data-tip="{{ s.tip }}"/>{% endfor %}
+  {% for l in c.labels %}<text x="{{ l.x }}" y="{{ l.y }}">{{ l.t }}</text>{% endfor %}
+</svg>
+{% endmacro %}
 <style>
   .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
   .chart h2 { font-size: 14px; }
@@ -39,8 +46,11 @@
   .ranked .tbar { height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 7px; overflow: hidden; }
   .ranked .tbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   .ranked td:last-child { text-align: right; white-space: nowrap; font-size: 12px; color: var(--text-2); }
-  .hours { gap: 4px; }
-  .hours .col > span { font-size: 10px; }
+  .clock { display: block; width: 100%; max-width: 260px; height: auto; margin: 10px auto 0; }
+  .clock .spoke { stroke: var(--line); stroke-width: 1; }
+  .clock .slice { fill: var(--accent); }
+  .clock .slice:hover { fill: var(--accent-strong); }
+  .clock text { font-size: 11px; fill: var(--muted); text-anchor: middle; dominant-baseline: middle; }
   .tip {
     position: fixed; z-index: 20; left: 0; top: 0;
     background: var(--text); color: var(--bg);
@@ -91,20 +101,23 @@
 </section>
 
 <section class="section">
-  <div class="chart-grid">
-    <div class="chart">
-      <h2>Monthly reading</h2>
-      <div class="cap">Hours read per month, last twelve months</div>
-      <div class="bars">
-        {% for label, secs in month_bars %}
-        <div class="col{% if not secs %} zero{% endif %}">
-          <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
-          <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
-          <span>{{ label }}</span>
-        </div>
-        {% endfor %}
+  <div class="chart">
+    <h2>Monthly reading</h2>
+    <div class="cap">Hours read per month, last twelve months</div>
+    <div class="bars">
+      {% for label, secs in month_bars %}
+      <div class="col{% if not secs %} zero{% endif %}">
+        <b class="num">{% if secs %}{{ (secs / 3600) | round(1) | int }}h{% endif %}</b>
+        <div class="plot"><div class="bar" style="height:{{ (secs / max_month * 100) | round(1) }}%"></div></div>
+        <span>{{ label }}</span>
       </div>
+      {% endfor %}
     </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="chart-grid">
     <div class="chart">
       <h2>Average per weekday</h2>
       <div class="cap">When the reading actually happens</div>
@@ -118,26 +131,15 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-</section>
-
-{% if hour_bars %}
-<section class="section">
-  <div class="chart">
-    <h2>Time of day</h2>
-    <div class="cap">Hours read at each hour of the day, all time · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
-    <div class="bars hours">
-      {% for hour, secs in hour_bars %}
-      <div class="col{% if not secs %} zero{% endif %}">
-        <b></b>
-        <div class="plot"><div class="bar" style="height:{{ (secs / max_hour * 100) | round(1) }}%"></div></div>
-        <span>{% if hour % 3 == 0 %}{{ '%02d' % hour }}{% endif %}</span>
-      </div>
-      {% endfor %}
+    {% if hour_clock.slices %}
+    <div class="chart">
+      <h2>Time of day</h2>
+      <div class="cap">Hours read at each hour, all time · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
+      {{ clock_svg(hour_clock) }}
     </div>
+    {% endif %}
   </div>
 </section>
-{% endif %}
 
 {% set hc = namespace(days=0) %}
 {% for wk, name in weeks %}{% for day in wk %}{% if day %}{% set hc.days = hc.days + 1 %}{% endif %}{% endfor %}{% endfor %}
@@ -198,15 +200,18 @@
   const tip = document.createElement('div');
   tip.className = 'tip';
   document.body.append(tip);
-  for (const cell of document.querySelectorAll('.heat .d[data-tip]')) {
-    cell.addEventListener('mouseenter', () => {
+  const place = e => {
+    const t = tip.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(e.clientX + 14, innerWidth - t.width - 8)) + 'px';
+    tip.style.top = Math.max(8, e.clientY - t.height - 14) + 'px';
+  };
+  for (const cell of document.querySelectorAll('[data-tip]')) {
+    cell.addEventListener('mouseenter', e => {
       tip.textContent = cell.dataset.tip;
-      const c = cell.getBoundingClientRect();
       tip.classList.add('on');
-      const t = tip.getBoundingClientRect();
-      tip.style.left = Math.max(8, Math.min(c.left + c.width / 2 - t.width / 2, innerWidth - t.width - 8)) + 'px';
-      tip.style.top = Math.max(8, c.top - t.height - 8) + 'px';
+      place(e);
     });
+    cell.addEventListener('mousemove', place);
     cell.addEventListener('mouseleave', () => tip.classList.remove('on'));
   }
   document.querySelector('.heat-scroll')?.addEventListener('scroll', () => tip.classList.remove('on'));

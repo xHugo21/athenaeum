@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import math
 import mimetypes
 import os
 import re
@@ -44,6 +45,28 @@ def read_hm(s: int) -> str:
         return f"{h}h"
     return f"{m}min"
 templates.env.filters["read_hm"] = read_hm
+
+
+def clock(values, tips, ticks):
+    c, step = 120, 360 / len(values)
+    top = max(values) or 1
+    at = lambda a, r: (round(c + r * math.cos(math.radians(a)), 1), round(c + r * math.sin(math.radians(a)), 1))
+    slices = []
+    for i, v in enumerate(values):
+        if not v:
+            continue
+        a, r = -90 + i * step, 80 * v / top
+        x0, y0 = at(a + step * 0.06, r)
+        x1, y1 = at(a + step * 0.94, r)
+        slices.append({"d": f"M{c} {c}L{x0} {y0}A{r:.1f} {r:.1f} 0 0 1 {x1} {y1}Z", "tip": tips[i]})
+    spokes, labels = [], []
+    for i in range(len(values)):
+        x, y = at(-90 + i * step, 94)
+        spokes.append({"x": x, "y": y})
+    for i, t in ticks:
+        x, y = at(-90 + i * step, 106)
+        labels.append({"x": x, "y": y, "t": t})
+    return {"slices": slices, "spokes": spokes, "labels": labels}
 
 
 
@@ -264,6 +287,11 @@ def stats(request: Request):
     months.reverse()
     month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
     wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
+    hour_clock = clock(
+        hour_secs,
+        [f"{h:02d}:00 – {h + 1:02d}:00 · {read_hm(s)}" for h, s in enumerate(hour_secs)],
+        [(h, f"{h:02d}") for h in range(0, 24, 3)],
+    )
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
@@ -315,11 +343,11 @@ def stats(request: Request):
             ),
             "month_bars": month_bars,
             "wd_bars": wd_bars,
+            "hour_clock": hour_clock,
             "max_month": max_month,
             "max_wd": max_wd,
             "max_hour": max_hour,
             "peak_hour": peak_hour,
-            "hour_bars": list(enumerate(hour_secs)) if any(hour_secs) else [],
             "cur_streak": cur_streak,
             "best_streak": best_streak,
         },
