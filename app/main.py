@@ -234,7 +234,8 @@ def index(request: Request):
 def stats(request: Request):
     with db() as con:
         totals = con.execute(
-            "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, COALESCE(SUM(pages_read),0) pages, AVG(rating) avg_rating FROM books"
+            "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, COALESCE(SUM(pages_read),0) pages,"
+            " COALESCE(SUM(CASE WHEN md5 IS NOT NULL THEN pages_read END),0) tracked_pages, AVG(rating) avg_rating FROM books"
         ).fetchone()
         days = con.execute(
             "SELECT day, seconds, pages FROM days ORDER BY day"

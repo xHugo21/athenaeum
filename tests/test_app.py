@@ -170,6 +170,11 @@ def test_stats_page(tmp_path, monkeypatch):
         assert r.status_code == 200
         assert "The Hobbit" in r.text
         assert "3m" in r.text
+        assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
+
+        client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)
+        r = client.get("/stats")
+        assert "2 from KOReader" in r.text, "untracked pages must not count as KOReader ones"
 
 
 def test_reject_garbage(tmp_path, monkeypatch):
