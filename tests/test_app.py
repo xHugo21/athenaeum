@@ -172,6 +172,7 @@ def test_stats_page(tmp_path, monkeypatch):
         assert "The Hobbit" in r.text
         assert "3m" in r.text
         assert "Monthly reading" in r.text and "Time of day" in r.text
+        assert r.text.count('class="hit"') == 24, "every hour needs a hover target"
         assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
         client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)

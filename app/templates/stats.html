@@ -42,6 +42,8 @@
   .profile { display: block; width: 100%; height: 168px; margin-top: 16px; background-image: linear-gradient(to top, var(--line) 1px, transparent 1px); background-size: 100% 25%; }
   .profile .line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
   .profile .fill { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .profile .hit { fill: transparent; }
+  .profile .hit:hover { fill: color-mix(in srgb, var(--text) 7%, transparent); }
   .profile-hours { display: grid; grid-template-columns: repeat(24, 1fr); margin-top: 6px; font-size: 11px; color: var(--muted); text-align: center; }
   .tip {
     position: fixed; z-index: 20; left: 0; top: 0;
@@ -131,6 +133,7 @@
     <svg class="profile" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Hours read at each hour of the day">
       <path class="fill" d="{{ profile_area }}"/>
       <polyline class="line" points="{{ profile }}" vector-effect="non-scaling-stroke"/>
+      {% for hour, tip in hour_bars %}<rect class="hit" x="{{ hour * 100 / 24 }}" y="0" width="{{ 100 / 24 }}" height="100" data-tip="{{ tip }}"/>{% endfor %}
     </svg>
     <div class="profile-hours">
       {% for h in range(24) %}<span>{% if h % 6 == 0 %}{{ '%02d' % h }}{% endif %}</span>{% endfor %}

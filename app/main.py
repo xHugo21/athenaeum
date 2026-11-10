@@ -265,6 +265,7 @@ def stats(request: Request):
     month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(day_names)]
+    hour_bars = [(h, f"{h:02d}:00 – {h + 1:02d}:00 · {read_hm(s)}") for h, s in enumerate(hour_secs)]
     peak_hour = hour_secs.index(max(hour_secs))
     max_hour = hour_secs[peak_hour] or 1
     xs = [(i + 0.5) * 100 / 24 for i in range(24)]
@@ -322,6 +323,7 @@ def stats(request: Request):
             "max_month": max_month,
             "max_hour": max_hour,
             "peak_hour": peak_hour,
+            "hour_bars": hour_bars,
             "profile": profile,
             "profile_area": profile_area,
             "wd_bars": wd_bars,
