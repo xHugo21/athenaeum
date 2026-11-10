@@ -39,16 +39,14 @@
   .ranked .tbar { height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 7px; overflow: hidden; }
   .ranked .tbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   .ranked td:last-child { text-align: right; white-space: nowrap; font-size: 12px; color: var(--text-2); }
-  [data-tip] { position: relative; }
-  [data-tip]::after {
-    content: attr(data-tip);
-    position: absolute; right: 0; bottom: calc(100% + 7px);
+  .tip {
+    position: fixed; z-index: 20; left: 0; top: 0;
     background: var(--text); color: var(--bg);
     padding: 4px 7px; border-radius: 4px;
     font-size: 12px; white-space: nowrap;
-    opacity: 0; pointer-events: none; transition: opacity .1s ease; z-index: 5;
+    opacity: 0; pointer-events: none; transition: opacity .1s ease;
   }
-  [data-tip]:hover::after { opacity: 1; }
+  .tip.on { opacity: 1; }
   @media (max-width: 820px) {
     .heat-scroll { mask-image: linear-gradient(90deg, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); }
     .heat-months .full { display: none; }
@@ -137,7 +135,7 @@
     <div class="wk">
       {% for day in wk %}
         {% if day %}
-        <div class="d" data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages" title="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+        <div class="d" data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
              style="background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, var(--surface-2))"></div>
         {% else %}
         <div class="d off"></div>
@@ -175,5 +173,23 @@
     {% endfor %}
   </table>
 </section>
+
+<script>
+  const tip = document.createElement('div');
+  tip.className = 'tip';
+  document.body.append(tip);
+  for (const cell of document.querySelectorAll('.heat .d[data-tip]')) {
+    cell.addEventListener('mouseenter', () => {
+      tip.textContent = cell.dataset.tip;
+      const c = cell.getBoundingClientRect();
+      tip.classList.add('on');
+      const t = tip.getBoundingClientRect();
+      tip.style.left = Math.max(8, Math.min(c.left + c.width / 2 - t.width / 2, innerWidth - t.width - 8)) + 'px';
+      tip.style.top = Math.max(8, c.top - t.height - 8) + 'px';
+    });
+    cell.addEventListener('mouseleave', () => tip.classList.remove('on'));
+  }
+  document.querySelector('.heat-scroll')?.addEventListener('scroll', () => tip.classList.remove('on'));
+</script>
 {% endif %}
 {% endblock %}
