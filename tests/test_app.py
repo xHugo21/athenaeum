@@ -130,6 +130,7 @@ def test_manual_add_with_isbn(tmp_path, monkeypatch):
             follow_redirects=False,
         )
         assert r.status_code == 303
+        assert client.get("/stats").status_code == 200, "stats must survive a library with no sessions"
     with sqlite3.connect("athenaeum.db") as c:
         row = c.execute("SELECT title, author, isbn, rating FROM books ORDER BY id").fetchall()
     assert row == [
@@ -170,8 +171,7 @@ def test_stats_page(tmp_path, monkeypatch):
         assert r.status_code == 200
         assert "The Hobbit" in r.text
         assert "3m" in r.text
-        assert "Time of day" in r.text and "· peak" in r.text
-        assert "Seasonality" in r.text
+        assert "Monthly reading" in r.text and "Time of day" in r.text
         assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
         client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)
@@ -249,7 +249,7 @@ def test_plugin_sync_no_dupes(tmp_path, monkeypatch):
         r = client.get("/books/1")
         assert "Call me Ishmael" in r.text
         r = client.get("/stats")
-        assert "Time of day" in r.text and "Seasonality" in r.text
+        assert "Time of day" in r.text
 
 
 def test_stats_streaks(tmp_path, monkeypatch):
@@ -267,7 +267,7 @@ def test_stats_streaks(tmp_path, monkeypatch):
         con.close()
         r = client.get("/stats")
         assert r.status_code == 200
-        assert "Monthly reading" in r.text and "Average per weekday" in r.text
+        assert "Monthly reading" in r.text
         import re
         assert re.search(r'class="streak current">\s*<div class="n num">3<', r.text)
         assert re.search(r'class="streak best">\s*<div class="n num">3<', r.text)

@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-import math
 import mimetypes
 import os
 import re
@@ -45,28 +44,6 @@ def read_hm(s: int) -> str:
         return f"{h}h"
     return f"{m}min"
 templates.env.filters["read_hm"] = read_hm
-
-
-def clock(values, tips, ticks):
-    c, step = 120, 360 / len(values)
-    top = max(values) or 1
-    at = lambda a, r: (round(c + r * math.cos(math.radians(a)), 1), round(c + r * math.sin(math.radians(a)), 1))
-    slices = []
-    for i, v in enumerate(values):
-        if not v:
-            continue
-        a, r = -90 + i * step, 80 * v / top
-        x0, y0 = at(a + step * 0.06, r)
-        x1, y1 = at(a + step * 0.94, r)
-        slices.append({"d": f"M{c} {c}L{x0} {y0}A{r:.1f} {r:.1f} 0 0 1 {x1} {y1}Z", "tip": tips[i]})
-    spokes, labels = [], []
-    for i in range(len(values)):
-        x, y = at(-90 + i * step, 94)
-        spokes.append({"x": x, "y": y})
-    for i, t in ticks:
-        x, y = at(-90 + i * step, 106)
-        labels.append({"x": x, "y": y, "t": t})
-    return {"slices": slices, "spokes": spokes, "labels": labels}
 
 
 
@@ -271,18 +248,12 @@ def stats(request: Request):
             "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) FROM sessions GROUP BY 1"
         ):
             hour_secs[h] = secs
-        month_secs_all, month_days = [0] * 12, [0] * 12
-        for m, secs, n in con.execute(
-            "SELECT CAST(substr(day, 6, 2) AS INTEGER), SUM(seconds), COUNT(*) FROM days GROUP BY 1"
-        ):
-            month_secs_all[m - 1], month_days[m - 1] = secs, n
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
-    month_secs, read_days, wd_secs, wd_count = {}, {}, [0] * 7, [0] * 7
+    month_secs, wd_secs, wd_count = {}, [0] * 7, [0] * 7
     for r in days:
         month_secs[r["day"][:7]] = month_secs.get(r["day"][:7], 0) + r["seconds"]
-        read_days[r["day"][:7]] = read_days.get(r["day"][:7], 0) + 1
         wd = date.fromisoformat(r["day"]).weekday()
         wd_secs[wd] += r["seconds"]
         wd_count[wd] += 1
@@ -291,25 +262,16 @@ def stats(request: Request):
         months.append(m)
         m = (m - timedelta(days=1)).replace(day=1)
     months.reverse()
-    month_bars = []
-    for mo in months:
-        key = mo.isoformat()[:7]
-        month_bars.append((mo.strftime("%b"), month_secs.get(key, 0) // read_days[key] if read_days.get(key) else 0))
-    wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])]
-    hour_clock = clock(
-        hour_secs,
-        [f"{h:02d}:00 – {h + 1:02d}:00 · {read_hm(s)}" for h, s in enumerate(hour_secs)],
-        [(h, f"{h:02d}") for h in range(0, 24, 3)],
-    )
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    season_secs = [month_secs_all[i] // month_days[i] if month_days[i] else 0 for i in range(12)]
-    season_clock = clock(
-        season_secs,
-        [f"{m} · {read_hm(s)} per reading day, {n} {'day' if n == 1 else 'days'}" for m, s, n in zip(month_names, season_secs, month_days)],
-        list(enumerate(month_names)),
-    )
-    peak_season = max(season_secs)
-    peak_month = month_names[season_secs.index(peak_season)]
+    month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    busiest = max(zip(wd_secs, day_names), default=(0, "—"))
+    quietest = min(((s, d) for s, d in zip(wd_secs, day_names) if s), default=busiest)
+    peak_hour = hour_secs.index(max(hour_secs))
+    max_hour = hour_secs[peak_hour] or 1
+    xs = [(i + 0.5) * 100 / 24 for i in range(24)]
+    pts = [(x, 100 - 100 * v / max_hour) for x, v in zip(xs, hour_secs)]
+    profile = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+    profile_area = f"M{pts[0][0]:.2f},100 " + " ".join(f"L{x:.2f},{y:.2f}" for x, y in pts) + f" L{pts[-1][0]:.2f},100 Z"
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
@@ -325,9 +287,6 @@ def stats(request: Request):
         best_streak = max(best_streak, run)
         prev = dd
     max_month = max((s for _, s in month_bars), default=0) or 1
-    max_wd = max(s for _, s in wd_bars) or 1
-    peak_hour = hour_secs.index(max(hour_secs))
-    max_hour = hour_secs[peak_hour] or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
     d = date.today() - timedelta(days=364)
@@ -360,15 +319,13 @@ def stats(request: Request):
                 else None
             ),
             "month_bars": month_bars,
-            "wd_bars": wd_bars,
-            "hour_clock": hour_clock,
-            "season_clock": season_clock,
-            "peak_month": peak_month,
-            "peak_season": peak_season,
             "max_month": max_month,
-            "max_wd": max_wd,
             "max_hour": max_hour,
             "peak_hour": peak_hour,
+            "profile": profile,
+            "profile_area": profile_area,
+            "busiest": busiest,
+            "quietest": quietest,
             "cur_streak": cur_streak,
             "best_streak": best_streak,
         },
