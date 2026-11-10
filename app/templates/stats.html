@@ -140,11 +140,11 @@
       {{ clock_svg(hour_clock) }}
     </div>
     {% endif %}
-    {% if marks_clock.slices %}
+    {% if season_clock.slices %}
     <div class="chart">
-      <h2>Highlights by month</h2>
-      <div class="cap">Highlights and bookmarks per calendar month, all time · peak {{ peak_month }} with {{ peak_marks }}</div>
-      {{ clock_svg(marks_clock) }}
+      <h2>Seasonality</h2>
+      <div class="cap">Hours read per calendar month, all years · peak {{ peak_month }} with {{ (peak_season / 3600) | round(0) | int }}h</div>
+      {{ clock_svg(season_clock) }}
     </div>
     {% endif %}
   </div>

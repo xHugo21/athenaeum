@@ -271,9 +271,11 @@ def stats(request: Request):
             "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) FROM sessions GROUP BY 1"
         ):
             hour_secs[h] = secs
-        month_marks = [0] * 12
-        for m, n in con.execute("SELECT CAST(strftime('%m', datetime) AS INTEGER), COUNT(*) FROM annotations GROUP BY 1"):
-            month_marks[m - 1] = n
+        month_secs_all, month_days = [0] * 12, [0] * 12
+        for m, secs, n in con.execute(
+            "SELECT CAST(substr(day, 6, 2) AS INTEGER), SUM(seconds), COUNT(*) FROM days GROUP BY 1"
+        ):
+            month_secs_all[m - 1], month_days[m - 1] = secs, n
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
@@ -296,13 +298,13 @@ def stats(request: Request):
         [(h, f"{h:02d}") for h in range(0, 24, 3)],
     )
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    marks_clock = clock(
-        month_marks,
-        [f"{m} · {n} {'mark' if n == 1 else 'marks'}" for m, n in zip(month_names, month_marks)],
+    season_clock = clock(
+        month_secs_all,
+        [f"{m} · {read_hm(s)} over {n} {'day' if n == 1 else 'days'}" for m, s, n in zip(month_names, month_secs_all, month_days)],
         list(enumerate(month_names)),
     )
-    peak_marks = max(month_marks)
-    peak_month = month_names[month_marks.index(peak_marks)]
+    peak_season = max(month_secs_all)
+    peak_month = month_names[month_secs_all.index(peak_season)]
     have = {r["day"] for r in days if r["seconds"] > 0}
     cur_streak, d0 = 0, date.today()
     if d0.isoformat() not in have:
@@ -355,9 +357,9 @@ def stats(request: Request):
             "month_bars": month_bars,
             "wd_bars": wd_bars,
             "hour_clock": hour_clock,
-            "marks_clock": marks_clock,
+            "season_clock": season_clock,
             "peak_month": peak_month,
-            "peak_marks": peak_marks,
+            "peak_season": peak_season,
             "max_month": max_month,
             "max_wd": max_wd,
             "max_hour": max_hour,
