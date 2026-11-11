@@ -113,7 +113,17 @@ CREATE TABLE IF NOT EXISTS tbr (
     author TEXT,
     added_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS labels (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+);
+CREATE TABLE IF NOT EXISTS book_labels (
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+    PRIMARY KEY (book_id, label_id)
+);
 CREATE INDEX IF NOT EXISTS idx_books_md5 ON books(md5);
+CREATE INDEX IF NOT EXISTS idx_book_labels_label ON book_labels(label_id);
 """
 
 
@@ -198,6 +208,7 @@ def find_book(con, title: str, author: str | None, md5: str | None = None):
 def index(request: Request):
     sort = request.query_params.get("sort", "recent")
     d = request.query_params.get("dir", "desc")
+    label = request.query_params.get("label", "")
     sort_sql = {
         ("title", "asc"): "title COLLATE NOCASE ASC",
         ("title", "desc"): "title COLLATE NOCASE DESC",
@@ -206,9 +217,18 @@ def index(request: Request):
     }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")
     with db() as con:
         books = [dict(r) for r in con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()]
+        book_labels, label_counts = {}, {}
+        for r in con.execute(
+            "SELECT bl.book_id, l.name FROM book_labels bl JOIN labels l ON l.id=bl.label_id "
+            "ORDER BY l.name COLLATE NOCASE"
+        ):
+            book_labels.setdefault(r["book_id"], []).append(r["name"])
+            label_counts[r["name"]] = label_counts.get(r["name"], 0) + 1
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
+            b["labels"] = book_labels.get(b["id"], [])
         max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
+    active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
     for b in books:
         p = os.path.join(COVERS_DIR, f"{b['id']}.jpg")
@@ -226,6 +246,8 @@ def index(request: Request):
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
             "cover_ts": cover_ts,
+            "labels": label_counts,
+            "active_label": active_label,
         },
     )
 
@@ -353,6 +375,14 @@ def book_detail(request: Request, book_id: int):
             "SELECT * FROM annotations WHERE book_id=? ORDER BY pageno, datetime",
             (book_id,),
         ).fetchall()
+        labels = [
+            r["name"]
+            for r in con.execute(
+                "SELECT l.name FROM labels l JOIN book_labels bl ON bl.label_id=l.id "
+                "WHERE bl.book_id=? ORDER BY l.name COLLATE NOCASE",
+                (book_id,),
+            )
+        ]
     return templates.TemplateResponse(
         request,
         "book.html",
@@ -362,6 +392,7 @@ def book_detail(request: Request, book_id: int):
             "sessions_n": sessions_n,
             "best": best,
             "anns": anns,
+            "labels": labels,
             "custom_cover": os.path.exists(cover_path := os.path.join(COVERS_DIR, f"{book_id}.jpg")),
             "cover_ts": int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
         },
@@ -459,6 +490,27 @@ def delete_book(book_id: int):
     if os.path.exists(path):
         os.remove(path)
     return RedirectResponse("/", 303)
+
+
+@app.post("/books/{book_id}/labels")
+def set_labels(book_id: int, labels: str = Form("")):
+    names = {}
+    for raw in labels.split(","):
+        name = " ".join(raw.split())
+        if name:
+            names.setdefault(name.casefold(), name)
+    with db() as con:
+        if not con.execute("SELECT 1 FROM books WHERE id=?", (book_id,)).fetchone():
+            return RedirectResponse("/", 303)
+        con.execute("DELETE FROM book_labels WHERE book_id=?", (book_id,))
+        for name in names.values():
+            con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
+            con.execute(
+                "INSERT OR IGNORE INTO book_labels (book_id, label_id) SELECT ?, id FROM labels WHERE name=?",
+                (book_id, name),
+            )
+        con.execute("DELETE FROM labels WHERE id NOT IN (SELECT label_id FROM book_labels)")
+    return RedirectResponse(f"/books/{book_id}", 303)
 
 
 @app.get("/tbr")

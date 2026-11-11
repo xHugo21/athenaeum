@@ -226,6 +226,17 @@
         <button type="button" data-value="none" aria-pressed="false"><span>Unrated</span></button>
       </div>
     </div>
+    {% if labels %}
+    <div class="rail-group">
+      <div class="label">Labels</div>
+      <div class="rail-list" data-filter="label">
+        <button type="button" data-value="" aria-pressed="{{ 'true' if active_label is none else 'false' }}"><span>All labels</span></button>
+        {% for name, count in labels.items() %}
+        <button type="button" data-value="{{ name }}" aria-pressed="{{ 'true' if active_label == name else 'false' }}"><span>{{ name }}</span><b class="num">{{ count }}</b></button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     <div class="rail-group">
       <div class="label">Sort</div>
       <div class="rail-list sort">
@@ -284,7 +295,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('finished' if (b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages'])) else 'reading') | tojson }},"hue":{{ b['hue'] }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('finished' if (b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages'])) else 'reading') | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -299,7 +310,7 @@
 <script>
   const booksData = JSON.parse(document.getElementById('book-data').textContent);
   const byId = new Map(booksData.map(b => [String(b.id), b]));
-  const state = { progress: 'all', rating: 'any', q: localStorage.getItem('athenaeum-q') || '' };
+  const state = { progress: 'all', rating: 'any', label: {{ active_label | tojson }}, q: localStorage.getItem('athenaeum-q') || '' };
   const q = document.getElementById('q');
   q.value = state.q;
 
@@ -308,6 +319,7 @@
   function matches(b) {
     if (state.q && !(b.title.toLowerCase().includes(state.q) || (b.author || '').toLowerCase().includes(state.q))) return false;
     if (state.progress !== 'all' && b.state !== state.progress) return false;
+    if (state.label && !b.labels.includes(state.label)) return false;
     if (state.rating === 'none' && b.rating) return false;
     if (state.rating !== 'any' && state.rating !== 'none' && Math.floor(b.rating) !== Number(state.rating)) return false;
     return true;
@@ -325,7 +337,8 @@
     const none = document.getElementById('no-results');
     if (none) none.hidden = ids.size > 0;
     const count = document.getElementById('book-count');
-    if (count) count.textContent = (state.q || state.progress !== 'all' || state.rating !== 'any')
+    const filtering = state.q || state.progress !== 'all' || state.rating !== 'any' || state.label;
+    if (count) count.textContent = filtering
       ? `${ids.size} of ${booksData.length} titles`
       : `${booksData.length} titles`;
     const chip = document.getElementById('filter-chip');
@@ -335,6 +348,7 @@
       if (state.q) parts.push(`“${state.q}”`);
       if (state.progress !== 'all') parts.push(state.progress);
       if (state.rating !== 'any') parts.push(state.rating === 'none' ? 'unrated' : state.rating + ' stars');
+      if (state.label) parts.push(state.label);
       chip.hidden = parts.length === 0;
       chipLabel.textContent = parts.join(' · ');
     }
@@ -353,6 +367,7 @@
     state.q = '';
     setFilter('progress', 'all');
     setFilter('rating', 'any');
+    setFilter('label', '');
     paintShelves();
     radial();
   }

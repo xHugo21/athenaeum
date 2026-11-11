@@ -27,6 +27,17 @@
     background: var(--accent-soft); color: var(--accent-strong);
     font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
   }
+  .label-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .label-row .tag { height: 23px; padding: 0 5px 0 9px; font-size: 12px; letter-spacing: 0; text-transform: none; }
+  .label-pill a { color: inherit; }
+  .label-pill a:hover { text-decoration: none; }
+  .label-x { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; opacity: .55; }
+  .label-x .icon { width: 11px; height: 11px; }
+  .label-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .label-row .label-add { border-style: dashed; background: none; color: var(--muted); padding: 0 9px; }
+  .label-row .label-add:hover { color: var(--text); border-color: var(--muted); }
+  .label-add .icon { width: 12px; height: 12px; }
+  .label-row .label-input { width: 110px; height: 23px; padding: 0 10px; border-radius: 999px; font-size: 12px; }
   .progress-head .pages { font-size: 12px; color: var(--muted); }
   .progress-block .track { height: 5px; }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px 24px; margin-top: 22px; }
@@ -111,6 +122,17 @@
             <button class="linkbtn" type="submit">{{ 'Mark as unread' if done else 'Mark as read' }}</button>
           </form>
         </span>
+      </div>
+      <div class="label-row" id="label-row" data-action="/books/{{ b['id'] }}/labels">
+        {% for l in labels %}
+        <span class="tag label-pill" data-name="{{ l }}">
+          <a href="/?label={{ l | urlencode }}">{{ l }}</a>
+          <button class="label-x" type="button" aria-label="Remove {{ l }}"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+        </span>
+        {% endfor %}
+        <button class="tag label-add" type="button" id="label-add">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add label
+        </button>
       </div>
     </div>
 
@@ -274,6 +296,84 @@
     });
     rateRoot.addEventListener('mouseleave', () => paint(committed, false));
     paint(committed, false);
+  }
+
+  const labelsRow = document.getElementById('label-row');
+  if (labelsRow) {
+    const labelsAction = labelsRow.dataset.action;
+    const labelAdd = document.getElementById('label-add');
+    let labelInput = null;
+    let labelSave = Promise.resolve();
+
+    const labelNames = () => [...labelsRow.querySelectorAll('.label-pill')].map(p => p.dataset.name);
+    const persistLabels = () => {
+      const body = new URLSearchParams({ labels: labelNames().join(',') });
+      labelSave = labelSave
+        .then(() => fetch(labelsAction, { method: 'POST', body, keepalive: true }))
+        .catch(() => {});
+    };
+
+    function addLabelPill(name) {
+      const pill = document.createElement('span');
+      pill.className = 'tag label-pill';
+      pill.dataset.name = name;
+      const link = document.createElement('a');
+      link.href = '/?label=' + encodeURIComponent(name);
+      link.textContent = name;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'label-x';
+      remove.setAttribute('aria-label', 'Remove ' + name);
+      remove.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>';
+      pill.append(link, remove);
+      labelsRow.insertBefore(pill, labelInput || labelAdd);
+    }
+
+    function commitLabel() {
+      if (!labelInput) return;
+      const name = labelInput.value.trim().replace(/\s+/g, ' ');
+      labelInput.value = '';
+      if (!name || labelNames().some(n => n.toLowerCase() === name.toLowerCase())) return;
+      addLabelPill(name);
+      persistLabels();
+    }
+
+    function closeLabelInput() {
+      const input = labelInput;
+      labelInput = null;
+      input?.remove();
+      labelAdd.hidden = false;
+    }
+
+    labelAdd.addEventListener('click', () => {
+      labelAdd.hidden = true;
+      labelInput = document.createElement('input');
+      labelInput.className = 'label-input';
+      labelInput.placeholder = 'label';
+      labelInput.setAttribute('aria-label', 'New label');
+      labelsRow.insertBefore(labelInput, labelAdd);
+      labelInput.focus();
+      labelInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commitLabel();
+        } else if (e.key === 'Escape') {
+          closeLabelInput();
+        }
+      });
+      labelInput.addEventListener('blur', () => {
+        if (!labelInput) return;
+        commitLabel();
+        closeLabelInput();
+      });
+    });
+
+    labelsRow.addEventListener('click', e => {
+      const remove = e.target.closest('.label-x');
+      if (!remove) return;
+      remove.closest('.label-pill').remove();
+      persistLabels();
+    });
   }
 </script>
 {% endblock %}

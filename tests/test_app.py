@@ -496,6 +496,41 @@ def test_db_is_wal_and_survives_concurrent_writes(tmp_path, monkeypatch):
         assert con.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 10
 
 
+def test_book_labels_assign_and_filter(tmp_path, monkeypatch):
+    import json
+    import re
+
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Dune"}, follow_redirects=False)
+        client.post("/books", data={"title": "Emma"}, follow_redirects=False)
+        r = client.post("/books/1/labels", data={"labels": " Sci-Fi, space ,sci-fi,, "}, follow_redirects=False)
+        assert r.status_code == 303
+        client.post("/books/2/labels", data={"labels": "classic"}, follow_redirects=False)
+
+        page = client.get("/books/1").text
+        assert "Sci-Fi" in page and "space" in page
+        assert 'href="/?label=Sci-Fi"' in page
+        assert 'class="label-x"' in page and 'id="label-add"' in page
+
+        r = client.get("/?label=space")
+        data = json.loads(re.search(r'id="book-data" type="application/json">(.*?)</script>', r.text, re.S).group(1))
+        assert [b["title"] for b in data] == ["Dune", "Emma"], "label filtering happens in the browser"
+        dune = next(b for b in data if b["title"] == "Dune")
+        assert sorted(dune["labels"]) == ["Sci-Fi", "space"]
+        assert '<button type="button" data-value="space" aria-pressed="true">' in r.text
+
+        client.post("/books/1/labels", data={"labels": "sci-fi, favorite"}, follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        names = dict(c.execute("SELECT name, id FROM labels").fetchall())
+        assert sorted(names) == ["Sci-Fi", "classic", "favorite"], "labels are reused case-insensitively and orphans removed"
+        rows = c.execute(
+            "SELECT l.name FROM book_labels bl JOIN labels l ON l.id=bl.label_id WHERE bl.book_id=1 ORDER BY l.name"
+        ).fetchall()
+    assert {r[0] for r in rows} == {"Sci-Fi", "favorite"}
+
+
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     import app.main as main
