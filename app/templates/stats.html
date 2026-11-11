@@ -39,6 +39,8 @@
   .ranked .tbar { height: 3px; border-radius: 2px; background: var(--surface-3); margin-top: 7px; overflow: hidden; }
   .ranked .tbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
   .ranked td:last-child { text-align: right; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+  .ranked th:first-child { width: 28px; }
+  .ranked th:last-child { text-align: right; }
   .profile { display: block; width: 100%; height: 168px; margin-top: 16px; background-image: linear-gradient(to top, var(--line) 1px, transparent 1px); background-size: 100% 25%; }
   .profile .line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
   .profile .fill { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
@@ -159,10 +161,12 @@
     <div class="wk">
       {% for day in wk %}
         {% if day %}
-        <div class="d" data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+        <div class="d" role="img"
+             aria-label="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+             data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
              style="background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, var(--surface-2))"></div>
         {% else %}
-        <div class="d off"></div>
+        <div class="d off" aria-hidden="true"></div>
         {% endif %}
       {% endfor %}
     </div>
