@@ -1,10 +1,11 @@
-<div class="stars-input" role="group" aria-label="Rating" data-value="{{ value | default(0) }}">
+<div class="stars-input" role="radiogroup" aria-label="Rating" data-value="{{ value | default(0) }}"
+     {% if stars_submit %}data-submit{% endif %}{% if stars_label %} data-label="{{ stars_label }}"{% endif %}>
   {% for i in range(1, 6) %}
   <span class="star" data-star="{{ i }}">
     <svg class="icon base" aria-hidden="true"><use href="#i-star"/></svg>
     <svg class="icon fill" aria-hidden="true"><use href="#i-star"/></svg>
-    <button type="button" data-v="{{ i - 0.5 }}" aria-label="{{ i - 0.5 }} stars"></button>
-    <button type="button" data-v="{{ i }}" aria-label="{{ i }} stars"></button>
+    <button type="button" role="radio" aria-checked="false" data-v="{{ i - 0.5 }}" aria-label="{{ i - 0.5 }} stars"></button>
+    <button type="button" role="radio" aria-checked="false" data-v="{{ i }}" aria-label="{{ i }} stars"></button>
   </span>
   {% endfor %}
 </div>

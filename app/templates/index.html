@@ -657,27 +657,6 @@
       el.querySelector('input, textarea')?.focus({ preventScroll: true });
     }
   }
-
-
-  const rateRoot = document.querySelector('.stars-input');
-  if (rateRoot) {
-    const hidden = document.getElementById('rate-val');
-    const paint = v => {
-      hidden.value = v;
-      rateRoot.querySelectorAll('.star').forEach(star => {
-        const i = Number(star.dataset.star);
-        star.classList.toggle('on', i <= v);
-        star.classList.toggle('half', i - 0.5 === Number(v));
-      });
-      rateRoot.querySelectorAll('button').forEach(b => {
-        b.setAttribute('aria-pressed', String(Number(b.dataset.v) === Number(v)));
-      });
-    };
-    rateRoot.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => paint(Number(btn.dataset.v)));
-    });
-    paint(Number(hidden.value) || 0);
-  }
 </script>
 {% endif %}
 {% endblock %}

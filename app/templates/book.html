@@ -166,6 +166,8 @@
     </form>
 
     {% set value = b['rating'] or 0 %}
+    {% set stars_submit = true %}
+    {% set stars_label = 'rate-label' %}
     <form id="rf" method="post" action="/books/{{ b['id'] }}/rate">
       <input type="hidden" name="rating" id="rate-val" value="{{ b['rating'] or 0 }}">
       <input type="hidden" name="review" value="{{ b['review'] or '' }}">
@@ -296,32 +298,6 @@
 
 {% block scripts %}
 <script>
-  const rateRoot = document.querySelector('.stars-input');
-  if (rateRoot) {
-    const hidden = document.getElementById('rate-val');
-    const label = document.getElementById('rate-label');
-    let committed = Number(rateRoot.dataset.value) || 0;
-    const paint = (v, commit) => {
-      if (commit) { committed = v; hidden.value = v; }
-      rateRoot.querySelectorAll('.star').forEach(star => {
-        const i = Number(star.dataset.star);
-        star.classList.toggle('on', i <= v);
-        star.classList.toggle('half', i - 0.5 === Number(v));
-      });
-      rateRoot.querySelectorAll('button').forEach(b => {
-        b.setAttribute('aria-pressed', String(Number(b.dataset.v) === Number(v)));
-      });
-      label.textContent = v ? Number(v).toFixed(1).replace('.0', '') + ' / 5' : 'Not rated';
-    };
-    rateRoot.querySelectorAll('button').forEach(btn => {
-      const v = Number(btn.dataset.v);
-      btn.addEventListener('click', () => { paint(v, true); document.getElementById('rf').submit(); });
-      btn.addEventListener('mouseenter', () => paint(v, false));
-    });
-    rateRoot.addEventListener('mouseleave', () => paint(committed, false));
-    paint(committed, false);
-  }
-
   const labelsRow = document.getElementById('label-row');
   if (labelsRow) {
     const labelsAction = labelsRow.dataset.action;

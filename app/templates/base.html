@@ -456,6 +456,54 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem('athenaeum-theme', next);
   });
+
+  for (const root of document.querySelectorAll('.stars-input')) {
+    const form = root.closest('form');
+    const input = form?.querySelector('input[name="rating"]');
+    const label = document.getElementById(root.dataset.label || '');
+    const radios = [...root.querySelectorAll('[role="radio"]')];
+    let committed = Number(root.dataset.value) || 0;
+
+    const paint = v => {
+      root.dataset.value = v;
+      radios.forEach(r => {
+        const on = Number(r.dataset.v) === v;
+        r.setAttribute('aria-checked', String(on));
+        r.tabIndex = on || (!v && r === radios[0]) ? 0 : -1;
+      });
+      root.querySelectorAll('.star').forEach(star => {
+        const i = Number(star.dataset.star);
+        star.classList.toggle('on', i <= v);
+        star.classList.toggle('half', i - 0.5 === v);
+      });
+      if (label) label.textContent = v ? `${v} / 5` : 'Not rated';
+    };
+
+    const commit = v => {
+      committed = v;
+      if (input) input.value = v;
+      paint(v);
+      if ('submit' in root.dataset && form) form.requestSubmit();
+    };
+
+    radios.forEach(r => {
+      r.addEventListener('click', () => commit(Number(r.dataset.v)));
+      r.addEventListener('mouseenter', () => paint(Number(r.dataset.v)));
+    });
+    root.addEventListener('mouseleave', () => paint(committed));
+    root.addEventListener('keydown', e => {
+      const i = radios.indexOf(document.activeElement);
+      const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+      const next = step
+        ? radios[Math.min(radios.length - 1, Math.max(0, i + step))]
+        : e.key === 'Home' ? radios[0] : e.key === 'End' ? radios.at(-1) : null;
+      if (i < 0 || !next) return;
+      e.preventDefault();
+      next.focus();
+      commit(Number(next.dataset.v));
+    });
+    paint(committed);
+  }
 </script>
 {% block scripts %}{% endblock %}
 </body>
