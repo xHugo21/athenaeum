@@ -188,6 +188,11 @@
   <div class="section-head"><h2>Most time per book</h2></div>
   {% set top_secs = top[0]['total_seconds'] if top else 0 %}
   <table class="ranked">
+    <caption class="sr-only">Most time per book</caption>
+    <thead>
+      <tr><th scope="col">#</th><th scope="col">Book</th><th scope="col">Time</th></tr>
+    </thead>
+    <tbody>
     {% for b in top %}
     {% set ratio = ((b['total_seconds'] or 0) / top_secs * 100) if top_secs else 0 %}
     <tr>
@@ -199,6 +204,7 @@
       <td class="num">{{ b['total_seconds'] | read_hm }}</td>
     </tr>
     {% endfor %}
+    </tbody>
   </table>
 </section>
 
