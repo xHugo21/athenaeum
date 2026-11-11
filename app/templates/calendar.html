@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Calendar · athenaeum{% endblock %}
+{% block content %}
+<style>
+  .cal-nav { display: flex; align-items: center; gap: 6px; }
+  .cal-totals { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .cal-totals b { color: var(--text); font-weight: 500; margin-right: 4px; }
+  .cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; align-items: start; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+  .cal-dow { background: var(--surface-2); padding: 7px 8px; font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .cal-dow .short { display: none; }
+  .cal-day { min-height: 78px; padding: 8px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; }
+  .cal-day:not(.out):hover { background: var(--surface-2); text-decoration: none; }
+  .cal-day.out { background: var(--surface-2); }
+  .cal-day.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+  .cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cal-day .n { font-size: 12px; color: var(--text-2); }
+  .cal-day .mins { font-size: 11px; color: var(--muted); }
+  .cal-day .bar { margin-top: auto; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .cal-day .bar span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .cal-panel { position: sticky; top: 76px; border-left: 1px solid var(--line); padding-left: 24px; min-height: 200px; }
+  .cal-panel h2 { margin-top: 6px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .cal-panel .meta { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  .cal-books { display: flex; flex-direction: column; margin-top: 12px; }
+  .cal-book { display: flex; flex-direction: column; gap: 2px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .cal-book:last-child { border-bottom: 0; }
+  .cal-book:hover { text-decoration: none; }
+  .cal-book .t { font-size: 13px; font-weight: 500; color: var(--text); }
+  .cal-book:hover .t { color: var(--accent-strong); }
+  .cal-book .a { font-size: 12px; color: var(--muted); }
+  .cal-book .m { margin-top: 2px; font-size: 11px; color: var(--text-2); }
+  .cal-empty { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  @media (max-width: 900px) {
+    .cal-layout { grid-template-columns: 1fr; gap: 24px; }
+    .cal-panel { position: static; border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
+  }
+  @media (max-width: 640px) {
+    .cal-day { min-height: 52px; padding: 5px; }
+    .cal-day .mins { display: none; }
+    .cal-day .bar { height: 2px; }
+    .cal-dow { padding: 6px 4px; text-align: center; }
+    .cal-dow .full { display: none; }
+    .cal-dow .short { display: inline; }
+    .cal-totals { gap: 14px; }
+  }
+</style>
+
+<div class="page-head">
+  <div class="title"><h1>Calendar</h1><span class="count num">{{ month_name }}</span></div>
+  <div class="actions cal-nav">
+    <a class="btn sm btn-ghost" href="/calendar?month={{ prev_month }}" aria-label="Previous month">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+    </a>
+    <a class="btn sm btn-ghost" href="/calendar?month={{ next_month }}" aria-label="Next month">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+    </a>
+    <a class="btn sm" href="/calendar">Today</a>
+  </div>
+</div>
+
+<div class="cal-totals">
+  <span><b class="num">{{ days_read }}</b>days read</span>
+  <span><b class="num">{{ month_seconds | read_hm }}</b>total</span>
+  <span><b class="num">{{ month_pages | comma }}</b>pages</span>
+  <span><b class="num">{{ books_read }}</b>books</span>
+</div>
+
+<div class="cal-layout">
+  <div class="cal-grid" aria-label="Reading calendar">
+    {% for d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+    <div class="cal-dow"><span class="full">{{ d }}</span><span class="short">{{ d[0] }}</span></div>
+    {% endfor %}
+    {% for week in weeks %}
+      {% for c in week %}
+        {% if not c['in_month'] %}
+        <span class="cal-day out"></span>
+        {% else %}
+        {% set iso = c['date'].isoformat() %}
+        <a class="cal-day{% if iso == selected_day %} selected{% endif %}"
+           href="/calendar?month={{ month_key }}&day={{ iso }}"
+           {% if iso == selected_day %}aria-current="date"{% endif %}
+           aria-label="{{ iso }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} pages, {{ c['books'] | length }} books">
+          <span class="n num">{{ c['date'].day }}</span>
+          {% if c['seconds'] %}
+          <span class="mins num">{{ ((c['seconds'] + 59) // 60) }}m</span>
+          <span class="bar"><span style="width:{{ (c['seconds'] / max_seconds * 100) | round(1) }}%"></span></span>
+          {% endif %}
+        </a>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <aside class="cal-panel" aria-label="Books read on selected day">
+    {% if selected_day %}
+    <div class="label">Selected day</div>
+    <h2 class="num">{{ selected_day | day_fmt }}</h2>
+    {% if selected_seconds or selected_pages %}
+    <div class="meta num">{{ selected_seconds | read_hm }} · {{ selected_pages }} pages</div>
+    {% endif %}
+    {% if selected_books %}
+    <div class="cal-books">
+      {% for b in selected_books %}
+      <a class="cal-book" href="/books/{{ b['book_id'] }}">
+        <span class="t">{{ b['title'] }}</span>
+        {% if b['author'] %}<span class="a">{{ b['author'] }}</span>{% endif %}
+        <span class="m num">{{ b['seconds'] | read_hm }} · {{ b['pages'] }} pages</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="cal-empty">No reading logged for this day.</p>
+    {% endif %}
+    {% else %}
+    <p class="cal-empty">No reading logged this month.</p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

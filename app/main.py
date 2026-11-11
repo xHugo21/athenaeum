@@ -1,3 +1,4 @@
+import calendar
 import hashlib
 import hmac
 import mimetypes
@@ -374,6 +375,80 @@ def stats(request: Request):
             "max_wd": max_wd,
             "cur_streak": cur_streak,
             "best_streak": best_streak,
+        },
+    )
+
+
+@app.get("/calendar")
+def calendar_page(request: Request):
+    today = date.today()
+    month = request.query_params.get("month", "")
+    try:
+        first = date.fromisoformat(month + "-01").replace(day=1)
+    except ValueError:
+        first = today.replace(day=1)
+    next_month = (first + timedelta(days=32)).replace(day=1)
+    prev_month = (first - timedelta(days=1)).replace(day=1)
+    with db() as con:
+        rows = con.execute(
+            "SELECT bd.day, bd.book_id, b.title, b.author, bd.seconds, bd.pages "
+            "FROM book_days bd JOIN books b ON b.id=bd.book_id "
+            "WHERE bd.day >= ? AND bd.day < ? "
+            "ORDER BY bd.day, bd.seconds DESC, b.title COLLATE NOCASE",
+            (first.isoformat(), next_month.isoformat()),
+        ).fetchall()
+    by_day = {}
+    for r in rows:
+        day = by_day.setdefault(r["day"], {"books": [], "seconds": 0, "pages": 0})
+        day["books"].append(r)
+        day["seconds"] += r["seconds"]
+        day["pages"] += r["pages"]
+    max_seconds = max((d["seconds"] for d in by_day.values()), default=0) or 1
+    weeks = []
+    for week in calendar.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month):
+        cells = []
+        for d in week:
+            info = by_day.get(d.isoformat()) if d.month == first.month else None
+            cells.append(
+                {
+                    "date": d,
+                    "in_month": d.month == first.month,
+                    "seconds": info["seconds"] if info else 0,
+                    "pages": info["pages"] if info else 0,
+                    "books": info["books"] if info else [],
+                }
+            )
+        weeks.append(cells)
+    selected = request.query_params.get("day", "")
+    try:
+        selected_date = date.fromisoformat(selected)
+    except ValueError:
+        selected_date = None
+    if not selected_date or (selected_date.year, selected_date.month) != (first.year, first.month):
+        selected = (
+            today.isoformat()
+            if (today.year, today.month) == (first.year, first.month)
+            else (max(by_day) if by_day else "")
+        )
+    info = by_day.get(selected, {"books": [], "seconds": 0, "pages": 0})
+    return templates.TemplateResponse(
+        request,
+        "calendar.html",
+        {
+            "month_name": first.strftime("%B %Y"),
+            "month_key": first.strftime("%Y-%m"),
+            "prev_month": prev_month.strftime("%Y-%m"),
+            "next_month": next_month.strftime("%Y-%m"),
+            "weeks": weeks,
+            "max_seconds": max_seconds,
+            "days_read": len(by_day),
+            "month_seconds": sum(d["seconds"] for d in by_day.values()),
+            "month_pages": sum(d["pages"] for d in by_day.values()),
+            "books_read": len({r["book_id"] for d in by_day.values() for r in d["books"]}),
+            "selected_day": selected,
+            "selected_books": info["books"],
+            "selected_seconds": info["seconds"],
+            "selected_pages": info["pages"],
         },
     )
 

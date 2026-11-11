@@ -637,6 +637,31 @@ def test_placeholder_cover_uses_html_fallback(tmp_path, monkeypatch):
         assert "A·001" not in client.get("/").text
 
 
+def test_calendar_lists_books_per_day(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
+        client.post("/books", data={"title": "Emma", "author": "Jane Austen"}, follow_redirects=False)
+        con = sqlite3.connect("athenaeum.db")
+        con.execute("INSERT INTO book_days VALUES (1, '2026-11-11', 3600, 120)")
+        con.execute("INSERT INTO book_days VALUES (2, '2026-11-11', 1800, 50)")
+        con.execute("INSERT INTO book_days VALUES (1, '2026-11-12', 600, 20)")
+        con.commit()
+        con.close()
+
+        r = client.get("/calendar?month=2026-11&day=2026-11-11")
+        assert r.status_code == 200
+        assert "November 2026" in r.text
+        assert "1h 30min" in r.text and "170" in r.text
+        assert r.text.index("Dune") < r.text.index("Emma"), "books are ordered by time read"
+        assert 'aria-current="date"' in r.text
+        assert "month=2026-10" in r.text and "month=2026-12" in r.text
+
+        r = client.get("/calendar?month=2026-12")
+        assert "December 2026" in r.text
+        assert "No reading logged this month." in r.text
+
+
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     import app.main as main
