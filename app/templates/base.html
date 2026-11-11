@@ -489,6 +489,7 @@
       paint(v);
       if ('submit' in root.dataset && form) form.requestSubmit();
     };
+    root.commit = commit;
 
     radios.forEach(r => {
       r.addEventListener('click', () => commit(Number(r.dataset.v)));

@@ -91,6 +91,7 @@
 <div class="page-head">
   <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
 </div>
+<p class="sr-only" role="status" id="save-status"></p>
 
 <div class="book-layout">
   <div class="cover-col">
@@ -132,11 +133,12 @@
           <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
           <span class="sep">·</span>
           <form class="inline-form status-form" method="post" action="/books/{{ b['id'] }}/status">
-            <select name="status" onchange="this.form.submit()" aria-label="Reading status">
+            <select name="status" aria-label="Reading status">
               <option value="reading" {{ 'selected' if b['status'] == 'reading' }}>Reading</option>
               <option value="finished" {{ 'selected' if b['status'] == 'finished' }}>Finished</option>
               <option value="abandoned" {{ 'selected' if b['status'] == 'abandoned' }}>Abandoned</option>
             </select>
+            <noscript><button class="btn sm">Save</button></noscript>
           </form>
         </span>
       </div>
@@ -174,7 +176,7 @@
       <div class="rate-row">
         {% include "_stars.html" %}
         <span class="of" id="rate-label">{{ (b['rating'] | round(1)) if b['rating'] else 'Not rated' }}</span>
-        {% if b['rating'] %}<button class="linkbtn" type="submit" onclick="document.getElementById('rate-val').value=0" style="font-size:12px">Clear</button>{% endif %}
+        <button class="linkbtn" type="button" id="rate-clear" style="font-size:12px"{% if not b['rating'] %} hidden{% endif %}>Clear</button>
       </div>
     </form>
 
@@ -182,12 +184,11 @@
       <div class="progress-head">
         <span class="pct-line">
           <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
-          {% if b['status'] == 'finished' %}<span class="tag">finished</span>
-          {% elif b['status'] == 'abandoned' %}<span class="tag tag-quiet">abandoned</span>{% endif %}
+          <span class="tag{% if b['status'] == 'abandoned' %} tag-quiet{% endif %}" id="status-tag"{% if b['status'] == 'reading' %} hidden{% endif %}>{{ b['status'] if b['status'] != 'reading' else '' }}</span>
         </span>
         <span class="pages num">{% if b['total_pages'] %}{{ b['pages_read'] or 0 }} / {{ b['total_pages'] }} pages{% endif %}</span>
       </div>
-      <div class="track{% if b['status'] == 'abandoned' %} abandoned{% endif %}"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
+      <div class="track{% if b['status'] == 'abandoned' %} abandoned{% endif %}" id="progress-track"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
     </div>
 
     <div class="facts">
@@ -298,6 +299,62 @@
 
 {% block scripts %}
 <script>
+  const announce = msg => {
+    const el = document.getElementById('save-status');
+    if (el) el.textContent = msg;
+  };
+  const save = form => fetch(form.action, { method: 'POST', body: new FormData(form), redirect: 'manual' })
+    .then(() => announce('Saved'))
+    .catch(() => form.submit());
+
+  const statusForm = document.querySelector('.status-form');
+  if (statusForm) {
+    const select = statusForm.elements.status;
+    const badge = document.getElementById('status-tag');
+    const track = document.getElementById('progress-track');
+    select.addEventListener('change', () => {
+      badge.hidden = select.value === 'reading';
+      badge.textContent = select.value;
+      badge.classList.toggle('tag-quiet', select.value === 'abandoned');
+      track.classList.toggle('abandoned', select.value === 'abandoned');
+      save(statusForm);
+    });
+  }
+
+  const rateForm = document.getElementById('rf');
+  const reviewForm = document.getElementById('rvf');
+  const reviewBox = document.getElementById('rv');
+  const reviewBtn = document.getElementById('review-edit-btn');
+  const clearRating = document.getElementById('rate-clear');
+  const stars = document.querySelector('.stars-input');
+
+  rateForm?.addEventListener('submit', e => {
+    e.preventDefault();
+    if (reviewForm) reviewForm.elements.rating.value = rateForm.elements.rating.value;
+    save(rateForm);
+  });
+
+  reviewForm?.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = reviewForm.elements.review.value.trim();
+    rateForm.elements.review.value = text;
+    save(reviewForm);
+    reviewBox.textContent = text || 'No review yet.';
+    reviewBox.className = text ? 'prose' : 'empty';
+    reviewBox.hidden = false;
+    reviewForm.hidden = true;
+    reviewBtn.hidden = false;
+    reviewBtn.textContent = text ? 'Edit review' : 'Write a review';
+  });
+
+  clearRating?.addEventListener('click', () => {
+    stars.commit(0);
+    clearRating.hidden = true;
+  });
+  stars?.addEventListener('click', () => {
+    if (clearRating) clearRating.hidden = !Number(stars.dataset.value);
+  });
+
   const labelsRow = document.getElementById('label-row');
   if (labelsRow) {
     const labelsAction = labelsRow.dataset.action;

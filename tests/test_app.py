@@ -432,7 +432,7 @@ def test_manual_book_status_and_abandoned_filter(tmp_path, monkeypatch):
         client.post("/books", data={"title": "Bought yesterday"}, follow_redirects=False)
         assert 'data-state="finished"' in client.get("/").text
         book = client.get("/books/1").text
-        assert '<option value="finished" selected>' in book and 'class="tag">finished<' in book
+        assert '<option value="finished" selected>' in book and '<span class="tag" id="status-tag">finished</span>' in book
 
         client.post("/books/1/status", data={"status": "reading"}, follow_redirects=False)
         assert 'data-state="reading"' in client.get("/").text
@@ -442,7 +442,7 @@ def test_manual_book_status_and_abandoned_filter(tmp_path, monkeypatch):
         page = client.get("/?progress=abandoned").text
         assert 'data-state="abandoned"' in page
         assert 'data-value="abandoned" aria-pressed="true"' in page
-        assert 'class="tag tag-quiet">abandoned<' in client.get("/books/1").text
+        assert '<span class="tag tag-quiet" id="status-tag">abandoned</span>' in client.get("/books/1").text
 
 
 def test_imported_book_can_be_marked_read_short_of_last_page(tmp_path, monkeypatch):
@@ -455,7 +455,7 @@ def test_imported_book_can_be_marked_read_short_of_last_page(tmp_path, monkeypat
         client.post("/books/1/status", data={"status": "finished"}, follow_redirects=False)
         assert 'data-state="finished"' in client.get("/").text
         book = client.get("/books/1").text
-        assert '<option value="finished" selected>' in book and 'class="tag">finished<' in book
+        assert '<option value="finished" selected>' in book and '<span class="tag" id="status-tag">finished</span>' in book
 
 
 def test_migrate_marks_manual_books_read(tmp_path, monkeypatch):
