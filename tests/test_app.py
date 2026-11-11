@@ -572,6 +572,61 @@ def test_bulk_actions(tmp_path, monkeypatch):
         assert c.execute("SELECT COUNT(*) FROM books WHERE finished=0").fetchone()[0] == 2
 
 
+def test_label_management_rename_merge_delete(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "A"}, follow_redirects=False)
+        client.post("/books", data={"title": "B"}, follow_redirects=False)
+        client.post("/books/1/labels", data={"labels": "fantasy, space"}, follow_redirects=False)
+        client.post("/books/2/labels", data={"labels": "fantasy"}, follow_redirects=False)
+        assert client.get("/labels").status_code == 200
+
+        with sqlite3.connect("athenaeum.db") as c:
+            ids = dict(c.execute("SELECT name, id FROM labels"))
+
+        r = client.post(f"/labels/{ids['space']}/rename", data={"name": "sci-fi"}, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/labels"
+        r = client.post(f"/labels/{ids['fantasy']}/rename", data={"name": "sci-fi"}, follow_redirects=False)
+        assert r.status_code == 303
+
+        page = client.get("/labels").text
+        assert "sci-fi" in page and "fantasy" not in page
+        with sqlite3.connect("athenaeum.db") as c:
+            assert c.execute("SELECT COUNT(*) FROM labels").fetchone()[0] == 1
+            assert c.execute("SELECT COUNT(*) FROM book_labels").fetchone()[0] == 2
+            label_id = c.execute("SELECT id FROM labels").fetchone()[0]
+
+        client.post(f"/labels/{label_id}/delete", follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT COUNT(*) FROM labels").fetchone()[0] == 0
+        assert c.execute("SELECT COUNT(*) FROM book_labels").fetchone()[0] == 0
+
+
+def test_library_sorts(tmp_path, monkeypatch):
+    import re
+
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Zebra", "author": "Alice", "pages": 100}, follow_redirects=False)
+        client.post("/books", data={"title": "Alpha", "author": "Bob", "pages": 200}, follow_redirects=False)
+        client.post("/books", data={"title": "Middle", "pages": 50}, follow_redirects=False)
+        with sqlite3.connect("athenaeum.db") as c:
+            c.execute("UPDATE books SET total_seconds=10, pages_read=10, added_at=30 WHERE id=1")
+            c.execute("UPDATE books SET total_seconds=300, pages_read=200, added_at=10 WHERE id=2")
+            c.execute("UPDATE books SET total_seconds=100, pages_read=50, added_at=20 WHERE id=3")
+
+        def order(url):
+            html = client.get(url).text
+            return [int(x) for x in re.findall(r'class="book-cell" data-id="(\d+)"', html)]
+
+        assert order("/?sort=title&dir=asc") == [2, 3, 1]
+        assert order("/?sort=author&dir=asc") == [1, 2, 3]
+        assert order("/?sort=pages&dir=desc") == [2, 3, 1]
+        assert order("/?sort=time&dir=desc") == [2, 3, 1]
+        assert order("/?sort=added&dir=asc") == [2, 3, 1]
+
+
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     import app.main as main

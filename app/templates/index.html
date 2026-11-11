@@ -5,6 +5,9 @@
   .layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 36px; }
   .rail { position: sticky; top: 76px; align-self: start; display: flex; flex-direction: column; gap: 26px; }
   .rail-group > .label { margin-bottom: 8px; }
+  .rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .rail-head a { color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .rail-head a:hover { color: var(--text); text-decoration: none; }
   .rail-list { display: flex; flex-direction: column; gap: 1px; }
   .rail-list button, .rail-list a {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -248,7 +251,7 @@
     </div>
     {% if labels %}
     <div class="rail-group">
-      <div class="label">Labels</div>
+      <div class="label rail-head"><span>Labels</span><a href="/labels">Manage</a></div>
       <div class="rail-list" data-filter="label">
         <button type="button" data-value="" aria-pressed="{{ 'true' if active_label is none else 'false' }}"><span>All labels</span></button>
         {% for name, count in labels.items() %}
@@ -260,8 +263,8 @@
     <div class="rail-group">
       <div class="label">Sort</div>
       <div class="rail-list sort">
-        {% for key, text in [('recent', 'Recently read'), ('title', 'Title'), ('rating', 'Rating')] %}
-        <a href="/?sort={{ key }}&dir={{ 'desc' if sort == key and dir == 'asc' else 'asc' }}" {% if sort == key %}aria-current="true"{% endif %}>
+        {% for key, text, default in [('recent', 'Recently read', 'desc'), ('title', 'Title', 'asc'), ('author', 'Author', 'asc'), ('rating', 'Rating', 'desc'), ('time', 'Time read', 'desc'), ('pages', 'Pages read', 'desc'), ('added', 'Date added', 'desc')] %}
+        <a href="/?sort={{ key }}&dir={{ ('desc' if dir == 'asc' else 'asc') if sort == key else default }}" {% if sort == key %}aria-current="true"{% endif %}>
           <span>{{ text }}</span>
           {% if sort == key %}<b class="num">{{ '↓' if dir == 'desc' else '↑' }}</b>{% endif %}
         </a>

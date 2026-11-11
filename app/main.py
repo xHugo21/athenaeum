@@ -208,6 +208,8 @@ def find_book(con, title: str, author: str | None, md5: str | None = None):
 def index(request: Request):
     sort = request.query_params.get("sort", "recent")
     d = request.query_params.get("dir", "desc")
+    if d not in ("asc", "desc"):
+        d = "desc"
     label = request.query_params.get("label", "")
     search = request.query_params.get("q", "").strip()[:200].lower()
     progress = request.query_params.get("progress", "all")
@@ -217,10 +219,20 @@ def index(request: Request):
     if rating not in ("any", "none", "1", "2", "3", "4", "5"):
         rating = "any"
     sort_sql = {
+        ("recent", "asc"): "COALESCE(last_read_at, added_at) ASC",
+        ("recent", "desc"): "COALESCE(last_read_at, added_at) DESC",
         ("title", "asc"): "title COLLATE NOCASE ASC",
         ("title", "desc"): "title COLLATE NOCASE DESC",
+        ("author", "asc"): "author IS NULL, author COLLATE NOCASE ASC",
+        ("author", "desc"): "author IS NULL, author COLLATE NOCASE DESC",
         ("rating", "asc"): "rating IS NULL, rating ASC",
         ("rating", "desc"): "rating DESC",
+        ("time", "asc"): "total_seconds ASC",
+        ("time", "desc"): "total_seconds DESC",
+        ("pages", "asc"): "pages_read ASC",
+        ("pages", "desc"): "pages_read DESC",
+        ("added", "asc"): "added_at ASC",
+        ("added", "desc"): "added_at DESC",
     }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")
     with db() as con:
         books = [dict(r) for r in con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()]
@@ -558,6 +570,45 @@ def bulk_books(
                 if os.path.exists(path):
                     os.remove(path)
     return RedirectResponse(target, 303)
+
+
+@app.get("/labels")
+def labels_page(request: Request):
+    with db() as con:
+        labels = con.execute(
+            "SELECT l.id, l.name, COUNT(bl.book_id) n FROM labels l "
+            "LEFT JOIN book_labels bl ON bl.label_id=l.id GROUP BY l.id ORDER BY l.name COLLATE NOCASE"
+        ).fetchall()
+    return templates.TemplateResponse(request, "labels.html", {"labels": labels})
+
+
+@app.post("/labels/{label_id}/rename")
+def rename_label(label_id: int, name: str = Form("")):
+    name = " ".join(name.split())
+    if name:
+        with db() as con:
+            old = con.execute("SELECT id FROM labels WHERE id=?", (label_id,)).fetchone()
+            existing = con.execute(
+                "SELECT id FROM labels WHERE name=? AND id<>?", (name, label_id)
+            ).fetchone()
+            if old and existing:
+                con.execute(
+                    "INSERT OR IGNORE INTO book_labels (book_id, label_id) "
+                    "SELECT book_id, ? FROM book_labels WHERE label_id=?",
+                    (existing["id"], label_id),
+                )
+                con.execute("DELETE FROM labels WHERE id=?", (label_id,))
+                con.execute("UPDATE labels SET name=? WHERE id=?", (name, existing["id"]))
+            elif old:
+                con.execute("UPDATE labels SET name=? WHERE id=?", (name, label_id))
+    return RedirectResponse("/labels", 303)
+
+
+@app.post("/labels/{label_id}/delete")
+def delete_label(label_id: int):
+    with db() as con:
+        con.execute("DELETE FROM labels WHERE id=?", (label_id,))
+    return RedirectResponse("/labels", 303)
 
 
 @app.get("/tbr")
