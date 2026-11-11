@@ -32,7 +32,7 @@
   .chip:hover { color: var(--text); border-color: var(--muted); }
   .library-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
   .library-bar .summary { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
-  .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 0 0 auto; min-width: 0; margin-left: auto; }
+  .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex: 0 0 auto; min-width: 0; margin-left: auto; }
   .library-toolbar .search { flex: 0 1 210px; min-width: 0; }
   .library-toolbar .search input { width: 100%; }
   .view-tools { display: flex; align-items: center; gap: 8px; }
@@ -138,7 +138,7 @@
     .book .track { margin-top: 7px; }
     .library-bar { gap: 14px; }
     .library-bar .summary { flex-basis: 100%; }
-    .library-toolbar { flex-basis: 100%; margin-left: 0; }
+    .library-toolbar { flex-basis: 100%; margin-left: 0; flex-wrap: wrap; }
     .library-toolbar .search { flex-basis: 100%; }
   }
 </style>
