@@ -632,8 +632,9 @@ def test_placeholder_cover_uses_html_fallback(tmp_path, monkeypatch):
     with TestClient(app) as client:
         client.post("/books", data={"title": "No Cover", "author": "Nobody"}, follow_redirects=False)
         assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 404
-        assert "A·001" in client.get("/").text
-        assert "A·001" in client.get("/books/1").text
+        assert 'class="cover-fallback"' in client.get("/").text
+        assert 'class="cover-fallback"' in client.get("/books/1").text
+        assert "A·001" not in client.get("/").text
 
 
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
