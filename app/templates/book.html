@@ -28,12 +28,7 @@
     font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
   }
   .tag-quiet { border-color: var(--line-2); background: var(--surface-2); color: var(--muted); }
-  .status-form select {
-    height: 24px; padding: 0 22px 0 7px; font-size: 12px;
-    border: 1px solid var(--line-2); border-radius: var(--r-sm);
-    background: var(--surface); color: var(--text-2);
-  }
-  .status-form select:hover { border-color: var(--muted); }
+  .status-form select { all: revert; }
   .label-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .label-row .tag { height: 23px; padding: 0 5px 0 9px; font-size: 12px; letter-spacing: 0; text-transform: none; }
   .label-pill a { color: inherit; }
@@ -67,9 +62,6 @@
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
-  @media (max-width: 640px) {
-    .status-form select { height: 40px; font-size: 16px; }
-  }
   @media (max-width: 760px) {
     .meta .isbn-part { display: none; }
     .book-layout { grid-template-columns: 1fr; gap: 24px; }
