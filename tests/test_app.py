@@ -643,6 +643,8 @@ def test_calendar_lists_books_per_day(tmp_path, monkeypatch):
         client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
         client.post("/books", data={"title": "Emma", "author": "Jane Austen"}, follow_redirects=False)
         con = sqlite3.connect("athenaeum.db")
+        con.execute("INSERT INTO book_days VALUES (1, '2026-11-09', 600, 10)")
+        con.execute("INSERT INTO book_days VALUES (1, '2026-11-10', 600, 10)")
         con.execute("INSERT INTO book_days VALUES (1, '2026-11-11', 3600, 120)")
         con.execute("INSERT INTO book_days VALUES (2, '2026-11-11', 1800, 50)")
         con.execute("INSERT INTO book_days VALUES (1, '2026-11-12', 600, 20)")
@@ -654,6 +656,7 @@ def test_calendar_lists_books_per_day(tmp_path, monkeypatch):
         assert "November 2026" in r.text
         assert "1h 30min" in r.text and "170" in r.text
         assert r.text.index("Dune") < r.text.index("Emma"), "books are ordered by time read"
+        assert "grid-column: 1 / span 4" in r.text, "consecutive days share one book bar"
         assert 'aria-current="date"' in r.text
         assert "month=2026-10" in r.text and "month=2026-12" in r.text
 

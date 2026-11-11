@@ -6,18 +6,26 @@
   .cal-totals { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   .cal-totals b { color: var(--text); font-weight: 500; margin-right: 4px; }
   .cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; align-items: start; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+  .cal-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+  .cal-grid { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--line); }
+  .cal-dow-row, .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; }
+  .cal-dow-row { margin-bottom: 1px; }
+  .cal-week { position: relative; min-height: calc(78px + var(--extra, 0) * 21px); }
+  .cal-week + .cal-week { margin-top: 1px; }
   .cal-dow { background: var(--surface-2); padding: 7px 8px; font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .cal-dow .short { display: none; }
-  .cal-day { min-height: 78px; padding: 8px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; }
+  .cal-day { padding: 8px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; }
   .cal-day:not(.out):hover { background: var(--surface-2); text-decoration: none; }
   .cal-day.out { background: var(--surface-2); }
   .cal-day.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
   .cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .cal-day .n { font-size: 12px; color: var(--text-2); }
   .cal-day .mins { font-size: 11px; color: var(--muted); }
-  .cal-day .bar { margin-top: auto; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
-  .cal-day .bar span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .cal-events { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; grid-auto-rows: 18px; row-gap: 3px; padding-top: 48px; pointer-events: none; }
+  .cal-event { display: block; min-width: 0; height: 18px; margin: 0 4px; padding: 0 7px; line-height: 16px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; pointer-events: auto; }
+  .cal-event:hover { background: var(--surface-3); border-color: var(--muted); color: var(--text); text-decoration: none; }
+  .cal-event.cont-l { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .cal-event.cont-r { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .cal-panel { position: sticky; top: 76px; border-left: 1px solid var(--line); padding-left: 24px; min-height: 200px; }
   .cal-panel h2 { margin-top: 6px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
   .cal-panel .meta { margin-top: 4px; font-size: 12px; color: var(--muted); }
@@ -35,9 +43,11 @@
     .cal-panel { position: static; border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
   }
   @media (max-width: 640px) {
-    .cal-day { min-height: 52px; padding: 5px; }
+    .cal-week { min-height: calc(56px + var(--extra, 0) * 20px); }
+    .cal-events { padding-top: 26px; grid-auto-rows: 16px; row-gap: 2px; }
+    .cal-event { height: 16px; margin: 0 2px; padding: 0 4px; line-height: 14px; font-size: 10px; }
+    .cal-day { padding: 5px; }
     .cal-day .mins { display: none; }
-    .cal-day .bar { height: 2px; }
     .cal-dow { padding: 6px 4px; text-align: center; }
     .cal-dow .full { display: none; }
     .cal-dow .short { display: inline; }
@@ -66,12 +76,16 @@
 </div>
 
 <div class="cal-layout">
+  <div class="cal-scroll">
   <div class="cal-grid" aria-label="Reading calendar">
-    {% for d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-    <div class="cal-dow"><span class="full">{{ d }}</span><span class="short">{{ d[0] }}</span></div>
-    {% endfor %}
+    <div class="cal-dow-row">
+      {% for d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+      <div class="cal-dow"><span class="full">{{ d }}</span><span class="short">{{ d[0] }}</span></div>
+      {% endfor %}
+    </div>
     {% for week in weeks %}
-      {% for c in week %}
+    <div class="cal-week" style="--extra: {{ week['extra'] }}">
+      {% for c in week['cells'] %}
         {% if not c['in_month'] %}
         <span class="cal-day out"></span>
         {% else %}
@@ -81,14 +95,23 @@
            {% if iso == selected_day %}aria-current="date"{% endif %}
            aria-label="{{ iso }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} pages, {{ c['books'] | length }} books">
           <span class="n num">{{ c['date'].day }}</span>
-          {% if c['seconds'] %}
-          <span class="mins num">{{ ((c['seconds'] + 59) // 60) }}m</span>
-          <span class="bar"><span style="width:{{ (c['seconds'] / max_seconds * 100) | round(1) }}%"></span></span>
-          {% endif %}
+          {% if c['seconds'] %}<span class="mins num">{{ ((c['seconds'] + 59) // 60) }}m</span>{% endif %}
         </a>
         {% endif %}
       {% endfor %}
+      {% if week['events'] %}
+      <div class="cal-events">
+        {% for e in week['events'] %}
+        <a class="cal-event{% if e['continues_left'] %} cont-l{% endif %}{% if e['continues_right'] %} cont-r{% endif %}"
+           href="/books/{{ e['book_id'] }}"
+           style="grid-column: {{ e['start'] + 1 }} / span {{ e['length'] }}; grid-row: {{ e['lane'] + 1 }};"
+           title="{{ e['title'] }}">{{ e['title'] }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
     {% endfor %}
+  </div>
   </div>
 
   <aside class="cal-panel" aria-label="Books read on selected day">

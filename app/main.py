@@ -403,7 +403,21 @@ def calendar_page(request: Request):
         day["books"].append(r)
         day["seconds"] += r["seconds"]
         day["pages"] += r["pages"]
-    max_seconds = max((d["seconds"] for d in by_day.values()), default=0) or 1
+    book_days = {}
+    for r in rows:
+        book = book_days.setdefault(r["book_id"], {"title": r["title"], "dates": set()})
+        book["dates"].add(date.fromisoformat(r["day"]))
+    runs = []
+    for book_id, book in book_days.items():
+        dates = sorted(book["dates"])
+        start = prev = dates[0]
+        for d in dates[1:]:
+            if (d - prev).days == 1:
+                prev = d
+            else:
+                runs.append((book_id, book["title"], start, prev))
+                start = prev = d
+        runs.append((book_id, book["title"], start, prev))
     weeks = []
     for week in calendar.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month):
         cells = []
@@ -418,7 +432,34 @@ def calendar_page(request: Request):
                     "books": info["books"] if info else [],
                 }
             )
-        weeks.append(cells)
+        segments = []
+        for book_id, title, start_d, end_d in runs:
+            seg_start = max(start_d, week[0])
+            seg_end = min(end_d, week[-1])
+            if seg_start > seg_end:
+                continue
+            segments.append(
+                {
+                    "book_id": book_id,
+                    "title": title,
+                    "start": (seg_start - week[0]).days,
+                    "length": (seg_end - seg_start).days + 1,
+                    "continues_left": start_d < week[0],
+                    "continues_right": end_d > week[-1],
+                }
+            )
+        segments.sort(key=lambda s: (s["start"], -s["length"], s["title"].casefold()))
+        lane_ends = []
+        for seg in segments:
+            for i, end in enumerate(lane_ends):
+                if end < seg["start"]:
+                    seg["lane"] = i
+                    lane_ends[i] = seg["start"] + seg["length"] - 1
+                    break
+            else:
+                seg["lane"] = len(lane_ends)
+                lane_ends.append(seg["start"] + seg["length"] - 1)
+        weeks.append({"cells": cells, "events": segments, "extra": max(0, len(lane_ends) - 1)})
     selected = request.query_params.get("day", "")
     try:
         selected_date = date.fromisoformat(selected)
@@ -440,7 +481,6 @@ def calendar_page(request: Request):
             "prev_month": prev_month.strftime("%Y-%m"),
             "next_month": next_month.strftime("%Y-%m"),
             "weeks": weeks,
-            "max_seconds": max_seconds,
             "days_read": len(by_day),
             "month_seconds": sum(d["seconds"] for d in by_day.values()),
             "month_pages": sum(d["pages"] for d in by_day.values()),
