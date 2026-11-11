@@ -44,7 +44,7 @@ def read_hm(s: int) -> str:
     if h:
         return f"{h}h"
     return f"{m}min"
-templates.env.filters["read_hm"] = read_hm
+templates.env.filters["read_hm"] = lambda s: read_hm(int(s))
 
 
 
