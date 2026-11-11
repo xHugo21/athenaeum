@@ -11,13 +11,8 @@
 </div>
 
 <div align="center">
-<img width="90%" alt="Walkthrough of athenaeum: filtering the library by label, the shelf view, a book with reading speed and time left, its highlights, the to-read list, label management, reading statistics and the calendar" src="assets/demo.gif" />
-<p><sub>30-second tour &middot; <a href="assets/demo.mp4">full-quality MP4 (1.3&nbsp;MB)</a></sub></p>
-</div>
-
-<div align="center">
-<img width="270" alt="The library, a book with reading speed and time left, its highlights, the to-read list and the stats page at phone width, in dark mode" src="assets/demo-mobile.gif" />
-<p><sub>13 seconds on a phone, dark mode &middot; <a href="assets/demo-mobile.mp4">MP4 (0.3&nbsp;MB)</a></sub></p>
+  <a href="assets/demo.mp4"><img width="70%" alt="Walkthrough of athenaeum: filtering the library by label, the shelf view, a book with reading speed and time left, its highlights, the to-read list, label management, reading statistics and the calendar" src="assets/demo.gif" /></a>
+  <a href="assets/demo-mobile.mp4"><img width="21%" alt="The library, a book with reading speed and time left, its highlights, the to-read list and the stats page at phone width, in dark mode" src="assets/demo-mobile.gif" /></a>
 </div>
 
 ## Features
