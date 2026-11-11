@@ -12,6 +12,7 @@
 
 <div align="center">
   <a href="assets/demo.mp4"><img width="70%" alt="Walkthrough of athenaeum: filtering the library by label, the shelf view, a book with reading speed and time left, its highlights, the to-read list, label management, reading statistics and the calendar" src="assets/demo.gif" /></a>
+  <img width="1.5%" alt="" src="assets/divider.svg" />
   <a href="assets/demo-mobile.mp4"><img width="21%" alt="The library, a book with reading speed and time left, its highlights, the to-read list and the stats page at phone width, in dark mode" src="assets/demo-mobile.gif" /></a>
 </div>
 
