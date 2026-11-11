@@ -30,9 +30,10 @@
     font-size: 12px; cursor: pointer;
   }
   .chip:hover { color: var(--text); border-color: var(--muted); }
-  .page-head { margin-bottom: 14px; }
-  .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
-  .library-toolbar .search { flex: 1 1 260px; min-width: 0; }
+  .library-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
+  .library-bar .summary { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+  .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 0 0 auto; min-width: 0; margin-left: auto; }
+  .library-toolbar .search { flex: 0 1 210px; min-width: 0; }
   .library-toolbar .search input { width: 100%; }
   .view-tools { display: flex; align-items: center; gap: 8px; }
   .results { min-width: 0; }
@@ -135,6 +136,9 @@
   @media (max-width: 640px) {
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
     .book .track { margin-top: 7px; }
+    .library-bar { gap: 14px; }
+    .library-bar .summary { flex-basis: 100%; }
+    .library-toolbar { flex-basis: 100%; margin-left: 0; }
     .library-toolbar .search { flex-basis: 100%; }
   }
 </style>
@@ -172,34 +176,35 @@
   </div>
 </div>
 
-<div class="library-toolbar">
-  <div class="search">
-    <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg>
-    <input type="search" id="q" placeholder="Search title or author" autocomplete="off" aria-label="Search library">
+<div class="library-bar">
+  <div class="summary">
+    <div><div class="label">Time read</div><div class="v num">{{ ns.secs | read_hm }}</div></div>
+    <div><div class="label">Pages read</div><div class="v num">{{ ns.pages | comma }}</div></div>
+    <div><div class="label">Titles</div><div class="v num">{{ books | length }}</div></div>
+    <div><div class="label">Average rating</div><div class="v num">{{ (ns.stars / (rated | length)) | round(1) if rated else '—' }}</div></div>
   </div>
-  <button class="chip" id="filter-chip" type="button" onclick="resetFilters()" hidden>
-    <span id="filter-chip-label"></span><span aria-hidden="true">×</span>
-  </button>
-  <div class="view-tools">
-    <div class="seg" role="group" aria-label="Library layout">
-      <button type="button" id="view-grid" aria-pressed="true" onclick="setView(false)">
-        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-grid"/></svg>Grid
-      </button>
-      <button type="button" id="view-shelf" aria-pressed="false" onclick="setView(true)">
-        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-shelf"/></svg>Shelf
+  <div class="library-toolbar">
+    <div class="search">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="search" id="q" placeholder="Search title or author" autocomplete="off" aria-label="Search library">
+    </div>
+    <button class="chip" id="filter-chip" type="button" onclick="resetFilters()" hidden>
+      <span id="filter-chip-label"></span><span aria-hidden="true">×</span>
+    </button>
+    <div class="view-tools">
+      <div class="seg" role="group" aria-label="Library layout">
+        <button type="button" id="view-grid" aria-pressed="true" onclick="setView(false)">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-grid"/></svg>Grid
+        </button>
+        <button type="button" id="view-shelf" aria-pressed="false" onclick="setView(true)">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-shelf"/></svg>Shelf
+        </button>
+      </div>
+      <button class="btn" type="button" id="select-toggle" aria-pressed="false">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg><span>Select</span>
       </button>
     </div>
-    <button class="btn" type="button" id="select-toggle" aria-pressed="false">
-      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg><span>Select</span>
-    </button>
   </div>
-</div>
-
-<div class="summary">
-  <div><div class="label">Time read</div><div class="v num">{{ ns.secs | read_hm }}</div></div>
-  <div><div class="label">Pages read</div><div class="v num">{{ ns.pages | comma }}</div></div>
-  <div><div class="label">Titles</div><div class="v num">{{ books | length }}</div></div>
-  <div><div class="label">Average rating</div><div class="v num">{{ (ns.stars / (rated | length)) | round(1) if rated else '—' }}</div></div>
 </div>
 
 <div class="panel" id="import-card" hidden>
