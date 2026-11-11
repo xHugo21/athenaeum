@@ -531,6 +531,47 @@ def test_book_labels_assign_and_filter(tmp_path, monkeypatch):
     assert {r[0] for r in rows} == {"Sci-Fi", "favorite"}
 
 
+def test_library_filters_in_url(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Dune", "rating": 5}, follow_redirects=False)
+        client.post("/books/1/labels", data={"labels": "space"}, follow_redirects=False)
+        r = client.get("/?q=Dune&progress=finished&rating=5&label=SPACE")
+        assert r.status_code == 200
+        assert 'data-value="finished" aria-pressed="true"' in r.text
+        assert 'data-value="5" aria-pressed="true"' in r.text
+        assert 'data-value="space" aria-pressed="true"' in r.text
+        assert 'q: "dune"' in r.text
+        assert 'label: "space"' in r.text
+        assert 'id="bulk-bar"' in r.text and 'class="book-cell"' in r.text
+
+
+def test_bulk_actions(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        for title in ("A", "B", "C"):
+            client.post("/books", data={"title": title}, follow_redirects=False)
+
+        r = client.post(
+            "/books/bulk",
+            data={"ids": "1,2,1", "action": "label", "label": " Favorites ", "next": "/?progress=finished"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303 and r.headers["location"] == "/?progress=finished"
+
+        r = client.post("/books/bulk", data={"ids": "1,2", "action": "unread", "next": "/"}, follow_redirects=False)
+        assert r.status_code == 303
+
+        r = client.post("/books/bulk", data={"ids": "3", "action": "delete", "next": "//evil.test"}, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/"
+
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 2
+        assert c.execute("SELECT COUNT(*) FROM labels WHERE name='Favorites'").fetchone()[0] == 1
+        assert c.execute("SELECT COUNT(*) FROM book_labels").fetchone()[0] == 2
+        assert c.execute("SELECT COUNT(*) FROM books WHERE finished=0").fetchone()[0] == 2
+
+
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     import app.main as main

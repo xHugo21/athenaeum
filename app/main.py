@@ -209,6 +209,13 @@ def index(request: Request):
     sort = request.query_params.get("sort", "recent")
     d = request.query_params.get("dir", "desc")
     label = request.query_params.get("label", "")
+    search = request.query_params.get("q", "").strip()[:200].lower()
+    progress = request.query_params.get("progress", "all")
+    if progress not in ("all", "reading", "finished"):
+        progress = "all"
+    rating = request.query_params.get("rating", "any")
+    if rating not in ("any", "none", "1", "2", "3", "4", "5"):
+        rating = "any"
     sort_sql = {
         ("title", "asc"): "title COLLATE NOCASE ASC",
         ("title", "desc"): "title COLLATE NOCASE DESC",
@@ -242,6 +249,9 @@ def index(request: Request):
             "max_pages": max_pages or 1,
             "sort": sort,
             "dir": d,
+            "search": search,
+            "progress": progress,
+            "rating": rating,
             "imported": request.query_params.get("imported"),
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
@@ -511,6 +521,43 @@ def set_labels(book_id: int, labels: str = Form("")):
             )
         con.execute("DELETE FROM labels WHERE id NOT IN (SELECT label_id FROM book_labels)")
     return RedirectResponse(f"/books/{book_id}", 303)
+
+
+@app.post("/books/bulk")
+def bulk_books(
+    ids: str = Form(""),
+    action: str = Form(""),
+    label: str = Form(""),
+    next: str = Form("/"),
+):
+    book_ids = list(dict.fromkeys(int(x) for x in ids.split(",") if x.strip().isdigit()))[:500]
+    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    if book_ids:
+        ph = ",".join("?" * len(book_ids))
+        with db() as con:
+            if action == "label":
+                name = " ".join(label.split())
+                if name:
+                    con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
+                    con.execute(
+                        f"INSERT OR IGNORE INTO book_labels (book_id, label_id) "
+                        f"SELECT id, (SELECT id FROM labels WHERE name=?) FROM books WHERE id IN ({ph})",
+                        (name, *book_ids),
+                    )
+            elif action in ("read", "unread"):
+                con.execute(
+                    f"UPDATE books SET finished=? WHERE id IN ({ph})",
+                    (1 if action == "read" else 0, *book_ids),
+                )
+            elif action == "delete":
+                con.execute(f"DELETE FROM books WHERE id IN ({ph})", tuple(book_ids))
+                con.execute("DELETE FROM labels WHERE id NOT IN (SELECT label_id FROM book_labels)")
+        if action == "delete":
+            for bid in book_ids:
+                path = os.path.join(COVERS_DIR, f"{bid}.jpg")
+                if os.path.exists(path):
+                    os.remove(path)
+    return RedirectResponse(target, 303)
 
 
 @app.get("/tbr")

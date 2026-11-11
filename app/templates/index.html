@@ -31,6 +31,23 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 26px 20px; }
   .book { display: flex; flex-direction: column; gap: 10px; color: inherit; }
   .book:hover { text-decoration: none; }
+  .book-cell { position: relative; min-width: 0; }
+  .book-select {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    display: none; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0;
+    border: 1px solid var(--line-2); border-radius: 6px;
+    background: var(--surface); color: transparent;
+    box-shadow: var(--shadow-1); cursor: pointer;
+  }
+  .book-select .icon { width: 14px; height: 14px; }
+  .selecting .book-select { display: inline-flex; }
+  .book-select[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .book-cell.selected .cover { box-shadow: 0 0 0 2px var(--accent), var(--shadow-2); }
+  .selecting .book:hover { text-decoration: none; }
+  .bulk-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+  .bulk-bar #bulk-count { margin-right: auto; font-size: 13px; font-weight: 500; }
+  .bulk-bar input[type="text"] { width: 150px; height: 28px; font-size: 12px; }
   .book .cover { transition: transform .18s ease, box-shadow .18s ease; }
   .book:hover .cover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
   .book .bm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -149,6 +166,9 @@
         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-shelf"/></svg>Shelf
       </button>
     </div>
+    <button class="btn" type="button" id="select-toggle" aria-pressed="false">
+      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg><span>Select</span>
+    </button>
     <button class="btn" type="button" onclick="panel('add-card', this)" aria-controls="add-card" aria-expanded="false">
       <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add
     </button>
@@ -209,21 +229,21 @@
     <div class="rail-group">
       <div class="label">Progress</div>
       <div class="rail-list" data-filter="progress">
-        <button type="button" data-value="all" aria-pressed="true"><span>All books</span><b class="num">{{ books | length }}</b></button>
-        <button type="button" data-value="reading" aria-pressed="false"><span>Reading</span><b class="num">{{ ns.reading }}</b></button>
-        <button type="button" data-value="finished" aria-pressed="false"><span>Finished</span><b class="num">{{ ns.finished }}</b></button>
+        <button type="button" data-value="all" aria-pressed="{{ 'true' if progress == 'all' else 'false' }}"><span>All books</span><b class="num">{{ books | length }}</b></button>
+        <button type="button" data-value="reading" aria-pressed="{{ 'true' if progress == 'reading' else 'false' }}"><span>Reading</span><b class="num">{{ ns.reading }}</b></button>
+        <button type="button" data-value="finished" aria-pressed="{{ 'true' if progress == 'finished' else 'false' }}"><span>Finished</span><b class="num">{{ ns.finished }}</b></button>
       </div>
     </div>
     <div class="rail-group">
       <div class="label">Rating</div>
       <div class="rail-list" data-filter="rating">
-        <button type="button" data-value="any" aria-pressed="true"><span>Any rating</span></button>
-        <button type="button" data-value="5" aria-pressed="false"><span>5 stars</span></button>
-        <button type="button" data-value="4" aria-pressed="false"><span>4 stars</span></button>
-        <button type="button" data-value="3" aria-pressed="false"><span>3 stars</span></button>
-        <button type="button" data-value="2" aria-pressed="false"><span>2 stars</span></button>
-        <button type="button" data-value="1" aria-pressed="false"><span>1 star</span></button>
-        <button type="button" data-value="none" aria-pressed="false"><span>Unrated</span></button>
+        <button type="button" data-value="any" aria-pressed="{{ 'true' if rating == 'any' else 'false' }}"><span>Any rating</span></button>
+        <button type="button" data-value="5" aria-pressed="{{ 'true' if rating == '5' else 'false' }}"><span>5 stars</span></button>
+        <button type="button" data-value="4" aria-pressed="{{ 'true' if rating == '4' else 'false' }}"><span>4 stars</span></button>
+        <button type="button" data-value="3" aria-pressed="{{ 'true' if rating == '3' else 'false' }}"><span>3 stars</span></button>
+        <button type="button" data-value="2" aria-pressed="{{ 'true' if rating == '2' else 'false' }}"><span>2 stars</span></button>
+        <button type="button" data-value="1" aria-pressed="{{ 'true' if rating == '1' else 'false' }}"><span>1 star</span></button>
+        <button type="button" data-value="none" aria-pressed="{{ 'true' if rating == 'none' else 'false' }}"><span>Unrated</span></button>
       </div>
     </div>
     {% if labels %}
@@ -252,12 +272,27 @@
 
   <div class="results">
     {% if books %}
+    <form id="bulk-bar" class="bulk-bar" method="post" action="/books/bulk" hidden>
+      <span class="num" id="bulk-count">0 selected</span>
+      <input type="hidden" name="ids" id="bulk-ids">
+      <input type="hidden" name="next" id="bulk-next">
+      <input type="text" name="label" id="bulk-label" placeholder="Label" aria-label="Label to add">
+      <button class="btn sm" type="submit" name="action" value="label">Add label</button>
+      <button class="btn sm" type="submit" name="action" value="read">Mark read</button>
+      <button class="btn sm btn-ghost" type="submit" name="action" value="unread">Mark unread</button>
+      <button class="btn sm btn-danger" type="submit" name="action" value="delete" onclick="return confirm('Delete selected books and their reading history?')">Delete</button>
+      <button class="btn sm btn-ghost" type="button" id="bulk-cancel">Cancel</button>
+    </form>
     <div id="grid-view" class="grid">
       {% for b in books %}
       {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
       {% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
       {% set state = 'finished' if done else 'reading' %}
-      <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
+      <div class="book-cell" data-id="{{ b['id'] }}">
+        <button class="book-select" type="button" aria-label="Select {{ b['title'] }}" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+        </button>
+        <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
         <div class="cover">
           <div class="cover-fallback">
             <div class="initial">{{ b['title'][:1] | upper }}</div>
@@ -284,6 +319,7 @@
           </div>
         </div>
       </a>
+      </div>
       {% endfor %}
     </div>
 
@@ -310,9 +346,25 @@
 <script>
   const booksData = JSON.parse(document.getElementById('book-data').textContent);
   const byId = new Map(booksData.map(b => [String(b.id), b]));
-  const state = { progress: 'all', rating: 'any', label: {{ active_label | tojson }}, q: localStorage.getItem('athenaeum-q') || '' };
+  const state = {
+    progress: {{ progress | tojson }},
+    rating: {{ rating | tojson }},
+    label: {{ active_label | tojson }},
+    q: {{ search | tojson }},
+  };
   const q = document.getElementById('q');
   q.value = state.q;
+
+  function syncUrl() {
+    const url = new URL(location.href);
+    const defaults = { q: '', progress: 'all', rating: 'any', label: '' };
+    for (const key of ['q', 'progress', 'rating', 'label']) {
+      const value = state[key];
+      if (value && value !== defaults[key]) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    history.replaceState(null, '', url);
+  }
 
   const CLOTH = ['#5d2a2f', '#24463a', '#26364f', '#7d5f27', '#4a3050', '#37414d', '#4a5138', '#63392f'];
 
@@ -327,7 +379,11 @@
 
   function radial() {
     const ids = new Set(booksData.filter(matches).map(b => String(b.id)));
-    document.querySelectorAll('#grid-view .book').forEach(el => { el.hidden = !ids.has(el.dataset.id); });
+    if (selecting) {
+      for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
+      paintSelection();
+    }
+    document.querySelectorAll('#grid-view .book-cell').forEach(el => { el.hidden = !ids.has(el.dataset.id); });
     document.querySelectorAll('#shelves .book-spine').forEach(a => {
       a.classList.toggle('hidden', !ids.has(a.dataset.id));
     });
@@ -359,6 +415,7 @@
     document.querySelectorAll(`[data-filter="${group}"] button`).forEach(b => {
       b.setAttribute('aria-pressed', String(b.dataset.value === value));
     });
+    syncUrl();
     radial();
   }
 
@@ -378,7 +435,7 @@
 
   q.addEventListener('input', () => {
     state.q = q.value.trim().toLowerCase();
-    localStorage.setItem('athenaeum-q', state.q);
+    syncUrl();
     radial();
   });
 
@@ -391,7 +448,7 @@
     if (e.key === 'Escape' && document.activeElement === q) {
       q.value = '';
       state.q = '';
-      localStorage.removeItem('athenaeum-q');
+      syncUrl();
       q.blur();
       radial();
     }
@@ -480,6 +537,7 @@
 
   let shelvesBuilt = false;
   function setView(shelf) {
+    if (shelf && selecting) setSelecting(false);
     document.getElementById('grid-view').hidden = shelf;
     document.getElementById('shelf-view').hidden = !shelf;
     document.getElementById('view-grid').setAttribute('aria-pressed', String(!shelf));
@@ -496,8 +554,73 @@
     if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
   });
 
+  document.querySelectorAll('.rail-list.sort a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const url = new URL(a.href);
+      new URLSearchParams(location.search).forEach((v, k) => {
+        if (k !== 'sort' && k !== 'dir') url.searchParams.set(k, v);
+      });
+      location.href = url;
+    });
+  });
+
+  const selectToggle = document.getElementById('select-toggle');
+  const bulkBar = document.getElementById('bulk-bar');
+  const bulkCount = document.getElementById('bulk-count');
+  const bulkIds = document.getElementById('bulk-ids');
+  const bulkNext = document.getElementById('bulk-next');
+  const gridView = document.getElementById('grid-view');
+  const selected = new Set();
+  let selecting = false;
+
+  function paintSelection() {
+    gridView.querySelectorAll('.book-cell').forEach(cell => {
+      const on = selected.has(cell.dataset.id);
+      cell.classList.toggle('selected', on);
+      cell.querySelector('.book-select').setAttribute('aria-pressed', String(on));
+    });
+    bulkCount.textContent = `${selected.size} selected`;
+    bulkIds.value = [...selected].join(',');
+    bulkBar.querySelectorAll('button[type="submit"]').forEach(b => { b.disabled = selected.size === 0; });
+  }
+
+  function setSelecting(on) {
+    selecting = on;
+    document.body.classList.toggle('selecting', on);
+    selectToggle.classList.toggle('btn-on', on);
+    selectToggle.setAttribute('aria-pressed', String(on));
+    selectToggle.querySelector('span').textContent = on ? 'Done' : 'Select';
+    bulkBar.hidden = !on;
+    if (on) setView(false);
+    else selected.clear();
+    paintSelection();
+  }
+
+  function toggleSelect(id) {
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    paintSelection();
+  }
+
+  selectToggle.addEventListener('click', () => setSelecting(!selecting));
+  document.getElementById('bulk-cancel').addEventListener('click', () => setSelecting(false));
+  gridView.addEventListener('click', e => {
+    if (!selecting) return;
+    const cell = e.target.closest('.book-cell');
+    if (!cell) return;
+    e.preventDefault();
+    toggleSelect(cell.dataset.id);
+  });
+  bulkBar.addEventListener('submit', e => {
+    if (!selected.size) { e.preventDefault(); return; }
+    bulkIds.value = [...selected].join(',');
+    bulkNext.value = location.pathname + location.search;
+  });
+
   if (localStorage.getItem('athenaeum-shelf') === '1') setView(true);
   radial();
+  syncUrl();
 
   function panel(id, btn) {
     const el = document.getElementById(id);
