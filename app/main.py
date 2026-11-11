@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS books (
     rating REAL,
     review TEXT,
     cover_failed INTEGER NOT NULL DEFAULT 0,
-    finished INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'reading',
     added_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
@@ -129,9 +129,18 @@ CREATE INDEX IF NOT EXISTS idx_book_labels_label ON book_labels(label_id);
 
 
 def migrate(con):
-    if "finished" not in {r[1] for r in con.execute("PRAGMA table_info(books)")}:
-        con.execute("ALTER TABLE books ADD COLUMN finished INTEGER NOT NULL DEFAULT 0")
-        con.execute("UPDATE books SET finished=1 WHERE md5 IS NULL")
+    cols = {r[1] for r in con.execute("PRAGMA table_info(books)")}
+    if "status" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN status TEXT NOT NULL DEFAULT 'reading'")
+        if "finished" not in cols:
+            con.execute("UPDATE books SET status='finished' WHERE md5 IS NULL")
+        if {"total_pages", "pages_read"} <= cols:
+            con.execute(
+                "UPDATE books SET status='finished' WHERE total_pages IS NOT NULL AND pages_read >= total_pages"
+            )
+    if "finished" in cols:
+        con.execute("UPDATE books SET status='finished' WHERE finished=1")
+        con.execute("ALTER TABLE books DROP COLUMN finished")
 
 
 @asynccontextmanager
@@ -214,7 +223,7 @@ def index(request: Request):
     label = request.query_params.get("label", "")
     search = request.query_params.get("q", "").strip()[:200].lower()
     progress = request.query_params.get("progress", "all")
-    if progress not in ("all", "reading", "finished"):
+    if progress not in ("all", "reading", "finished", "abandoned"):
         progress = "all"
     rating = request.query_params.get("rating", "any")
     if rating not in ("any", "none", "1", "2", "3", "4", "5"):
@@ -551,7 +560,7 @@ def add_book(
     total_pages = pages or meta.get("pages")
     with db() as con:
         con.execute(
-            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, finished, added_at) VALUES (?,?,?,?,?,?,?,1,?)",
+            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
@@ -560,6 +569,7 @@ def add_book(
                 total_pages,
                 rating or None,
                 review or None,
+                "finished",
                 int(time.time()),
             ),
         )
@@ -612,10 +622,12 @@ def edit_book(
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
-@app.post("/books/{book_id}/finished")
-def set_finished(book_id: int, finished: int = Form(0)):
+@app.post("/books/{book_id}/status")
+def set_status(book_id: int, status: str = Form("reading")):
+    if status not in ("reading", "finished", "abandoned"):
+        status = "reading"
     with db() as con:
-        con.execute("UPDATE books SET finished=? WHERE id=?", (1 if finished else 0, book_id))
+        con.execute("UPDATE books SET status=? WHERE id=?", (status, book_id))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -671,10 +683,10 @@ def bulk_books(
                         f"SELECT id, (SELECT id FROM labels WHERE name=?) FROM books WHERE id IN ({ph})",
                         (name, *book_ids),
                     )
-            elif action in ("read", "unread"):
+            elif action in ("reading", "finished", "abandoned"):
                 con.execute(
-                    f"UPDATE books SET finished=? WHERE id IN ({ph})",
-                    (1 if action == "read" else 0, *book_ids),
+                    f"UPDATE books SET status=? WHERE id IN ({ph})",
+                    (action, *book_ids),
                 )
             elif action == "delete":
                 con.execute(f"DELETE FROM books WHERE id IN ({ph})", tuple(book_ids))
@@ -818,9 +830,12 @@ async def plugin_import(request: Request):
                 )
             else:
                 created += 1
+                pages = book.get("pages")
+                read = book.get("total_read_pages") or 0
+                status = "finished" if pages and read >= pages else "reading"
                 cur = con.execute(
-                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?)",
-                    (title, authors, md5, book.get("total_read_time") or 0, book.get("total_read_pages") or 0, book.get("pages"), book.get("last_open"), int(time.time())),
+                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (title, authors, md5, book.get("total_read_time") or 0, read, pages, book.get("last_open"), status, int(time.time())),
                 )
                 bid = cur.lastrowid
             for s_row in body.get("stats") or []:
@@ -860,8 +875,9 @@ def import_koreader(file: UploadFile):
                 )
             else:
                 created += 1
+                status = "finished" if s.total_pages and s.pages_read >= s.total_pages else "reading"
                 cur = con.execute(
-                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, added_at) VALUES (?,?,?,?,?,?,?,?)",
+                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
                     (
                         s.title,
                         s.author,
@@ -870,6 +886,7 @@ def import_koreader(file: UploadFile):
                         s.pages_read,
                         s.total_pages,
                         s.last_read_at,
+                        status,
                         int(time.time()),
                     ),
                 )

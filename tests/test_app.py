@@ -426,17 +426,23 @@ def test_manual_highlight_crud(tmp_path, monkeypatch):
     assert n == 0
 
 
-def test_manual_book_is_read_and_can_be_unmarked(tmp_path, monkeypatch):
+def test_manual_book_status_and_abandoned_filter(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with TestClient(app) as client:
         client.post("/books", data={"title": "Bought yesterday"}, follow_redirects=False)
         assert 'data-state="finished"' in client.get("/").text
         book = client.get("/books/1").text
-        assert "Mark as unread" in book and 'class="tag">read<' in book
+        assert '<option value="finished" selected>' in book and 'class="tag">finished<' in book
 
-        client.post("/books/1/finished", data={"finished": 0}, follow_redirects=False)
+        client.post("/books/1/status", data={"status": "reading"}, follow_redirects=False)
         assert 'data-state="reading"' in client.get("/").text
-        assert "Mark as read" in client.get("/books/1").text
+        assert '<option value="reading" selected>' in client.get("/books/1").text
+
+        client.post("/books/1/status", data={"status": "abandoned"}, follow_redirects=False)
+        page = client.get("/?progress=abandoned").text
+        assert 'data-state="abandoned"' in page
+        assert 'data-value="abandoned" aria-pressed="true"' in page
+        assert 'class="tag tag-quiet">abandoned<' in client.get("/books/1").text
 
 
 def test_imported_book_can_be_marked_read_short_of_last_page(tmp_path, monkeypatch):
@@ -444,12 +450,12 @@ def test_imported_book_can_be_marked_read_short_of_last_page(tmp_path, monkeypat
     with TestClient(app) as client:
         client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
         assert 'data-state="reading"' in client.get("/").text
-        assert "Mark as read" in client.get("/books/1").text
+        assert '<option value="reading" selected>' in client.get("/books/1").text
 
-        client.post("/books/1/finished", data={"finished": 1}, follow_redirects=False)
+        client.post("/books/1/status", data={"status": "finished"}, follow_redirects=False)
         assert 'data-state="finished"' in client.get("/").text
         book = client.get("/books/1").text
-        assert "Mark as unread" in book and 'class="tag">read<' in book
+        assert '<option value="finished" selected>' in book and 'class="tag">finished<' in book
 
 
 def test_migrate_marks_manual_books_read(tmp_path, monkeypatch):
@@ -461,8 +467,27 @@ def test_migrate_marks_manual_books_read(tmp_path, monkeypatch):
     con.execute("INSERT INTO books (title, md5) VALUES ('manual', NULL), ('synced', 'abc')")
     migrate(con)
     con.commit()
-    rows = dict(con.execute("SELECT title, finished FROM books").fetchall())
-    assert rows == {"manual": 1, "synced": 0}
+    rows = dict(con.execute("SELECT title, status FROM books").fetchall())
+    assert rows == {"manual": "finished", "synced": "reading"}
+
+
+def test_migrate_finished_column_to_status(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from app.main import migrate
+
+    con = sqlite3.connect("athenaeum.db")
+    con.execute(
+        "CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT NOT NULL, md5 TEXT, pages_read INTEGER, total_pages INTEGER, finished INTEGER)"
+    )
+    con.execute("INSERT INTO books (title, md5, pages_read, total_pages, finished) VALUES ('manual', NULL, 0, NULL, 0)")
+    con.execute("INSERT INTO books (title, md5, pages_read, total_pages, finished) VALUES ('complete', 'abc', 100, 100, 0)")
+    con.execute("INSERT INTO books (title, md5, pages_read, total_pages, finished) VALUES ('marked', 'def', 10, 100, 1)")
+    con.execute("INSERT INTO books (title, md5, pages_read, total_pages, finished) VALUES ('reading', 'ghi', 10, 100, 0)")
+    migrate(con)
+    con.commit()
+    rows = dict(con.execute("SELECT title, status FROM books").fetchall())
+    assert rows == {"manual": "reading", "complete": "finished", "marked": "finished", "reading": "reading"}
+    assert "finished" not in {r[1] for r in con.execute("PRAGMA table_info(books)")}
 
 
 def test_db_is_wal_and_survives_concurrent_writes(tmp_path, monkeypatch):
@@ -559,8 +584,9 @@ def test_bulk_actions(tmp_path, monkeypatch):
         )
         assert r.status_code == 303 and r.headers["location"] == "/?progress=finished"
 
-        r = client.post("/books/bulk", data={"ids": "1,2", "action": "unread", "next": "/"}, follow_redirects=False)
+        r = client.post("/books/bulk", data={"ids": "1,2", "action": "reading", "next": "/"}, follow_redirects=False)
         assert r.status_code == 303
+        client.post("/books/bulk", data={"ids": "1", "action": "abandoned", "next": "/"}, follow_redirects=False)
 
         r = client.post("/books/bulk", data={"ids": "3", "action": "delete", "next": "//evil.test"}, follow_redirects=False)
         assert r.status_code == 303 and r.headers["location"] == "/"
@@ -569,7 +595,8 @@ def test_bulk_actions(tmp_path, monkeypatch):
         assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 2
         assert c.execute("SELECT COUNT(*) FROM labels WHERE name='Favorites'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM book_labels").fetchone()[0] == 2
-        assert c.execute("SELECT COUNT(*) FROM books WHERE finished=0").fetchone()[0] == 2
+        assert c.execute("SELECT COUNT(*) FROM books WHERE status='reading'").fetchone()[0] == 1
+        assert c.execute("SELECT COUNT(*) FROM books WHERE status='abandoned'").fetchone()[0] == 1
 
 
 def test_label_management_rename_merge_delete(tmp_path, monkeypatch):

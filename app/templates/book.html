@@ -27,6 +27,13 @@
     background: var(--accent-soft); color: var(--accent-strong);
     font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
   }
+  .tag-quiet { border-color: var(--line-2); background: var(--surface-2); color: var(--muted); }
+  .status-form select {
+    height: 24px; padding: 0 22px 0 7px; font-size: 12px;
+    border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    background: var(--surface); color: var(--text-2);
+  }
+  .status-form select:hover { border-color: var(--muted); }
   .label-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .label-row .tag { height: 23px; padding: 0 5px 0 9px; font-size: 12px; letter-spacing: 0; text-transform: none; }
   .label-pill a { color: inherit; }
@@ -60,6 +67,9 @@
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+  @media (max-width: 640px) {
+    .status-form select { height: 40px; font-size: 16px; }
+  }
   @media (max-width: 760px) {
     .meta .isbn-part { display: none; }
     .book-layout { grid-template-columns: 1fr; gap: 24px; }
@@ -74,7 +84,6 @@
 
 {% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
 {% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int if b['total_pages'] else none %}
-{% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
 
 <div class="page-head">
   <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
@@ -119,9 +128,12 @@
         <span class="meta-actions">
           <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
           <span class="sep">·</span>
-          <form class="inline-form" method="post" action="/books/{{ b['id'] }}/finished">
-            <input type="hidden" name="finished" value="{{ 0 if done else 1 }}">
-            <button class="linkbtn" type="submit">{{ 'Mark as unread' if done else 'Mark as read' }}</button>
+          <form class="inline-form status-form" method="post" action="/books/{{ b['id'] }}/status">
+            <select name="status" onchange="this.form.submit()" aria-label="Reading status">
+              <option value="reading" {{ 'selected' if b['status'] == 'reading' }}>Reading</option>
+              <option value="finished" {{ 'selected' if b['status'] == 'finished' }}>Finished</option>
+              <option value="abandoned" {{ 'selected' if b['status'] == 'abandoned' }}>Abandoned</option>
+            </select>
           </form>
         </span>
       </div>
@@ -165,11 +177,12 @@
       <div class="progress-head">
         <span class="pct-line">
           <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
-          {% if done %}<span class="tag">read</span>{% endif %}
+          {% if b['status'] == 'finished' %}<span class="tag">finished</span>
+          {% elif b['status'] == 'abandoned' %}<span class="tag tag-quiet">abandoned</span>{% endif %}
         </span>
         <span class="pages num">{% if b['total_pages'] %}{{ b['pages_read'] or 0 }} / {{ b['total_pages'] }} pages{% endif %}</span>
       </div>
-      <div class="track"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
+      <div class="track{% if b['status'] == 'abandoned' %} abandoned{% endif %}"><span style="width:{{ pct if pct is not none else 0 }}%"></span></div>
     </div>
 
     <div class="facts">

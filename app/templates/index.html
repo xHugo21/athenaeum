@@ -143,12 +143,12 @@
   }
 </style>
 {% set rated = books | selectattr('rating') | list %}
-{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0) %}
+{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0, abandoned=0) %}
 {% for b in books %}
   {% set ns.secs = ns.secs + (b['total_seconds'] or 0) %}
   {% set ns.pages = ns.pages + (b['pages_read'] or 0) %}
-  {% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
-  {% if done %}{% set ns.finished = ns.finished + 1 %}
+  {% if b['status'] == 'finished' %}{% set ns.finished = ns.finished + 1 %}
+  {% elif b['status'] == 'abandoned' %}{% set ns.abandoned = ns.abandoned + 1 %}
   {% else %}{% set ns.reading = ns.reading + 1 %}{% endif %}
 {% endfor %}
 {% for b in rated %}{% set ns.stars = ns.stars + (b['rating'] or 0) %}{% endfor %}
@@ -251,6 +251,7 @@
         <button type="button" data-value="all" aria-pressed="{{ 'true' if progress == 'all' else 'false' }}"><span>All books</span><b class="num">{{ books | length }}</b></button>
         <button type="button" data-value="reading" aria-pressed="{{ 'true' if progress == 'reading' else 'false' }}"><span>Reading</span><b class="num">{{ ns.reading }}</b></button>
         <button type="button" data-value="finished" aria-pressed="{{ 'true' if progress == 'finished' else 'false' }}"><span>Finished</span><b class="num">{{ ns.finished }}</b></button>
+        <button type="button" data-value="abandoned" aria-pressed="{{ 'true' if progress == 'abandoned' else 'false' }}"><span>Abandoned</span><b class="num">{{ ns.abandoned }}</b></button>
       </div>
     </div>
     <div class="rail-group">
@@ -297,16 +298,16 @@
       <input type="hidden" name="next" id="bulk-next">
       <input type="text" name="label" id="bulk-label" placeholder="Label" aria-label="Label to add">
       <button class="btn sm" type="submit" name="action" value="label">Add label</button>
-      <button class="btn sm" type="submit" name="action" value="read">Mark read</button>
-      <button class="btn sm btn-ghost" type="submit" name="action" value="unread">Mark unread</button>
+      <button class="btn sm" type="submit" name="action" value="finished">Mark finished</button>
+      <button class="btn sm btn-ghost" type="submit" name="action" value="reading">Mark reading</button>
+      <button class="btn sm btn-ghost" type="submit" name="action" value="abandoned">Mark abandoned</button>
       <button class="btn sm btn-danger" type="submit" name="action" value="delete" onclick="return confirm('Delete selected books and their reading history?')">Delete</button>
       <button class="btn sm btn-ghost" type="button" id="bulk-cancel">Cancel</button>
     </form>
     <div id="grid-view" class="grid">
       {% for b in books %}
       {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
-      {% set done = b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages']) %}
-      {% set state = 'finished' if done else 'reading' %}
+      {% set state = b['status'] %}
       <div class="book-cell" data-id="{{ b['id'] }}">
         <button class="book-select" type="button" aria-label="Select {{ b['title'] }}" aria-pressed="false">
           <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
@@ -331,9 +332,10 @@
             {% endif %}
           </div>
           <div class="bm-author">{{ b['author'] or 'Unknown author' }}</div>
-          <div class="track{% if not pct %} quiet{% endif %}"><span style="width:{{ pct if pct else 0 }}%"></span></div>
+          <div class="track{% if not pct %} quiet{% elif state == 'abandoned' %} abandoned{% endif %}"><span style="width:{{ pct if pct else 0 }}%"></span></div>
           <div class="bm-readout">
-            {% if done %}<span class="num">finished</span>
+            {% if state == 'finished' %}<span class="num">finished</span>
+            {% elif state == 'abandoned' %}<span class="num">abandoned</span>
             {% elif pct is none %}<span class="num">—</span>
             {% else %}<span class="num">{{ pct }}%</span>{% endif %}
             <span class="num">{{ b['total_seconds'] | read_hm if b['total_seconds'] else '' }}</span>
@@ -352,7 +354,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ ('finished' if (b['finished'] or (b['total_pages'] and b['pages_read'] >= b['total_pages'])) else 'reading') | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
