@@ -321,7 +321,8 @@
             </span>
             <span class="a">{{ b['author'] or '' }}</span>
           </div>
-          <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="" loading="lazy"
+          <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="" decoding="async"
+               {% if loop.index <= 6 %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
                onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
         </div>
         <div class="bm">

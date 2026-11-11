@@ -102,7 +102,7 @@
         </span>
         <span class="a">{{ b['author'] or '' }}</span>
       </div>
-      <img src="{{ cover_url }}" alt="Cover of {{ b['title'] }}" onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
+      <img src="{{ cover_url }}" alt="Cover of {{ b['title'] }}" decoding="async" fetchpriority="high" onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
     </div>
     <div class="cover-tools">
       <form method="post" action="/books/{{ b['id'] }}/cover" enctype="multipart/form-data" style="flex:1">
