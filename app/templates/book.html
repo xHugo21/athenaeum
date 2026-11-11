@@ -83,10 +83,13 @@
 <div class="book-layout">
   <div class="cover-col">
     <div class="cover">
-      <div class="cover-fallback">
-        <div class="initial">{{ b['title'][:1] | upper }}</div>
-        <div class="t">{{ b['title'] }}</div>
-        <div class="a">{{ b['author'] or '' }}</div>
+      <div class="cover-fallback" aria-hidden="true">
+        <span class="mark num">A·{{ '%03d' | format(b['id']) }}</span>
+        <span class="body">
+          <span class="t">{{ b['title'] }}</span>
+          <span class="rule"></span>
+        </span>
+        <span class="a">{{ b['author'] or '' }}</span>
       </div>
       <img src="{{ cover_url }}" alt="Cover of {{ b['title'] }}" onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
     </div>

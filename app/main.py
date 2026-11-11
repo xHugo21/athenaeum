@@ -921,47 +921,18 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
     return None
 
 
-def placeholder_svg(title: str, author: str) -> bytes:
-    def esc(s):
-        return s.replace("&", "&amp;").replace("<", "&lt;")
-    initial = (title[:1] or "?").upper()
-    words = esc(title).split()
-    lines = []
-    for w in words:
-        if not lines or len(lines[-1]) + 1 + len(w) > 20:
-            lines.append(w)
-        else:
-            lines[-1] += " " + w
-    lines = lines[:4]
-    title_size = 8 if max((len(l) for l in lines), default=0) <= 16 else 7
-    line_h = title_size + 2
-    title_y = 104 - (len(lines) - 1) * line_h / 2
-    title_text = "".join(
-        f'<tspan x="64" dy="{line_h if i else 0}">{l}</tspan>' for i, l in enumerate(lines)
-    )
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 192" preserveAspectRatio="xMidYMid slice">
-  <rect width="128" height="192" fill="#efeeeb"/>
-  <rect x="0" y="0" width="128" height="5" fill="#e0562e"/>
-  <rect x="9.5" y="9.5" width="109" height="173" fill="none" stroke="#dad8d3"/>
-  <text x="64" y="76" text-anchor="middle" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-size="42" font-weight="600" fill="#151517">{initial}</text>
-  <text x="64" y="{title_y}" text-anchor="middle" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-size="{title_size}" fill="#3a3a3e">{title_text}</text>
-  <text x="64" y="168" text-anchor="middle" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-size="6" letter-spacing=".5" fill="#8b8b90">{esc(author)[:24].upper()}</text>
-</svg>'''
-    return svg.encode()
-
-
 @app.get("/covers/{book_id}.jpg")
 def cover_image(book_id: int):
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
     if os.path.exists(path):
         return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
     with db() as con:
-        book = con.execute("SELECT title, author, isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
+        book = con.execute("SELECT isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
     if not book:
         return RedirectResponse("/", 303)
     if fetch_cover(book_id, book["isbn"], book["cover_failed"]):
         return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
-    return Response(placeholder_svg(book["title"], book["author"] or ""), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+    return Response(status_code=404)
 
 
 @app.post("/books/{book_id}/cover/remove")

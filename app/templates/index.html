@@ -313,10 +313,13 @@
         </button>
         <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
         <div class="cover">
-          <div class="cover-fallback">
-            <div class="initial">{{ b['title'][:1] | upper }}</div>
-            <div class="t">{{ b['title'] }}</div>
-            <div class="a">{{ b['author'] or '' }}</div>
+          <div class="cover-fallback" aria-hidden="true">
+            <span class="mark num">A·{{ '%03d' | format(b['id']) }}</span>
+            <span class="body">
+              <span class="t">{{ b['title'] }}</span>
+              <span class="rule"></span>
+            </span>
+            <span class="a">{{ b['author'] or '' }}</span>
           </div>
           <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="" loading="lazy"
                onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">

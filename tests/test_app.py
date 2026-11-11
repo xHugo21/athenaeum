@@ -627,6 +627,15 @@ def test_library_sorts(tmp_path, monkeypatch):
         assert order("/?sort=added&dir=asc") == [2, 3, 1]
 
 
+def test_placeholder_cover_uses_html_fallback(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "No Cover", "author": "Nobody"}, follow_redirects=False)
+        assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 404
+        assert "A·001" in client.get("/").text
+        assert "A·001" in client.get("/books/1").text
+
+
 def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     import app.main as main

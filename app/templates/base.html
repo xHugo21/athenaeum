@@ -308,18 +308,26 @@
     overflow: hidden;
     background: var(--surface-2);
     display: flex; align-items: center; justify-content: center;
+    container-type: inline-size;
   }
   .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .1); pointer-events: none; }
   .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .cover-fallback { padding: 14px; text-align: center; color: var(--text-2); }
-  .cover-fallback .initial {
-    font-size: 22px; font-weight: 500; color: var(--text);
-    width: 34px; height: 34px; margin: 0 auto 10px;
-    display: grid; place-items: center;
-    border: 1px solid var(--line-2); border-radius: 50%;
+  .cover-fallback {
+    position: absolute; inset: 0; padding: clamp(10px, 9cqw, 18px);
+    display: flex; flex-direction: column; text-align: left;
   }
-  .cover-fallback .t { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.35; }
-  .cover-fallback .a { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .cover-fallback .mark { font-size: clamp(7px, 5cqw, 11px); letter-spacing: .07em; color: var(--muted); }
+  .cover-fallback .body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(8px, 6cqw, 14px); }
+  .cover-fallback .t {
+    font-size: 12px; font-size: clamp(11px, 8cqw, 17px); font-weight: 600;
+    color: var(--text); line-height: 1.28; letter-spacing: -.012em; text-wrap: balance;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .cover-fallback .rule { width: clamp(14px, 12cqw, 24px); height: 1px; background: var(--line-2); flex: 0 0 1px; }
+  .cover-fallback .a {
+    margin-top: 8px; font-size: 11px; font-size: clamp(9px, 6.5cqw, 13px); color: var(--muted);
+    line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
 
   .track { height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
   .track > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
