@@ -703,3 +703,14 @@ def test_static_assets_are_public_behind_password(tmp_path, monkeypatch):
         r = client.get("/", follow_redirects=False)
         assert r.status_code == 303 and r.headers["location"] == "/login"
         assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 303
+
+
+def test_book_reading_pace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+        r = client.get("/books/1")
+        assert "pages an hour" in r.text and "Time left" in r.text
+        assert "7h 27min" in r.text, "298 pages left at 90s a page"
+        assert r.text.count("Reading speed") == 1
+        assert client.get("/stats").status_code == 200

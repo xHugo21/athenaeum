@@ -189,6 +189,12 @@
       {% if b['total_seconds'] %}
       <div class="fact"><div class="label">Time read</div><div class="v num">{{ b['total_seconds'] | read_hm }}</div></div>
       {% endif %}
+      {% if pph %}
+      <div class="fact"><div class="label">Reading speed</div><div class="v num">{{ pph }}</div><div class="s">pages an hour</div></div>
+      {% endif %}
+      {% if time_left %}
+      <div class="fact"><div class="label">Time left</div><div class="v num">{{ time_left | read_hm }}</div>{% if eta %}<div class="s">at this pace, ~{{ eta }}</div>{% endif %}</div>
+      {% endif %}
       {% if agg and agg['n'] %}
       <div class="fact"><div class="label">Sessions</div><div class="v num">{{ sessions_n }}</div></div>
       <div class="fact"><div class="label">Days read</div><div class="v num">{{ agg['n'] }}</div></div>

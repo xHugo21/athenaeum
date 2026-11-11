@@ -513,6 +513,13 @@ def book_detail(request: Request, book_id: int):
             (book_id,),
         ).fetchone()
         sessions_n = con.execute("SELECT COUNT(*) FROM sessions WHERE book_id=?", (book_id,)).fetchone()[0]
+        speed = con.execute(
+            "SELECT SUM(duration) secs, COUNT(DISTINCT page) pages FROM sessions WHERE book_id=?", (book_id,)
+        ).fetchone()
+        pace = con.execute(
+            "SELECT SUM(seconds)/14.0 FROM book_days WHERE book_id=? AND day>=date('now','-14 day')",
+            (book_id,),
+        ).fetchone()[0]
         best = con.execute(
             "SELECT day, seconds FROM book_days WHERE book_id=? ORDER BY seconds DESC LIMIT 1",
             (book_id,),
@@ -529,6 +536,11 @@ def book_detail(request: Request, book_id: int):
                 (book_id,),
             )
         ]
+    secs_per_page = speed["secs"] / speed["pages"] if speed["secs"] and speed["pages"] >= 2 else None
+    left = ((book["total_pages"] or 0) - book["pages_read"]) if book["status"] == "reading" else 0
+    time_left = left * secs_per_page if secs_per_page and left > 0 else None
+    days_left = round(time_left / pace) if time_left and pace else None
+    eta = date.today() + timedelta(days=days_left) if days_left and days_left <= 120 else None
     return templates.TemplateResponse(
         request,
         "book.html",
@@ -539,6 +551,9 @@ def book_detail(request: Request, book_id: int):
             "best": best,
             "anns": anns,
             "labels": labels,
+            "pph": round(3600 / secs_per_page) if secs_per_page else None,
+            "time_left": time_left,
+            "eta": eta.strftime("%-d %b") if eta else None,
             "custom_cover": os.path.exists(cover_path := os.path.join(COVERS_DIR, f"{book_id}.jpg")),
             "cover_ts": int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
         },
