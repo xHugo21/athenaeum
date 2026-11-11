@@ -13,6 +13,7 @@ from datetime import date, timedelta
 
 import httpx
 from fastapi import FastAPI, Form, Request, UploadFile
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -151,7 +152,16 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="athenaeum", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
+
+@app.middleware("http")
+async def static_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 
 def make_token(nonce: str, expires: int) -> str:
@@ -1069,16 +1079,17 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
 
 
 @app.get("/covers/{book_id}.jpg")
-def cover_image(book_id: int):
+def cover_image(book_id: int, v: str = ""):
     path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    cache = {"Cache-Control": "public, max-age=31536000, immutable"} if v else {"Cache-Control": "no-cache"}
     if os.path.exists(path):
-        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+        return FileResponse(path, media_type="image/jpeg", headers=cache)
     with db() as con:
         book = con.execute("SELECT isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
     if not book:
         return RedirectResponse("/", 303)
     if fetch_cover(book_id, book["isbn"], book["cover_failed"]):
-        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+        return FileResponse(path, media_type="image/jpeg", headers=cache)
     return Response(status_code=404)
 
 
