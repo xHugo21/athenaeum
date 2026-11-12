@@ -5,7 +5,7 @@
   .book-layout { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 40px; align-items: start; }
   .cover-col { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 10px; }
   .cover-col .cover { border-radius: var(--r); }
-  .cover-tools { display: flex; gap: 6px; }
+  .cover-tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .book-main { min-width: 0; }
   .book-main h1 { font-size: 26px; line-height: 1.2; }
   .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--text-2); }
@@ -70,6 +70,23 @@
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .story-open { flex: 1 0 100%; }
+  .story-overlay {
+    position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px;
+    background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(10px);
+  }
+  .story-sheet { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .story-sheet canvas {
+    max-height: min(72vh, 780px); max-width: 100%; height: auto; width: auto;
+    border-radius: 10px; box-shadow: 0 0 0 1px var(--line), var(--shadow-2);
+  }
+  .story-actions { display: flex; gap: 8px; }
+  .story-pick { display: flex; align-items: center; gap: 8px; max-width: 100%; font-size: 12px; color: var(--muted); }
+  .story-pick select {
+    height: 30px; max-width: min(64vw, 360px); padding: 0 8px;
+    border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    background: var(--surface); color: var(--text); font: inherit; font-size: 13px;
+  }
   @media (max-width: 640px) {
     .status-form select { height: 40px; font-size: 16px; padding-right: 18px; background-position: right 2px center; background-size: 12px; }
   }
@@ -119,6 +136,9 @@
         </button>
       </form>
       {% endif %}
+      <button class="btn sm story-open" type="button" id="story-btn">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-share"/></svg>Share story
+      </button>
     </div>
   </div>
 
@@ -289,6 +309,34 @@
 </section>
 {% endif %}
 
+<div class="story-overlay" id="story-overlay" hidden>
+  <div class="story-sheet" role="dialog" aria-modal="true" aria-label="Share as a story">
+    <canvas id="story-canvas" width="1080" height="1920"></canvas>
+    {% if quotes %}
+    <label class="story-pick">Highlight
+      <select id="story-quote">
+        <option value="">None</option>
+        {% for q in quotes %}
+        <option value="{{ loop.index0 }}">{% if q['page'] %}p. {{ q['page'] }} · {% endif %}{{ q['text'] | truncate(54, false, '…') }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="story-actions">
+      <button class="btn btn-primary" type="button" id="story-share" hidden>Share</button>
+      <a class="btn" id="story-save" download>Download</a>
+      <button class="btn btn-ghost" type="button" id="story-close">Close</button>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="story-data">{{ {
+  "title": b['title'],
+  "author": b['author'] or '',
+  "rating": b['rating'] or 0,
+  "cover": cover_url,
+  "quotes": quotes,
+} | tojson }}</script>
+
 <div class="danger-zone">
   <a class="btn btn-ghost" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Back to library</a>
   <form method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book and its reading history?')">
@@ -430,6 +478,244 @@
       if (!remove) return;
       remove.closest('.label-pill').remove();
       persistLabels();
+    });
+  }
+
+  {
+    const btn = document.getElementById('story-btn');
+    const data = JSON.parse(document.getElementById('story-data').textContent);
+    const overlay = document.getElementById('story-overlay');
+    const canvas = document.getElementById('story-canvas');
+    const shareBtn = document.getElementById('story-share');
+    const saveLink = document.getElementById('story-save');
+    const pick = document.getElementById('story-quote');
+    const g = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+    const clip = (text, max) => {
+      if (g.measureText(text).width <= max) return text;
+      let t = text;
+      while (t && g.measureText(t + '…').width > max) t = t.slice(0, -1);
+      return t.trimEnd() + '…';
+    };
+    const wrap = (text, max) => {
+      const lines = [];
+      let line = '';
+      for (const word of text.split(/\s+/).filter(Boolean)) {
+        const next = line ? line + ' ' + word : word;
+        if (line && g.measureText(next).width > max) {
+          lines.push(line);
+          line = word;
+        } else line = next;
+      }
+      if (line) lines.push(line);
+      return lines;
+    };
+    const starPath = (cx, cy, r) => {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rad = i % 2 ? r * 0.48 : r;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        g.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+      }
+      g.closePath();
+    };
+    const load = src => new Promise(resolve => {
+      const im = new Image();
+      im.onload = () => resolve(im.naturalWidth > 10 ? im : null);
+      im.onerror = () => resolve(null);
+      im.src = src;
+    });
+
+    async function render() {
+      const ink = css('--text'), soft = css('--text-2'), muted = css('--muted'), accent = css('--accent');
+      const line2 = css('--line-2'), surface2 = css('--surface-2');
+      const quote = pick && pick.value !== '' ? data.quotes[pick.value] : null;
+
+      let size = 62;
+      g.font = `600 ${size}px Geist`;
+      let lines = wrap(data.title, 880);
+      while (lines.length > 2 && size > 38) {
+        size -= 4;
+        g.font = `600 ${size}px Geist`;
+        lines = wrap(data.title, 880);
+      }
+      if (lines.length > 2) lines = [lines[0], clip(lines.slice(1).join(' '), 880)];
+
+      let qLines = [];
+      if (quote) {
+        g.font = '400 38px Geist';
+        const words = wrap(quote.text.replace(/\s+/g, ' '), 820);
+        qLines = words.length > 3 ? words.slice(0, 2).concat(clip(words.slice(2).join(' '), 820)) : words;
+      }
+
+      const tail =
+        74 +
+        (data.rating > 0 ? 34 : 0) +
+        (qLines.length ? 132 + (qLines.length - 1) * 52 + 38 : 0);
+      const textH = 96 + size * 0.78 + (lines.length - 1) * size * 1.16 + (data.author ? 50 : 0) + tail;
+      const ch = Math.round(Math.max(600, Math.min(1120, H - 360 - textH)));
+      const cw = Math.round((ch * 2) / 3);
+      const x = (W - cw) / 2;
+      const y = Math.round((H - ch - textH) / 2);
+
+      g.textAlign = 'center';
+      g.textBaseline = 'alphabetic';
+      g.lineJoin = 'round';
+      g.fillStyle = css('--bg');
+      g.fillRect(0, 0, W, H);
+
+      g.save();
+      g.shadowColor = 'rgba(0, 0, 0, .38)';
+      g.shadowBlur = 70;
+      g.shadowOffsetY = 26;
+      g.fillStyle = surface2;
+      g.beginPath();
+      g.roundRect(x, y, cw, ch, 8);
+      g.fill();
+      g.restore();
+
+      const cover = await load(data.cover);
+      g.save();
+      g.beginPath();
+      g.roundRect(x, y, cw, ch, 8);
+      g.clip();
+      if (cover) {
+        const scale = Math.max(cw / cover.width, ch / cover.height);
+        const iw = cover.width * scale, ih = cover.height * scale;
+        g.drawImage(cover, x + (cw - iw) / 2, y + (ch - ih) / 2, iw, ih);
+      } else {
+        const pad = Math.round(cw * 0.09), max = cw - pad * 2;
+        const tSize = Math.round(cw * 0.075);
+        g.textAlign = 'left';
+        g.fillStyle = ink;
+        g.font = `600 ${tSize}px Geist`;
+        const lines = wrap(data.title, max).slice(0, 6);
+        const lh = Math.round(tSize * 1.26);
+        let ty = y + ch / 2 - (lines.length * lh) / 2 + Math.round(tSize * 0.3);
+        for (const l of lines) {
+          g.fillText(l, x + pad, ty);
+          ty += lh;
+        }
+        g.fillStyle = line2;
+        g.fillRect(x + pad, ty + Math.round(tSize * 0.2), Math.round(cw * 0.08), 2);
+        if (data.author) {
+          g.fillStyle = muted;
+          g.font = `400 ${Math.round(cw * 0.048)}px Geist`;
+          g.fillText(clip(data.author, max), x + pad, ty + Math.round(tSize * 1.1));
+        }
+        g.textAlign = 'center';
+      }
+      g.restore();
+
+      g.fillStyle = ink;
+      g.font = `600 ${size}px Geist`;
+      let cy = y + ch + 96 + size * 0.78;
+      for (const l of lines) {
+        g.fillText(l, W / 2, cy);
+        cy += size * 1.16;
+      }
+      cy -= size * 1.16;
+      if (data.author) {
+        g.fillStyle = soft;
+        g.font = '400 32px Geist';
+        cy += 50;
+        g.fillText(clip(data.author, 820), W / 2, cy);
+      }
+
+      cy += 74;
+      if (data.rating > 0) {
+        const r = 34, gap = 14, total = 5 * r * 2 + 4 * gap;
+        let sx = (W - total) / 2 + r;
+        for (let i = 1; i <= 5; i++) {
+          const fill = Math.min(1, Math.max(0, data.rating - (i - 1)));
+          starPath(sx, cy, r);
+          if (fill === 0) {
+            g.strokeStyle = line2;
+            g.lineWidth = 3;
+            g.stroke();
+          } else {
+            g.save();
+            if (fill < 1) {
+              g.beginPath();
+              g.rect(sx - r - 2, cy - r - 2, r + 2, (r + 2) * 2);
+              g.clip();
+            }
+            starPath(sx, cy, r);
+            g.fillStyle = accent;
+            g.fill();
+            g.restore();
+            if (fill < 1) {
+              starPath(sx, cy, r);
+              g.strokeStyle = line2;
+              g.lineWidth = 3;
+              g.stroke();
+            }
+          }
+          sx += r * 2 + gap;
+        }
+      }
+
+      if (qLines.length) {
+        let qy = cy + 132;
+
+        g.strokeStyle = muted;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(W / 2 - 28, qy - 56);
+        g.lineTo(W / 2 + 28, qy - 56);
+        g.stroke();
+
+        g.fillStyle = soft;
+        g.font = '400 38px Geist';
+        for (const l of qLines) {
+          g.fillText(l, W / 2, qy);
+          qy += 52;
+        }
+        if (quote.page) {
+          g.fillStyle = muted;
+          g.font = '500 26px "Geist Mono"';
+          g.fillText('p. ' + quote.page, W / 2, qy + 30);
+        }
+      }
+    }
+
+    let url = '';
+    const close = () => {
+      overlay.hidden = true;
+      document.body.style.overflow = '';
+    };
+
+    async function paint() {
+      await render();
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(blob);
+      saveLink.href = url;
+      saveLink.download = 'athenaeum-' + (data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story') + '.png';
+      const file = new File([blob], saveLink.download, { type: 'image/png' });
+      shareBtn.hidden = !(navigator.canShare && navigator.canShare({ files: [file] }));
+      shareBtn.onclick = () => navigator.share({ files: [file] }).catch(() => {});
+    }
+
+    pick?.addEventListener('change', paint);
+    btn.addEventListener('click', async () => {
+      overlay.hidden = false;
+      document.body.style.overflow = 'hidden';
+      await document.fonts.ready;
+      await Promise.all(
+        ['600 62px Geist', '400 38px Geist', '400 32px Geist', '500 26px "Geist Mono"'].map(f => document.fonts.load(f))
+      );
+      await paint();
+    });
+    document.getElementById('story-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !overlay.hidden) close();
     });
   }
 </script>

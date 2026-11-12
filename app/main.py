@@ -560,6 +560,11 @@ def book_detail(request: Request, book_id: int):
             "sessions_n": sessions_n,
             "best": best,
             "anns": anns,
+            "quotes": [
+                {"text": a["text"], "page": a["pageno"]}
+                for a in anns
+                if a["type"] != "bookmark" and (a["text"] or "").strip()
+            ],
             "labels": labels,
             "pph": round(3600 / secs_per_page) if secs_per_page else None,
             "time_left": time_left,

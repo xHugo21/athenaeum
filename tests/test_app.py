@@ -714,3 +714,15 @@ def test_book_reading_pace(tmp_path, monkeypatch):
         assert "7h 27min" in r.text, "298 pages left at 90s a page"
         assert r.text.count("Reading speed") == 1
         assert client.get("/stats").status_code == 200
+
+
+def test_book_page_has_story_share(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with TestClient(app) as client:
+        client.post("/books", data={"title": "Dune", "author": "Frank Herbert", "rating": "4.5"})
+        assert 'id="story-quote"' not in client.get("/books/1").text, "no highlights, no picker"
+        client.post("/books/1/highlights/edit", data={"text": "Fear is the mind-killer", "pageno": "59"})
+        page = client.get("/books/1").text
+    assert 'id="story-overlay"' in page and 'id="story-btn"' in page
+    assert '"rating": 4.5' in page and '"title": "Dune"' in page
+    assert '<option value="0">p. 59 · Fear is the mind-killer</option>' in page
