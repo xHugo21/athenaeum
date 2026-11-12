@@ -650,6 +650,7 @@
         g.fillText(clip(data.author, 820), W / 2, cy);
       }
 
+      const textBottom = cy + 12;
       cy += 74;
       if (data.rating > 0) {
         const r = 34, sg = 14, total = 5 * r * 2 + 4 * sg;
@@ -684,14 +685,16 @@
       }
 
       if (quote) {
-        let qy = cy + 132;
+        const ruleY = Math.round(((data.rating > 0 ? cy + 28 : textBottom) + cy + 132 - qSize * 0.72) / 2);
 
         g.strokeStyle = muted;
         g.lineWidth = 2;
         g.beginPath();
-        g.moveTo(W / 2 - 28, qy - 56);
-        g.lineTo(W / 2 + 28, qy - 56);
+        g.moveTo(W / 2 - 28, ruleY);
+        g.lineTo(W / 2 + 28, ruleY);
         g.stroke();
+
+        let qy = cy + 132;
 
         g.fillStyle = soft;
         g.font = `400 ${qSize}px Newsreader, Georgia, serif`;
