@@ -315,7 +315,7 @@
     {% if quotes %}
     <label class="story-pick">Highlight
       <select id="story-quote">
-        <option value="">None</option>
+        <option value="">No quote</option>
         {% for q in quotes %}
         <option value="{{ loop.index0 }}">{% if q['page'] %}p. {{ q['page'] }} · {% endif %}{{ q['text'] | truncate(54, false, '…') }}</option>
         {% endfor %}
@@ -529,58 +529,24 @@
       im.src = src;
     });
 
-    async function render() {
-      const ink = css('--text'), soft = css('--text-2'), muted = css('--muted'), accent = css('--accent');
-      const line2 = css('--line-2'), surface2 = css('--surface-2');
-      const quote = pick && pick.value !== '' ? data.quotes[pick.value] : null;
-
-      let size = 62;
-      g.font = `600 ${size}px Geist`;
-      let lines = wrap(data.title, 880);
-      while (lines.length > 2 && size > 38) {
-        size -= 4;
-        g.font = `600 ${size}px Geist`;
-        lines = wrap(data.title, 880);
-      }
-      if (lines.length > 2) lines = [lines[0], clip(lines.slice(1).join(' '), 880)];
-
-      let qLines = [];
-      if (quote) {
-        g.font = '400 38px Geist';
-        const words = wrap(quote.text.replace(/\s+/g, ' '), 820);
-        qLines = words.length > 3 ? words.slice(0, 2).concat(clip(words.slice(2).join(' '), 820)) : words;
-      }
-
-      const tail =
-        74 +
-        (data.rating > 0 ? 34 : 0) +
-        (qLines.length ? 132 + (qLines.length - 1) * 52 + 38 : 0);
-      const textH = 96 + size * 0.78 + (lines.length - 1) * size * 1.16 + (data.author ? 50 : 0) + tail;
-      const ch = Math.round(Math.max(600, Math.min(1120, H - 360 - textH)));
-      const cw = Math.round((ch * 2) / 3);
-      const x = (W - cw) / 2;
-      const y = Math.round((H - ch - textH) / 2);
-
-      g.textAlign = 'center';
-      g.textBaseline = 'alphabetic';
-      g.lineJoin = 'round';
-      g.fillStyle = css('--bg');
-      g.fillRect(0, 0, W, H);
+    async function drawCover(x, y, cw, ch) {
+      const ink = css('--text'), muted = css('--muted'), line2 = css('--line-2'), surface2 = css('--surface-2');
+      const r = Math.max(4, Math.round(cw * 0.012));
 
       g.save();
       g.shadowColor = 'rgba(0, 0, 0, .38)';
-      g.shadowBlur = 70;
-      g.shadowOffsetY = 26;
+      g.shadowBlur = cw * 0.12;
+      g.shadowOffsetY = cw * 0.045;
       g.fillStyle = surface2;
       g.beginPath();
-      g.roundRect(x, y, cw, ch, 8);
+      g.roundRect(x, y, cw, ch, r);
       g.fill();
       g.restore();
 
       const cover = await load(data.cover);
       g.save();
       g.beginPath();
-      g.roundRect(x, y, cw, ch, 8);
+      g.roundRect(x, y, cw, ch, r);
       g.clip();
       if (cover) {
         const scale = Math.max(cw / cover.width, ch / cover.height);
@@ -589,12 +555,12 @@
       } else {
         const pad = Math.round(cw * 0.09), max = cw - pad * 2;
         const tSize = Math.round(cw * 0.075);
-        g.textAlign = 'left';
-        g.fillStyle = ink;
-        g.font = `600 ${tSize}px Geist`;
         const lines = wrap(data.title, max).slice(0, 6);
         const lh = Math.round(tSize * 1.26);
         let ty = y + ch / 2 - (lines.length * lh) / 2 + Math.round(tSize * 0.3);
+        g.textAlign = 'left';
+        g.fillStyle = ink;
+        g.font = `600 ${tSize}px Geist`;
         for (const l of lines) {
           g.fillText(l, x + pad, ty);
           ty += lh;
@@ -609,6 +575,65 @@
         g.textAlign = 'center';
       }
       g.restore();
+    }
+
+    async function render() {
+      const ink = css('--text'), soft = css('--text-2'), muted = css('--muted'), accent = css('--accent');
+      const line2 = css('--line-2');
+      const quote = pick && pick.value !== '' ? data.quotes[pick.value] : null;
+
+      g.textAlign = 'center';
+      g.textBaseline = 'alphabetic';
+      g.lineJoin = 'round';
+      g.fillStyle = css('--bg');
+      g.fillRect(0, 0, W, H);
+
+      let size = 62;
+      g.font = `600 ${size}px Geist`;
+      let lines = wrap(data.title, 880);
+      while (lines.length > 2 && size > 38) {
+        size -= 4;
+        g.font = `600 ${size}px Geist`;
+        lines = wrap(data.title, 880);
+      }
+      if (lines.length > 2) lines = [lines[0], clip(lines.slice(1).join(' '), 880)];
+
+      const textBase =
+        96 +
+        size * 0.78 +
+        (lines.length - 1) * size * 1.16 +
+        (data.author ? 50 : 0) +
+        74 +
+        (data.rating > 0 ? 34 : 0);
+
+      const gap = 132;
+      let qSize = 44, qLines = [], qLh = 0;
+      const measure = s => {
+        g.font = `400 ${s}px Newsreader, Georgia, serif`;
+        qLines = wrap(quote.text.replace(/\s+/g, ' '), 840);
+        qLh = Math.round(s * 1.42);
+        return (qLines.length - 1) * qLh + 46;
+      };
+      let quoteH = quote ? gap + measure(qSize) : 0;
+      let ch = quote ? H - 360 - textBase - quoteH : Math.min(1120, H - 360 - textBase);
+      while (quote && ch < 240 && qSize > 36) {
+        qSize -= 4;
+        quoteH = gap + measure(qSize);
+        ch = H - 360 - textBase - quoteH;
+      }
+      ch = Math.floor(Math.max(220, Math.min(1120, ch)));
+
+      if (quote && ch + textBase + quoteH > H - 359) {
+        const maxLines = Math.max(1, Math.floor((H - 360 - ch - textBase - gap - 46) / qLh) + 1);
+        qLines = qLines.slice(0, maxLines - 1).concat(clip(qLines.slice(maxLines - 1).join(' '), 840));
+        quoteH = gap + (qLines.length - 1) * qLh + 46;
+      }
+
+      const cw = Math.round((ch * 2) / 3);
+      const x = (W - cw) / 2;
+      const y = Math.round((H - ch - textBase - quoteH) / 2);
+
+      await drawCover(x, y, cw, ch);
 
       g.fillStyle = ink;
       g.font = `600 ${size}px Geist`;
@@ -627,7 +652,7 @@
 
       cy += 74;
       if (data.rating > 0) {
-        const r = 34, gap = 14, total = 5 * r * 2 + 4 * gap;
+        const r = 34, sg = 14, total = 5 * r * 2 + 4 * sg;
         let sx = (W - total) / 2 + r;
         for (let i = 1; i <= 5; i++) {
           const fill = Math.min(1, Math.max(0, data.rating - (i - 1)));
@@ -654,11 +679,11 @@
               g.stroke();
             }
           }
-          sx += r * 2 + gap;
+          sx += r * 2 + sg;
         }
       }
 
-      if (qLines.length) {
+      if (quote) {
         let qy = cy + 132;
 
         g.strokeStyle = muted;
@@ -669,15 +694,15 @@
         g.stroke();
 
         g.fillStyle = soft;
-        g.font = '400 38px Geist';
+        g.font = `400 ${qSize}px Newsreader, Georgia, serif`;
         for (const l of qLines) {
           g.fillText(l, W / 2, qy);
-          qy += 52;
+          qy += qLh;
         }
         if (quote.page) {
           g.fillStyle = muted;
           g.font = '500 26px "Geist Mono"';
-          g.fillText('p. ' + quote.page, W / 2, qy + 30);
+          g.fillText('p. ' + quote.page, W / 2, qy + 40);
         }
       }
     }
@@ -706,7 +731,7 @@
       document.body.style.overflow = 'hidden';
       await document.fonts.ready;
       await Promise.all(
-        ['600 62px Geist', '400 38px Geist', '400 32px Geist', '500 26px "Geist Mono"'].map(f => document.fonts.load(f))
+        ['600 62px Geist', '400 32px Geist', '400 44px Newsreader', '500 26px "Geist Mono"'].map(f => document.fonts.load(f))
       );
       await paint();
     });
