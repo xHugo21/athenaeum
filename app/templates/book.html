@@ -74,6 +74,7 @@
     background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(10px);
   }
   .story-sheet { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .story-sheet:focus { outline: none; }
   .story-sheet canvas {
     max-height: min(72vh, 780px); max-width: 100%; height: auto; width: auto;
     border-radius: 10px; box-shadow: 0 0 0 1px var(--line), var(--shadow-2);
@@ -302,7 +303,7 @@
 </section>
 
 <div class="story-overlay" id="story-overlay" hidden>
-  <div class="story-sheet" role="dialog" aria-modal="true" aria-label="Share as a story">
+  <div class="story-sheet" role="dialog" aria-modal="true" aria-label="Share as a story" tabindex="-1">
     <canvas id="story-canvas" width="1080" height="1920"></canvas>
     {% if quotes %}
     <label class="story-pick">Highlight
@@ -707,9 +708,17 @@
     }
 
     let url = '';
+    const sheet = overlay.querySelector('.story-sheet');
+    const setBackground = inert => {
+      for (const el of [document.querySelector('.skip'), document.querySelector('.topbar'), ...document.querySelector('main').children]) {
+        if (el && el !== overlay) el.inert = inert;
+      }
+    };
     const close = () => {
       overlay.hidden = true;
       document.body.style.overflow = '';
+      setBackground(false);
+      btn.focus();
     };
 
     async function paint() {
@@ -728,6 +737,8 @@
     btn.addEventListener('click', async () => {
       overlay.hidden = false;
       document.body.style.overflow = 'hidden';
+      setBackground(true);
+      sheet.focus();
       await document.fonts.ready;
       await Promise.all(
         ['600 62px Geist', '400 32px Geist', '400 44px Newsreader', '500 26px "Geist Mono"'].map(f => document.fonts.load(f))

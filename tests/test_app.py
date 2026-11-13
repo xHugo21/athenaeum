@@ -693,6 +693,7 @@ def test_book_page_has_story_share(client):
     client.post("/books/1/annotations/edit", data={"text": "Fear is the mind-killer", "pageno": "59"})
     page = client.get("/books/1").text
     assert 'id="story-overlay"' in page and 'id="story-btn"' in page
+    assert 'aria-modal="true"' in page and 'tabindex="-1"' in page
     assert '"rating": 4.5' in page and '"title": "Dune"' in page
     assert '<option value="0">p. 59 · Fear is the mind-killer</option>' in page
 
