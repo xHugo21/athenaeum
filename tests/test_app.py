@@ -549,6 +549,7 @@ def test_theme_toggle_reports_its_state(client):
     html = client.get("/").text
     assert 'role="switch"' in html and 'aria-label="Dark mode"' in html
     assert "syncThemeBtn" in html, "initial aria-checked is only corrected by script"
+    assert '<main id="content" tabindex="-1">' in html, "skip link must move focus, not just scroll"
 
 
 def test_library_filters_in_url(client):
