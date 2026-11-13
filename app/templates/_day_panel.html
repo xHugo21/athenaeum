@@ -1,0 +1,24 @@
+  <aside class="cal-panel" id="day-panel" aria-live="polite" aria-label="Books read on selected day">
+    {% if selected_day %}
+    <div class="label">Selected day</div>
+    <h2 class="num">{{ selected_day | day_fmt }}</h2>
+    {% if selected_seconds or selected_pages %}
+    <div class="meta num">{{ selected_seconds | read_hm }} · {{ selected_pages }} pages</div>
+    {% endif %}
+    {% if selected_books %}
+    <div class="cal-books">
+      {% for b in selected_books %}
+      <a class="cal-book" href="/books/{{ b['book_id'] }}">
+        <span class="t">{{ b['title'] }}</span>
+        {% if b['author'] %}<span class="a">{{ b['author'] }}</span>{% endif %}
+        <span class="m num">{{ b['seconds'] | read_hm }} · {{ b['pages'] }} pages</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="cal-empty">No reading logged for this day.</p>
+    {% endif %}
+    {% else %}
+    <p class="cal-empty">No reading logged this month.</p>
+    {% endif %}
+  </aside>

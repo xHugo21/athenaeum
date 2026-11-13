@@ -549,25 +549,23 @@ def calendar_page(request: Request):
             else (max(by_day) if by_day else "")
         )
     info = by_day.get(selected, {"books": [], "seconds": 0, "pages": 0})
-    return templates.TemplateResponse(
-        request,
-        "calendar.html",
-        {
-            "month_name": first.strftime("%B %Y"),
-            "month_key": first.strftime("%Y-%m"),
-            "prev_month": prev_month.strftime("%Y-%m"),
-            "next_month": next_month.strftime("%Y-%m"),
-            "weeks": weeks,
-            "days_read": len(by_day),
-            "month_seconds": sum(d["seconds"] for d in by_day.values()),
-            "month_pages": sum(d["pages"] for d in by_day.values()),
-            "books_read": len({r["book_id"] for d in by_day.values() for r in d["books"]}),
-            "selected_day": selected,
-            "selected_books": info["books"],
-            "selected_seconds": info["seconds"],
-            "selected_pages": info["pages"],
-        },
-    )
+    context = {
+        "month_name": first.strftime("%B %Y"),
+        "month_key": first.strftime("%Y-%m"),
+        "prev_month": prev_month.strftime("%Y-%m"),
+        "next_month": next_month.strftime("%Y-%m"),
+        "weeks": weeks,
+        "days_read": len(by_day),
+        "month_seconds": sum(d["seconds"] for d in by_day.values()),
+        "month_pages": sum(d["pages"] for d in by_day.values()),
+        "books_read": len({r["book_id"] for d in by_day.values() for r in d["books"]}),
+        "selected_day": selected,
+        "selected_books": info["books"],
+        "selected_seconds": info["seconds"],
+        "selected_pages": info["pages"],
+    }
+    template = "_day_panel.html" if request.query_params.get("partial") else "calendar.html"
+    return templates.TemplateResponse(request, template, context)
 
 
 @app.get("/books/{book_id}")

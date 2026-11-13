@@ -675,6 +675,17 @@ def test_cover_fetch_runs_after_the_response(client, monkeypatch):
     assert calls == [(1, "9780140328721", 0)], "the miss schedules a fetch instead of waiting on it"
 
 
+def test_calendar_day_panel_renders_alone(client):
+    client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("INSERT INTO book_days VALUES (1, '2026-11-11', 3600, 120)")
+    r = client.get("/calendar?month=2026-11&day=2026-11-11&partial=1")
+    assert r.status_code == 200
+    assert '<html' not in r.text and 'class="cal-grid"' not in r.text, "the panel is the whole answer"
+    assert 'id="day-panel"' in r.text and "Dune" in r.text
+    assert len(r.content) < 1500, "the fragment must not carry the month grid"
+
+
 def test_calendar_lists_books_per_day(client):
     client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
     client.post("/books", data={"title": "Emma", "author": "Jane Austen"}, follow_redirects=False)
