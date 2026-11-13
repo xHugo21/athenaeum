@@ -186,6 +186,11 @@ def test_stats_page(client):
     assert "Monthly reading" in r.text and "Time of day" in r.text
     assert r.text.count('class="hit"') == 24, "every hour needs a hover target"
     assert r.text.count('role="img"') == 2, "two charts only: the hour profile and the heatmap"
+    with sqlite3.connect("athenaeum.db") as c:
+        hours = c.execute("SELECT COUNT(*), SUM(seconds) FROM hours").fetchone()
+        total = c.execute("SELECT SUM(duration) FROM sessions").fetchone()[0]
+    assert hours[1] == total, "the hour table is rebuilt from every session"
+    assert 0 < hours[0] <= 24
     assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
     client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)

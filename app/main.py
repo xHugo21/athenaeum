@@ -113,6 +113,10 @@ CREATE TABLE IF NOT EXISTS days (
     seconds INTEGER NOT NULL,
     pages INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS hours (
+    hour INTEGER PRIMARY KEY,
+    seconds INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS book_days (
     book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
     day TEXT NOT NULL,
@@ -149,6 +153,7 @@ CREATE TABLE IF NOT EXISTS book_labels (
     PRIMARY KEY (book_id, label_id)
 );
 CREATE INDEX IF NOT EXISTS idx_books_md5 ON books(md5);
+CREATE INDEX IF NOT EXISTS idx_book_days_day ON book_days(day);
 CREATE INDEX IF NOT EXISTS idx_book_labels_label ON book_labels(label_id);
 """
 
@@ -173,6 +178,8 @@ async def lifespan(app):
     with db() as con:
         con.executescript(SCHEMA)
         migrate(con)
+        if not con.execute("SELECT 1 FROM hours LIMIT 1").fetchone() and con.execute("SELECT 1 FROM sessions LIMIT 1").fetchone():
+            rebuild_aggregates(con)
     yield
 
 app = FastAPI(title="athenaeum", lifespan=lifespan)
@@ -354,9 +361,7 @@ def stats(request: Request):
             "SELECT id, title, author, total_seconds FROM books WHERE total_seconds > 0 ORDER BY total_seconds DESC LIMIT 5"
         ).fetchall()
         hour_secs = [0] * 24
-        for h, secs in con.execute(
-            "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) FROM sessions GROUP BY 1"
-        ):
+        for h, secs in con.execute("SELECT hour, seconds FROM hours"):
             hour_secs[h] = secs
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
@@ -861,6 +866,7 @@ def download_db():
 def rebuild_aggregates(con):
     con.execute("DELETE FROM days")
     con.execute("DELETE FROM book_days")
+    con.execute("DELETE FROM hours")
     con.execute(
         "INSERT INTO days (day, seconds, pages) "
         "SELECT date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
@@ -870,6 +876,11 @@ def rebuild_aggregates(con):
         "INSERT INTO book_days (book_id, day, seconds, pages) "
         "SELECT book_id, date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
         "FROM sessions GROUP BY 1, 2"
+    )
+    con.execute(
+        "INSERT INTO hours (hour, seconds) "
+        "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) "
+        "FROM sessions GROUP BY 1"
     )
 
 
