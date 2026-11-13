@@ -330,10 +330,10 @@ def index(request: Request):
             b["labels"] = book_labels.get(b["id"], [])
     active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
-    for b in books:
-        p = cover_path(b["id"])
-        if os.path.exists(p):
-            cover_ts[b["id"]] = int(os.path.getmtime(p))
+    if os.path.isdir(COVERS_DIR):
+        cover_ts = {
+            int(e.name[:-4]): int(e.stat().st_mtime) for e in os.scandir(COVERS_DIR) if e.name.endswith(".jpg") and e.name[:-4].isdigit()
+        }
     return templates.TemplateResponse(
         request,
         "index.html",
