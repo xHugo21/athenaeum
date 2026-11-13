@@ -211,7 +211,8 @@ def test_plugin_sync_no_dupes(client):
         "annotations": {md5: [
             {"datetime": "2024-01-05T10:00:00", "page": 42, "pageno": 42, "total_pages": 720,
              "text": "Call me Ishmael.", "chapter": "Loomings", "drawer": "lighten"},
-            {"datetime": "2024-01-07T09:00:00", "page": 100},
+            {"datetime": "2024-01-07T09:00:00", "page": 100, "pageno": 100, "total_pages": 720,
+             "text": "in Loomings", "chapter": "Loomings"},
         ]},
         "device_id": "dev1",
     }
@@ -737,3 +738,48 @@ def test_db_rolls_back_on_error(client):
 
     with db() as con:
         assert con.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 0
+
+
+def test_plugin_annotation_types_follow_position(client):
+    md5 = "d" * 32
+    payload = {
+        "version": "0.3.0",
+        "books": [{"title": "Type Book", "authors": "A", "pages": 100, "md5": md5}],
+        "stats": [],
+        "annotations": {md5: [
+            {"datetime": "2024-01-01T09:00:00", "page": 1, "text": "in Loomings"},
+            {"datetime": "2024-01-02T09:00:00", "page": 2, "text": "in Loomings", "note": "a bookmark note"},
+            {"datetime": "2024-01-03T09:00:00", "page": 3, "text": "Call me Ishmael.", "drawer": "lighten"},
+            {"datetime": "2024-01-04T09:00:00", "page": 4, "text": "Call me Ishmael.", "note": "note", "drawer": "lighten"},
+            {"datetime": "2024-01-05T09:00:00", "page": 5, "text": "text without a position"},
+            {"datetime": "2024-01-06T09:00:00", "page": 6, "color": "yellow"},
+        ]},
+    }
+    client.post("/api/plugin/import", json=payload, follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        got = dict(c.execute("SELECT datetime, type FROM annotations").fetchall())
+    assert got == {
+        "2024-01-01T09:00:00": "bookmark",
+        "2024-01-02T09:00:00": "bookmark",
+        "2024-01-03T09:00:00": "highlight",
+        "2024-01-04T09:00:00": "note",
+        "2024-01-05T09:00:00": "bookmark",
+        "2024-01-06T09:00:00": "highlight",
+    }, "KOReader classifies by drawer/colour; bookmark text is the chapter label"
+
+
+def test_manual_annotation_types_follow_content(client):
+    client.post("/books", data={"title": "Manual"}, follow_redirects=False)
+    cases = [
+        ({"text": "only a quote", "pageno": "1"}, "highlight"),
+        ({"note": "only a note", "pageno": "2"}, "note"),
+        ({"text": "quote", "note": "note", "pageno": "3"}, "note"),
+        ({"pageno": "4"}, "bookmark"),
+    ]
+    for data, _ in cases:
+        client.post("/books/1/highlights/edit", data=data, follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        got = [r[0] for r in c.execute("SELECT type FROM annotations ORDER BY pageno")]
+    assert got == [expected for _, expected in cases], "the form has no position, so content decides"
