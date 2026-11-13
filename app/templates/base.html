@@ -231,7 +231,7 @@
   .seg button:hover { color: var(--text); }
   .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
 
-  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
   .field > span, .field > label { font-size: 12px; font-weight: 500; color: var(--text-2); }
   input, textarea, select, button { font: inherit; }
   input[type="text"], input:not([type]), input[type="password"], input[type="number"],
@@ -277,9 +277,7 @@
     padding: 20px;
     margin-bottom: 20px;
   }
-  .panel[hidden] { display: none; }
   .panel h2 { margin-bottom: 14px; font-size: 14px; }
-  .field { margin: 0; }
   .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
   .form-grid .span-12 { grid-column: span 12; }
   .form-grid .span-6 { grid-column: span 6; }
