@@ -255,8 +255,8 @@
   <div class="section-head">
     <h2>Highlights <span class="count num">{{ hls | length }}</span></h2>
     <div class="actions">
-      {% if hls %}
-      <a class="btn sm btn-ghost" href="/books/{{ b['id'] }}/annotations.md" download title="Download these highlights as Markdown">
+      {% if anns %}
+      <a class="btn sm btn-ghost" href="/books/{{ b['id'] }}/annotations.md" download title="Download all annotations as Markdown">
         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export
       </a>
       {% endif %}

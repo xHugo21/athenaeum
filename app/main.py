@@ -998,25 +998,39 @@ def download_annotations(book_id: int):
     if book["author"]:
         out.append(f"*{book['author']}*")
         out.append("")
-    for a in anns:
-        if a["type"] == "bookmark":
-            continue
-        meta_bits = []
-        if a["chapter"]:
-            meta_bits.append(a["chapter"])
-        meta_bits.append(f"p. {a['pageno'] or '?'}")
-        meta = " — ".join(meta_bits)
-        for line in (a["text"] or "").splitlines() or [""]:
-            out.append(f"> {line}")
-        out.append(f">")
-        out.append(f"> *— {meta}*")
-        if a["note"]:
-            out.append(">")
-            for i, line in enumerate(a["note"].splitlines()):
-                out.append(f"> **Note:** {line}" if i == 0 else f"> {line}")
-        out.append("")
+    highlights = [a for a in anns if a["type"] != "bookmark"]
+    if highlights:
+        out += ["## Highlights", ""]
+        for a in highlights:
+            meta_bits = []
+            if a["chapter"]:
+                meta_bits.append(a["chapter"])
+            meta_bits.append(f"p. {a['pageno'] or '?'}")
+            meta = " — ".join(meta_bits)
+            for line in (a["text"] or "").splitlines() or [""]:
+                out.append(f"> {line}")
+            out.append(f">")
+            out.append(f"> *— {meta}*")
+            if a["note"]:
+                out.append(">")
+                for i, line in enumerate(a["note"].splitlines()):
+                    out.append(f"> **Note:** {line}" if i == 0 else f"> {line}")
+            out.append("")
+    bookmarks = [a for a in anns if a["type"] == "bookmark"]
+    if bookmarks:
+        out += ["## Bookmarks", ""]
+        for a in bookmarks:
+            meta_bits = []
+            if a["chapter"]:
+                meta_bits.append(a["chapter"])
+            meta_bits.append(f"p. {a['pageno'] or '?'}")
+            out.append("- " + " · ".join(meta_bits))
+            if a["note"]:
+                for i, line in enumerate(a["note"].splitlines()):
+                    out.append("  " + (f"**Note:** {line}" if i == 0 else line))
+            out.append("")
     body = "\n".join(out).rstrip() + "\n"
-    fname = re.sub(r"[^A-Za-z0-9._-]+", "_", book["title"]).strip("_") or "highlights"
+    fname = re.sub(r"[^A-Za-z0-9._-]+", "_", book["title"]).strip("_") or "annotations"
     return Response(
         body.encode(),
         media_type="text/markdown; charset=utf-8",

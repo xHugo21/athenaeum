@@ -278,7 +278,7 @@ def test_stats_streaks(client):
     assert re.search(r'class="streak best">\s*<div class="n num">3<', r.text)
 
 
-def test_highlights_export(client):
+def test_annotations_export(client):
     client.post("/books", data={"title": "1984", "author": "Orwell"}, follow_redirects=False)
     con = sqlite3.connect("athenaeum.db")
     con.execute(
@@ -291,7 +291,7 @@ def test_highlights_export(client):
     )
     con.execute(
         "INSERT INTO annotations VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (1, "2024-01-02 09:00:00", "42", "bookmark", None, None, None, 42, 200, None),
+        (1, "2024-01-02 09:00:00", "42", "bookmark", "in Chapter 3", "A bookmark note", "Chapter 3", 42, 200, None),
     )
     con.commit()
     con.close()
@@ -301,12 +301,14 @@ def test_highlights_export(client):
     assert 'filename="1984-annotations.md"' in r.headers["content-disposition"]
     body = r.text
     assert "# 1984" in body and "*Orwell*" in body
+    assert "## Highlights" in body and "## Bookmarks" in body
+    assert "- Chapter 3 · p. 42" in body
+    assert "**Note:** A bookmark note" in body
+    assert "in Chapter 3" not in body, "a bookmark's text is the chapter label, not a quote"
     assert "> It was a bright cold day in April." in body
     assert "*— Chapter 1 — p. 5*" in body
     assert "> The clocks were striking thirteen." in body
     assert "**Note:** Surreal." in body
-    assert "Bookmarks" not in body
-    assert "p. 42" not in body
 
 
 def test_delete_book_removes_cover_file(client):
