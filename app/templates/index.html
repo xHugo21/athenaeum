@@ -226,7 +226,7 @@
   <h2>Add a book</h2>
   <form method="post" action="/books">
     <div class="form-grid">
-      <label class="field span-6"><span>Title</span><input id="f-title" name="title" required autofocus></label>
+      <label class="field span-6"><span>Title</span><input id="f-title" name="title" required></label>
       <label class="field span-4"><span>Author</span><input id="f-author" name="author"></label>
       <label class="field span-2"><span>Pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
       <label class="field span-4"><span>ISBN</span><input id="f-isbn" name="isbn" inputmode="numeric" placeholder="9780140328721"></label>
@@ -358,17 +358,31 @@
 
 {% block scripts %}
 <script>
+  let panelTrigger = null;
+
+  function closePanels() {
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
+    document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    panelTrigger?.focus();
+    panelTrigger = null;
+  }
+
   function panel(id, btn) {
     const el = document.getElementById(id);
     const open = !el.hidden;
-    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
-    document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    closePanels();
     if (!open) {
       el.hidden = false;
+      panelTrigger = btn || null;
       if (btn) btn.setAttribute('aria-expanded', 'true');
       el.querySelector('input, textarea')?.focus({ preventScroll: true });
     }
   }
+
+  document.addEventListener('keydown', e => {
+    const open = document.querySelector('.panel:not([hidden])');
+    if (e.key === 'Escape' && open?.contains(document.activeElement)) closePanels();
+  });
 </script>
 {% if books %}
 <script>
