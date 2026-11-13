@@ -427,7 +427,8 @@ def test_manual_book_status_and_abandoned_filter(client):
     client.post("/books", data={"title": "Bought yesterday"}, follow_redirects=False)
     assert 'data-state="finished"' in client.get("/").text
     book = client.get("/books/1").text
-    assert '<option value="finished" selected>' in book and '<span class="tag" id="status-tag">finished</span>' in book
+    assert '<option value="finished" selected>' in book
+    assert 'id="status-tag"' not in book
 
     client.post("/books/1/status", data={"status": "reading"}, follow_redirects=False)
     assert 'data-state="reading"' in client.get("/").text
@@ -437,7 +438,7 @@ def test_manual_book_status_and_abandoned_filter(client):
     page = client.get("/?progress=abandoned").text
     assert 'data-state="abandoned"' in page
     assert 'data-value="abandoned" aria-pressed="true"' in page
-    assert '<span class="tag tag-quiet" id="status-tag">abandoned</span>' in client.get("/books/1").text
+    assert '<option value="abandoned" selected>' in client.get("/books/1").text
 
 
 def test_imported_book_can_be_marked_read_short_of_last_page(client):
@@ -448,7 +449,8 @@ def test_imported_book_can_be_marked_read_short_of_last_page(client):
     client.post("/books/1/status", data={"status": "finished"}, follow_redirects=False)
     assert 'data-state="finished"' in client.get("/").text
     book = client.get("/books/1").text
-    assert '<option value="finished" selected>' in book and '<span class="tag" id="status-tag">finished</span>' in book
+    assert '<option value="finished" selected>' in book
+    assert 'id="status-tag"' not in book
 
 
 def test_migrate_marks_manual_books_read(workdir):
@@ -910,3 +912,18 @@ def test_book_page_shows_empty_annotation_sections(client):
     assert "No highlights yet" in page
     assert "No bookmarks yet" in page
     assert "Add annotation" in client.get("/books/1/annotations/edit").text
+
+
+def test_book_edit_controls_are_icons(client):
+    client.post("/books", data={"title": "B"}, follow_redirects=False)
+    page = client.get("/books/1").text
+    assert 'aria-label="Edit details"' in page and "#i-pencil" in page
+    assert '<select name="status"' in page and 'id="status-tag"' not in page
+
+    review = re.search(r'<button[^>]*id="review-edit-btn"[^>]*>(.*?)</button>', page, re.S).group(1)
+    assert "Write a review" in review and "#i-pencil" not in review
+
+    client.post("/books/1/rate", data={"rating": 4, "review": "Nice"}, follow_redirects=False)
+    page = client.get("/books/1").text
+    review = re.search(r'<button[^>]*id="review-edit-btn"[^>]*>(.*?)</button>', page, re.S).group(1)
+    assert "#i-pencil" in review and "Write a review" not in review

@@ -27,7 +27,6 @@
     background: var(--accent-soft); color: var(--accent-strong);
     font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
   }
-  .tag-quiet { border-color: var(--line-2); background: var(--surface-2); color: var(--muted); }
   .status-form select {
     field-sizing: content;
     height: 24px; padding: 0 14px 0 0; font-size: 12px;
@@ -67,7 +66,8 @@
   .bm-row:last-child { border-bottom: 0; }
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
-  .annotation-edit { display: inline-flex; align-items: center; margin-left: 6px; }
+  .annotation-edit { display: inline-flex; align-items: center; }
+  .hl-meta .annotation-edit, .bm-row .annotation-edit { margin-left: 6px; }
   @media (hover: hover) and (pointer: fine) {
     .hl-meta .linkbtn, .bm-row .linkbtn { opacity: 0; transition: opacity .12s ease; }
     .hl:hover .linkbtn, .hl:focus-within .linkbtn,
@@ -148,16 +148,9 @@
         {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a></span>{% endif %}
         <span class="sep">·</span>
         <span class="meta-actions">
-          <button class="linkbtn linkbtn-quiet" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
-          <span class="sep">·</span>
-          <form class="inline-form status-form" method="post" action="/books/{{ b['id'] }}/status">
-            <select name="status" aria-label="Reading status">
-              <option value="reading" {{ 'selected' if b['status'] == 'reading' }}>Reading</option>
-              <option value="finished" {{ 'selected' if b['status'] == 'finished' }}>Finished</option>
-              <option value="abandoned" {{ 'selected' if b['status'] == 'abandoned' }}>Abandoned</option>
-            </select>
-            <noscript><button class="btn sm">Save</button></noscript>
-          </form>
+          <button class="linkbtn linkbtn-quiet annotation-edit" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()" title="Edit details" aria-label="Edit details">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>
+          </button>
         </span>
       </div>
       <div class="label-row" id="label-row" data-action="/books/{{ b['id'] }}/labels">
@@ -202,7 +195,14 @@
       <div class="progress-head">
         <span class="pct-line">
           <span class="pct">{% if pct is not none %}{{ pct }}% read{% else %}Pages not set{% endif %}</span>
-          <span class="tag{% if b['status'] == 'abandoned' %} tag-quiet{% endif %}" id="status-tag"{% if b['status'] == 'reading' %} hidden{% endif %}>{{ b['status'] if b['status'] != 'reading' else '' }}</span>
+          <form class="inline-form status-form" method="post" action="/books/{{ b['id'] }}/status">
+            <select name="status" aria-label="Reading status">
+              <option value="reading" {{ 'selected' if b['status'] == 'reading' }}>Reading</option>
+              <option value="finished" {{ 'selected' if b['status'] == 'finished' }}>Finished</option>
+              <option value="abandoned" {{ 'selected' if b['status'] == 'abandoned' }}>Abandoned</option>
+            </select>
+            <noscript><button class="btn sm">Save</button></noscript>
+          </form>
         </span>
         <span class="pages num">{% if b['total_pages'] %}{{ b['pages_read'] or 0 }} / {{ b['total_pages'] }} pages{% endif %}</span>
       </div>
@@ -237,8 +237,8 @@
 <section class="section">
   <div class="section-head">
     <h2>Review</h2>
-    <button class="linkbtn{% if b['review'] %} linkbtn-quiet{% endif %}" type="button" id="review-edit-btn" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true">
-      {{ 'Edit review' if b['review'] else 'Write a review' }}
+    <button class="linkbtn{% if b['review'] %} linkbtn-quiet annotation-edit{% endif %}" type="button" id="review-edit-btn" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true"{% if b['review'] %} title="Edit review" aria-label="Edit review"{% endif %}>
+      {% if b['review'] %}<svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>{% else %}Write a review{% endif %}
     </button>
   </div>
   <div id="rv" class="{{ 'prose' if b['review'] else 'empty' }}">{{ b['review'] or 'No review yet.' }}</div>
@@ -358,12 +358,8 @@
   const statusForm = document.querySelector('.status-form');
   if (statusForm) {
     const select = statusForm.elements.status;
-    const badge = document.getElementById('status-tag');
     const track = document.getElementById('progress-track');
     select.addEventListener('change', () => {
-      badge.hidden = select.value === 'reading';
-      badge.textContent = select.value;
-      badge.classList.toggle('tag-quiet', select.value === 'abandoned');
       track.classList.toggle('abandoned', select.value === 'abandoned');
       save(statusForm);
     });
@@ -375,6 +371,21 @@
   const reviewBtn = document.getElementById('review-edit-btn');
   const clearRating = document.getElementById('rate-clear');
   const stars = document.querySelector('.stars-input');
+
+  const setReviewButton = has => {
+    reviewBtn.classList.toggle('linkbtn-quiet', has);
+    reviewBtn.classList.toggle('annotation-edit', has);
+    reviewBtn.innerHTML = has
+      ? '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>'
+      : 'Write a review';
+    if (has) {
+      reviewBtn.title = 'Edit review';
+      reviewBtn.setAttribute('aria-label', 'Edit review');
+    } else {
+      reviewBtn.removeAttribute('title');
+      reviewBtn.removeAttribute('aria-label');
+    }
+  };
 
   rateForm?.addEventListener('submit', e => {
     e.preventDefault();
@@ -392,8 +403,7 @@
     reviewBox.hidden = false;
     reviewForm.hidden = true;
     reviewBtn.hidden = false;
-    reviewBtn.textContent = text ? 'Edit review' : 'Write a review';
-    reviewBtn.classList.toggle('linkbtn-quiet', !!text);
+    setReviewButton(!!text);
   });
 
   clearRating?.addEventListener('click', () => {
