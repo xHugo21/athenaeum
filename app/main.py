@@ -1055,7 +1055,7 @@ def highlight_save(
         "chapter": chapter.strip() or None,
         "pageno": int(pageno) if pageno.strip().isdigit() else None,
     }
-    a["type"] = "bookmark" if not (a["text"] or a["note"]) else "note" if a["note"] else "highlight"
+    a["type"] = manual_ann_type(a)
     with db() as con:
         if datetime and page_ref:
             con.execute(
@@ -1080,10 +1080,18 @@ def highlight_delete(book_id: int, datetime: str = Form(...), page_ref: str = Fo
     return RedirectResponse(f"/books/{book_id}#highlights", 303)
 
 
-def ann_type(a: dict) -> str:
+def plugin_ann_type(a: dict) -> str:
     if not a.get("drawer") and not a.get("color") and not a.get("pos0") and not a.get("pos1"):
         return "bookmark"
     if a.get("note") and a.get("text"):
+        return "note"
+    return "highlight"
+
+
+def manual_ann_type(a: dict) -> str:
+    if not (a.get("text") or a.get("note")):
+        return "bookmark"
+    if a.get("note"):
         return "note"
     return "highlight"
 
@@ -1098,7 +1106,7 @@ def insert_annotation(con, book_id: int, a: dict):
             book_id,
             a.get("datetime"),
             str(a.get("page")),
-            a.get("type") or ann_type(a),
+            a.get("type") or plugin_ann_type(a),
             a.get("text"),
             a.get("note"),
             a.get("chapter"),
