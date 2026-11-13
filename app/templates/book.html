@@ -73,7 +73,7 @@
     .hl:hover .linkbtn, .hl:focus-within .linkbtn,
     .bm-row:hover .linkbtn, .bm-row:focus-within .linkbtn { opacity: 1; }
   }
-  .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .danger-zone { display: flex; justify-content: flex-end; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
   .story-open { flex: 1 0 100%; }
   .story-overlay {
     position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px;
@@ -289,7 +289,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty">No highlights yet. They arrive with a KOReader sync, or you can <a href="/books/{{ b['id'] }}/annotations/edit">add one</a>.</div>
+  <div class="empty">No highlights yet.</div>
   {% endif %}
 </section>
 
@@ -338,7 +338,6 @@
 } | tojson }}</script>
 
 <div class="danger-zone">
-  <a class="btn btn-ghost" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Back to library</a>
   <form method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book and its reading history?')">
     <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete book</button>
   </form>
