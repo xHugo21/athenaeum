@@ -23,6 +23,20 @@ from .koreader import norm, parse_koreader
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 DB_PATH = os.environ.get("ATHENAEUM_DB", "athenaeum.db")
+COVERS_DIR = os.path.join(os.path.dirname(DB_PATH), "covers")
+os.makedirs(COVERS_DIR, exist_ok=True)
+
+
+def cover_path(book_id: int) -> str:
+    return os.path.join(COVERS_DIR, f"{book_id}.jpg")
+
+
+def drop_cover(book_id: int):
+    path = cover_path(book_id)
+    if os.path.exists(path):
+        os.remove(path)
+
+
 PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
 SESSION_COOKIE = "athenaeum_session"
 templates = Jinja2Templates(
@@ -270,7 +284,7 @@ def index(request: Request):
     active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
     for b in books:
-        p = os.path.join(COVERS_DIR, f"{b['id']}.jpg")
+        p = cover_path(b["id"])
         if os.path.exists(p):
             cover_ts[b["id"]] = int(os.path.getmtime(p))
     return templates.TemplateResponse(
@@ -551,6 +565,7 @@ def book_detail(request: Request, book_id: int):
     time_left = left * secs_per_page if secs_per_page and left > 0 else None
     days_left = round(time_left / pace) if time_left and pace else None
     eta = date.today() + timedelta(days=days_left) if days_left and days_left <= 120 else None
+    cover_file = cover_path(book_id)
     return templates.TemplateResponse(
         request,
         "book.html",
@@ -569,8 +584,8 @@ def book_detail(request: Request, book_id: int):
             "pph": round(3600 / secs_per_page) if secs_per_page else None,
             "time_left": time_left,
             "eta": eta.strftime("%-d %b") if eta else None,
-            "custom_cover": os.path.exists(cover_path := os.path.join(COVERS_DIR, f"{book_id}.jpg")),
-            "cover_ts": int(os.path.getmtime(cover_path)) if os.path.exists(cover_path) else 0,
+            "custom_cover": os.path.exists(cover_file),
+            "cover_ts": int(os.path.getmtime(cover_file)) if os.path.exists(cover_file) else 0,
         },
     )
 
@@ -665,9 +680,7 @@ def set_status(book_id: int, status: str = Form("reading")):
 def delete_book(book_id: int):
     with db() as con:
         con.execute("DELETE FROM books WHERE id=?", (book_id,))
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
-    if os.path.exists(path):
-        os.remove(path)
+    drop_cover(book_id)
     return RedirectResponse("/", 303)
 
 
@@ -723,9 +736,7 @@ def bulk_books(
                 con.execute("DELETE FROM labels WHERE id NOT IN (SELECT label_id FROM book_labels)")
         if action == "delete":
             for bid in book_ids:
-                path = os.path.join(COVERS_DIR, f"{bid}.jpg")
-                if os.path.exists(path):
-                    os.remove(path)
+                drop_cover(bid)
     return RedirectResponse(target, 303)
 
 
@@ -1056,12 +1067,8 @@ def insert_annotation(con, book_id: int, a: dict):
     )
 
 
-COVERS_DIR = os.path.join(os.path.dirname(DB_PATH), "covers")
-os.makedirs(COVERS_DIR, exist_ok=True)
-
-
 def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    path = cover_path(book_id)
     if os.path.exists(path):
         return path
     if not isbn or failed:
@@ -1085,7 +1092,7 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
 
 @app.get("/covers/{book_id}.jpg")
 def cover_image(book_id: int, v: str = ""):
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
+    path = cover_path(book_id)
     cache = {"Cache-Control": "public, max-age=31536000, immutable"} if v else {"Cache-Control": "no-cache"}
     if os.path.exists(path):
         return FileResponse(path, media_type="image/jpeg", headers=cache)
@@ -1100,9 +1107,7 @@ def cover_image(book_id: int, v: str = ""):
 
 @app.post("/books/{book_id}/cover/remove")
 def remove_cover(book_id: int):
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
-    if os.path.exists(path):
-        os.remove(path)
+    drop_cover(book_id)
     with db() as con:
         con.execute("UPDATE books SET cover_failed=1 WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
@@ -1115,8 +1120,7 @@ async def upload_cover(book_id: int, cover: UploadFile):
     data = await cover.read()
     if len(data) > 5_000_000 or not data.startswith((b"\xff\xd8\xff", b"\x89PNG", b"GIF8", b"RIFF", b"WEBP")):
         return RedirectResponse(f"/books/{book_id}?error=Invalid+image", 303)
-    path = os.path.join(COVERS_DIR, f"{book_id}.jpg")
-    with open(path, "wb") as f:
+    with open(cover_path(book_id), "wb") as f:
         f.write(data)
     return RedirectResponse(f"/books/{book_id}", 303)
 
