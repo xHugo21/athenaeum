@@ -289,7 +289,6 @@ def index(request: Request):
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
-        max_pages = max((b["total_pages"] or 0) for b in books) if books else 1
     active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
     for b in books:
@@ -301,7 +300,6 @@ def index(request: Request):
         "index.html",
         {
             "books": books,
-            "max_pages": max_pages or 1,
             "sort": sort,
             "dir": d,
             "search": search,
