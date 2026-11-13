@@ -320,11 +320,11 @@ def index(request: Request):
         books = [dict(r) for r in con.execute(f"SELECT * FROM books ORDER BY {sort_sql}").fetchall()]
         book_labels, label_counts = {}, {}
         for r in con.execute(
-            "SELECT bl.book_id, l.name FROM book_labels bl JOIN labels l ON l.id=bl.label_id "
+            "SELECT bl.book_id, l.id, l.name FROM book_labels bl JOIN labels l ON l.id=bl.label_id "
             "ORDER BY l.name COLLATE NOCASE"
         ):
             book_labels.setdefault(r["book_id"], []).append(r["name"])
-            label_counts[r["name"]] = label_counts.get(r["name"], 0) + 1
+            label_counts.setdefault(r["name"], {"id": r["id"], "name": r["name"], "n": 0})["n"] += 1
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
@@ -348,7 +348,7 @@ def index(request: Request):
             "added": request.query_params.get("added"),
             "error": request.query_params.get("error"),
             "cover_ts": cover_ts,
-            "labels": label_counts,
+            "labels": list(label_counts.values()),
             "active_label": active_label,
         },
     )
@@ -733,6 +733,10 @@ def clean_label(name: str) -> str:
     return " ".join(name.split())
 
 
+def safe_next(next: str) -> str:
+    return next if next.startswith("/") and not next.startswith("//") else "/"
+
+
 def attach_label(con, name: str, book_ids: list[int]):
     con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
     ph = ",".join("?" * len(book_ids))
@@ -768,7 +772,7 @@ def bulk_books(
     next: str = Form("/"),
 ):
     book_ids = list(dict.fromkeys(int(x) for x in ids.split(",") if x.strip().isdigit()))[:500]
-    target = next if next.startswith("/") and not next.startswith("//") else "/"
+    target = safe_next(next)
     if book_ids:
         ph = ",".join("?" * len(book_ids))
         with db() as con:
@@ -801,7 +805,7 @@ def labels_page(request: Request):
 
 
 @app.post("/labels/{label_id}/rename")
-def rename_label(label_id: int, name: str = Form("")):
+def rename_label(label_id: int, name: str = Form(""), next: str = Form("/")):
     name = clean_label(name)
     if name:
         with db() as con:
@@ -819,14 +823,14 @@ def rename_label(label_id: int, name: str = Form("")):
                 con.execute("UPDATE labels SET name=? WHERE id=?", (name, existing["id"]))
             elif old:
                 con.execute("UPDATE labels SET name=? WHERE id=?", (name, label_id))
-    return RedirectResponse("/labels", 303)
+    return RedirectResponse(safe_next(next), 303)
 
 
 @app.post("/labels/{label_id}/delete")
-def delete_label(label_id: int):
+def delete_label(label_id: int, next: str = Form("/")):
     with db() as con:
         con.execute("DELETE FROM labels WHERE id=?", (label_id,))
-    return RedirectResponse("/labels", 303)
+    return RedirectResponse(safe_next(next), 303)
 
 
 @app.get("/tbr")

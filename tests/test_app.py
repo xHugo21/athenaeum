@@ -617,10 +617,10 @@ def test_label_management_rename_merge_delete(client):
     with sqlite3.connect("athenaeum.db") as c:
         ids = dict(c.execute("SELECT name, id FROM labels"))
 
-    r = client.post(f"/labels/{ids['space']}/rename", data={"name": "sci-fi"}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/labels"
-    r = client.post(f"/labels/{ids['fantasy']}/rename", data={"name": "sci-fi"}, follow_redirects=False)
-    assert r.status_code == 303
+    r = client.post(f"/labels/{ids['space']}/rename", data={"name": "sci-fi", "next": "/?sort=title"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/?sort=title"
+    r = client.post(f"/labels/{ids['fantasy']}/rename", data={"name": "sci-fi", "next": "//evil.com"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
 
     page = client.get("/labels").text
     assert "sci-fi" in page and "fantasy" not in page
