@@ -398,7 +398,7 @@ def test_manual_highlight_crud(client):
         (n,) = c.execute("SELECT COUNT(*) FROM annotations").fetchone()
         kind, note = c.execute("SELECT type, note FROM annotations").fetchone()
     assert n == 1, "editing must update in place"
-    assert (kind, note) == ("note", "My thought")
+    assert (kind, note) == ("highlight", "My thought"), "editing never reclassifies an annotation"
 
     assert "My thought" in client.get("/books/1").text, "typed notes must show on the book page"
     r = client.post(
@@ -783,3 +783,47 @@ def test_manual_annotation_types_follow_content(client):
     with sqlite3.connect("athenaeum.db") as c:
         got = [r[0] for r in c.execute("SELECT type FROM annotations ORDER BY pageno")]
     assert got == [expected for _, expected in cases], "the form has no position, so content decides"
+
+
+def test_editing_a_bookmark_keeps_its_type_and_label(client):
+    md5 = "b" * 32
+    payload = {
+        "version": "0.3.0",
+        "books": [{"title": "Moby Dick", "authors": "Melville", "pages": 720, "md5": md5}],
+        "stats": [],
+        "annotations": {md5: [
+            {"datetime": "2024-01-07T09:00:00", "page": 100, "pageno": 100,
+             "chapter": "Loomings", "text": "in Loomings", "note": "first"},
+        ]},
+    }
+    client.post("/api/plugin/import", json=payload)
+
+    form = client.get(
+        "/books/1/annotations/edit",
+        params={"datetime": "2024-01-07T09:00:00", "page_ref": "100"},
+    ).text
+    assert "Edit bookmark" in form
+    assert 'name="text"' not in form, "a bookmark's chapter label is not editable"
+    assert "first" in form
+
+    client.post(
+        "/books/1/annotations/edit",
+        data={"datetime": "2024-01-07T09:00:00", "page_ref": "100",
+              "note": "updated", "pageno": "100", "chapter": "Loomings"},
+        follow_redirects=False,
+    )
+
+    with sqlite3.connect("athenaeum.db") as c:
+        row = c.execute("SELECT type, text, note FROM annotations").fetchone()
+    assert row == ("bookmark", "in Loomings", "updated")
+
+    page = client.get("/books/1").text
+    assert "No bookmarks yet" not in page and "updated" in page
+    assert "No highlights yet" in page, "a bookmark must stay out of the highlights section"
+
+
+def test_book_page_shows_empty_annotation_sections(client):
+    client.post("/books", data={"title": "Nothing yet"}, follow_redirects=False)
+    page = client.get("/books/1").text
+    assert "No highlights yet" in page
+    assert "No bookmarks yet" in page

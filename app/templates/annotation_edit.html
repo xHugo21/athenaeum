@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if a else 'Add' }} annotation · {{ b['title'] }}{% endblock %}
+{% set bookmark = a and a['type'] == 'bookmark' %}
+{% set anchor = 'bookmarks' if bookmark else 'highlights' %}
+{% block title %}{% if bookmark %}Edit bookmark{% elif a %}Edit highlight{% else %}Add annotation{% endif %} · {{ b['title'] }}{% endblock %}
 {% block content %}
 <style>
   .hl-form { max-width: 620px; display: flex; flex-direction: column; gap: 16px; }
@@ -12,11 +14,11 @@
 </style>
 
 <div class="page-head">
-  <a class="back" href="/books/{{ b['id'] }}#highlights"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>{{ b['title'] }}</a>
+  <a class="back" href="/books/{{ b['id'] }}#{{ anchor }}"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>{{ b['title'] }}</a>
 </div>
 
 <div style="margin-bottom:22px">
-  <h1 style="font-size:20px">{{ 'Edit annotation' if a else 'Add annotation' }}</h1>
+  <h1 style="font-size:20px">{% if bookmark %}Edit bookmark{% elif a %}Edit highlight{% else %}Add annotation{% endif %}</h1>
   <p class="muted" style="font-size:13px;margin-top:4px">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
 </div>
 
@@ -25,9 +27,11 @@
   <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
   <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
   {% endif %}
+  {% if not bookmark %}
   <label class="field"><span>Quote</span>
     <textarea class="quote" name="text" placeholder="The passage you want to keep">{{ a.get('text') or '' }}</textarea>
   </label>
+  {% endif %}
   <label class="field"><span>Note</span>
     <textarea name="note" rows="2" placeholder="Optional thought of your own">{{ a.get('note') or '' }}</textarea>
   </label>
@@ -39,17 +43,17 @@
       <input name="chapter" value="{{ a.get('chapter') or '' }}">
     </label>
   </div>
-  <p class="hint">Leave the quote and note empty to save a bookmark.</p>
+  {% if not a %}<p class="hint">Leave the quote and note empty to save a bookmark.</p>{% endif %}
   <div class="hl-actions">
     <button class="btn btn-primary" type="submit">Save</button>
-    <a class="btn btn-ghost" href="/books/{{ b['id'] }}#highlights">Cancel</a>
+    <a class="btn btn-ghost" href="/books/{{ b['id'] }}#{{ anchor }}">Cancel</a>
   </div>
 </form>
 {% if a %}
-<form method="post" action="/books/{{ b['id'] }}/annotations/delete" onsubmit="return confirm('Delete this annotation?')" style="max-width:620px;margin-top:14px;padding-top:16px;border-top:1px solid var(--line)">
+<form method="post" action="/books/{{ b['id'] }}/annotations/delete" onsubmit="return confirm('Delete this {{ 'bookmark' if bookmark else 'highlight' }}?')" style="max-width:620px;margin-top:14px;padding-top:16px;border-top:1px solid var(--line)">
   <input type="hidden" name="datetime" value="{{ a['datetime'] }}">
   <input type="hidden" name="page_ref" value="{{ a['page_ref'] }}">
-  <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete annotation</button>
+  <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete {{ 'bookmark' if bookmark else 'highlight' }}</button>
 </form>
 {% endif %}
 {% endblock %}

@@ -1055,29 +1055,43 @@ def annotation_save(
         "chapter": chapter.strip() or None,
         "pageno": int(pageno) if pageno.strip().isdigit() else None,
     }
-    a["type"] = manual_ann_type(a)
     with db() as con:
         if datetime and page_ref:
+            row = con.execute(
+                "SELECT type, text FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",
+                (book_id, datetime, page_ref),
+            ).fetchone()
+            if not row:
+                return RedirectResponse(f"/books/{book_id}#highlights", 303)
+            text_value = row["text"] if row["type"] == "bookmark" else a["text"]
             con.execute(
-                "UPDATE annotations SET type=?, text=?, note=?, chapter=?, pageno=? "
+                "UPDATE annotations SET text=?, note=?, chapter=?, pageno=? "
                 "WHERE book_id=? AND datetime=? AND page_ref=?",
-                (a["type"], a["text"], a["note"], a["chapter"], a["pageno"], book_id, datetime, page_ref),
+                (text_value, a["note"], a["chapter"], a["pageno"], book_id, datetime, page_ref),
             )
+            anchor = "bookmarks" if row["type"] == "bookmark" else "highlights"
         else:
+            a["type"] = manual_ann_type(a)
             a["datetime"] = time.strftime("%Y-%m-%d %H:%M:%S")
             a["page"] = "m:" + secrets.token_hex(6)
             insert_annotation(con, book_id, a)
-    return RedirectResponse(f"/books/{book_id}#highlights", 303)
+            anchor = "bookmarks" if a["type"] == "bookmark" else "highlights"
+    return RedirectResponse(f"/books/{book_id}#{anchor}", 303)
 
 
 @app.post("/books/{book_id}/annotations/delete")
 def annotation_delete(book_id: int, datetime: str = Form(...), page_ref: str = Form(...)):
     with db() as con:
+        row = con.execute(
+            "SELECT type FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",
+            (book_id, datetime, page_ref),
+        ).fetchone()
         con.execute(
             "DELETE FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",
             (book_id, datetime, page_ref),
         )
-    return RedirectResponse(f"/books/{book_id}#highlights", 303)
+    anchor = "bookmarks" if row and row["type"] == "bookmark" else "highlights"
+    return RedirectResponse(f"/books/{book_id}#{anchor}", 303)
 
 
 def plugin_ann_type(a: dict) -> str:

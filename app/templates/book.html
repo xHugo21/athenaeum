@@ -287,9 +287,9 @@
   {% endif %}
 </section>
 
-{% if bms %}
-<section class="section">
+<section class="section" id="bookmarks">
   <div class="section-head"><h2>Bookmarks <span class="count num">{{ bms | length }}</span></h2></div>
+  {% if bms %}
   {% for a in bms %}
   <div class="bm-row">
     <div>
@@ -299,8 +299,10 @@
     <a class="linkbtn" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
   </div>
   {% endfor %}
+  {% else %}
+  <div class="empty">No bookmarks yet.</div>
+  {% endif %}
 </section>
-{% endif %}
 
 <div class="story-overlay" id="story-overlay" hidden>
   <div class="story-sheet" role="dialog" aria-modal="true" aria-label="Share as a story">
