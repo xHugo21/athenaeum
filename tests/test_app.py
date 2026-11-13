@@ -388,6 +388,7 @@ def test_manual_highlight_crud(client):
 
     form = client.get(f"/books/1/annotations/edit?datetime={datetime}&page_ref={page_ref}").text
     assert "A passage" in form and "Delete" in form
+    assert "Edit highlight" in form and 'name="text"' in form
     r = client.post(
         "/books/1/annotations/edit",
         data={"text": "A passage", "note": "My thought", "pageno": "12", "chapter": "One",
@@ -829,3 +830,4 @@ def test_book_page_shows_empty_annotation_sections(client):
     page = client.get("/books/1").text
     assert "No highlights yet" in page
     assert "No bookmarks yet" in page
+    assert "Add annotation" in client.get("/books/1/annotations/edit").text
