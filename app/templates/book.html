@@ -62,16 +62,16 @@
   .hl-swatch { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 7px; border-radius: 2px; background: var(--hl, var(--accent)); }
   .hl-text { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; }
   .hl-note { font-size: 13px; line-height: 1.6; color: var(--text-2); margin: 6px 0 0 20px; white-space: pre-wrap; }
-  .hl-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 0 20px; font-size: 12px; color: var(--muted); }
-  .bm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .hl-meta { display: flex; align-items: center; margin: 8px 0 0 20px; font-size: 12px; color: var(--muted); }
+  .bm-row { display: flex; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .bm-row:last-child { border-bottom: 0; }
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
-  .annotation-edit { display: inline-flex; align-items: center; }
+  .annotation-edit { display: inline-flex; align-items: center; margin-left: 6px; }
   @media (hover: hover) and (pointer: fine) {
-    .hl-meta .linkbtn, .bm-row > .linkbtn { opacity: 0; transition: opacity .12s ease; }
-    .hl:hover .hl-meta .linkbtn, .hl:focus-within .hl-meta .linkbtn,
-    .bm-row:hover > .linkbtn, .bm-row:focus-within > .linkbtn { opacity: 1; }
+    .hl-meta .linkbtn, .bm-row .linkbtn { opacity: 0; transition: opacity .12s ease; }
+    .hl:hover .linkbtn, .hl:focus-within .linkbtn,
+    .bm-row:hover .linkbtn, .bm-row:focus-within .linkbtn { opacity: 1; }
   }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
   .story-open { flex: 1 0 100%; }
@@ -299,12 +299,9 @@
   {% for a in bms %}
   <div class="bm-row">
     <div>
-      <div class="n num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</div>
+      <div class="n num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}<a class="linkbtn linkbtn-quiet annotation-edit" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" title="Edit bookmark" aria-label="Edit bookmark"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg></a></div>
       {% if a['note'] %}<div class="t" style="margin-top:3px;white-space:pre-wrap">{{ a['note'] }}</div>{% endif %}
     </div>
-    <a class="linkbtn linkbtn-quiet annotation-edit" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" title="Edit bookmark" aria-label="Edit bookmark">
-      <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>
-    </a>
   </div>
   {% endfor %}
   {% else %}
