@@ -313,18 +313,9 @@
           <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
         </button>
         <a class="book" href="/books/{{ b['id'] }}" data-id="{{ b['id'] }}" data-state="{{ state }}">
-        <div class="cover">
-          <div class="cover-fallback" aria-hidden="true">
-            <span class="body">
-              <span class="t">{{ b['title'] }}</span>
-              <span class="rule"></span>
-            </span>
-            <span class="a">{{ b['author'] or '' }}</span>
-          </div>
-          <img src="/covers/{{ b['id'] }}.jpg?v={{ cover_ts.get(b['id'], 0) }}" alt="" decoding="async"
-               {% if loop.index <= 6 %}fetchpriority="high"{% else %}loading="lazy"{% endif %}
-               onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
-        </div>
+        {% with cover_src="/covers/" ~ b['id'] ~ ".jpg?v=" ~ cover_ts.get(b['id'], 0), cover_alt="", cover_priority=(loop.index <= 6) %}
+          {% include "_cover.html" %}
+        {% endwith %}
         <div class="bm">
           <div class="bm-row">
             <span class="bm-title">{{ b['title'] }}</span>

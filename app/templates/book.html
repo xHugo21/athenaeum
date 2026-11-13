@@ -112,16 +112,9 @@
 
 <div class="book-layout">
   <div class="cover-col">
-    <div class="cover">
-      <div class="cover-fallback" aria-hidden="true">
-        <span class="body">
-          <span class="t">{{ b['title'] }}</span>
-          <span class="rule"></span>
-        </span>
-        <span class="a">{{ b['author'] or '' }}</span>
-      </div>
-      <img src="{{ cover_url }}" alt="Cover of {{ b['title'] }}" decoding="async" fetchpriority="high" onerror="this.remove()" onload="if(this.naturalWidth<10||this.naturalHeight<10)this.remove()">
-    </div>
+    {% with cover_src=cover_url, cover_alt="Cover of " ~ b['title'], cover_priority=true %}
+      {% include "_cover.html" %}
+    {% endwith %}
     <div class="cover-tools">
       <form method="post" action="/books/{{ b['id'] }}/cover" enctype="multipart/form-data" style="flex:1">
         <label class="btn sm" style="width:100%;cursor:pointer">
