@@ -5,9 +5,19 @@
   .layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 36px; }
   .rail { position: sticky; top: 76px; align-self: start; display: flex; flex-direction: column; gap: 26px; }
   .rail-group > .label { margin-bottom: 8px; }
-  .rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .rail-head a { color: var(--muted); font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; }
-  .rail-head a:hover { color: var(--text); text-decoration: none; }
+  .rail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rail-head button { display: inline-flex; align-items: center; color: var(--muted); }
+  .rail-head button:hover, .rail-head button[aria-pressed="true"] { color: var(--text); }
+  .rail-label { display: flex; }
+  .rail-label [data-value] { flex: 1; min-width: 0; }
+  .rail-label .label-edit { display: none; align-items: center; gap: 2px; margin: 0 -8px; }
+  .rail-label .label-edit form { display: flex; align-items: center; gap: 2px; min-width: 0; }
+  .rail-label .label-edit form:first-child { flex: 1; }
+  .rail-label .label-edit input[type="text"] { flex: 1; min-width: 0; height: 28px; font-size: 12px; }
+  .rail-list.managing .rail-label [data-value] { display: none; }
+  .rail-list.managing .rail-label .label-edit { display: flex; flex: 1; }
+  .rail-list .label-edit button { display: inline-flex; align-items: center; flex: 0 0 auto; width: auto; height: 28px; margin: 0; padding: 0 3px; justify-content: center; }
+  .rail-list .label-edit button:hover { background: none; color: var(--accent-strong); }
   .rail-list { display: flex; flex-direction: column; gap: 1px; }
   .rail-list button, .rail-list a {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -268,11 +278,33 @@
     </div>
     {% if labels %}
     <div class="rail-group">
-      <div class="label rail-head"><span>Labels</span><a href="/labels">Manage</a></div>
+      <div class="label rail-head">
+        <span>Labels</span>
+        <button class="linkbtn linkbtn-quiet" type="button" id="labels-manage" aria-pressed="false" title="Manage labels" aria-label="Manage labels">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>
+        </button>
+      </div>
       <div class="rail-list" data-filter="label">
         <button type="button" data-value="" aria-pressed="{{ 'true' if active_label is none else 'false' }}"><span>All labels</span></button>
-        {% for name, count in labels.items() %}
-        <button type="button" data-value="{{ name }}" aria-pressed="{{ 'true' if active_label == name else 'false' }}"><span>{{ name }}</span><b class="num">{{ count }}</b></button>
+        {% for l in labels %}
+        <div class="rail-label">
+          <button type="button" data-value="{{ l['name'] }}" aria-pressed="{{ 'true' if active_label == l['name'] else 'false' }}"><span>{{ l['name'] }}</span><b class="num">{{ l['n'] }}</b></button>
+          <div class="label-edit">
+            <form method="post" action="/labels/{{ l['id'] }}/rename">
+              <input type="text" name="name" value="{{ l['name'] }}" aria-label="Rename {{ l['name'] }}">
+              <input type="hidden" name="next" value="{{ request.url.path }}{{ '?' + request.url.query if request.url.query else '' }}">
+              <button class="linkbtn linkbtn-quiet" type="submit" title="Save {{ l['name'] }}" aria-label="Save {{ l['name'] }}">
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg>
+              </button>
+            </form>
+            <form method="post" action="/labels/{{ l['id'] }}/delete" onsubmit="return confirm('Delete this label from every book?')">
+              <input type="hidden" name="next" value="{{ request.url.path }}{{ '?' + request.url.query if request.url.query else '' }}">
+              <button class="linkbtn linkbtn-quiet" type="submit" title="Delete {{ l['name'] }}" aria-label="Delete {{ l['name'] }}">
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>
+              </button>
+            </form>
+          </div>
+        </div>
         {% endfor %}
       </div>
     </div>
@@ -454,7 +486,7 @@
 
   function setFilter(group, value) {
     state[group] = value;
-    document.querySelectorAll(`[data-filter="${group}"] button`).forEach(b => {
+    document.querySelectorAll(`[data-filter="${group}"] button[data-value]`).forEach(b => {
       b.setAttribute('aria-pressed', String(b.dataset.value === value));
     });
     syncUrl();
@@ -466,7 +498,7 @@
     state.q = '';
     for (const [group, value] of Object.entries({ progress: 'all', rating: 'any', label: '' })) {
       state[group] = value;
-      document.querySelectorAll(`[data-filter="${group}"] button`).forEach(b => {
+      document.querySelectorAll(`[data-filter="${group}"] button[data-value]`).forEach(b => {
         b.setAttribute('aria-pressed', String(b.dataset.value === value));
       });
     }
@@ -475,7 +507,7 @@
     radial();
   }
 
-  document.querySelectorAll('[data-filter] button').forEach(btn => {
+  document.querySelectorAll('[data-filter] button[data-value]').forEach(btn => {
     btn.addEventListener('click', () => setFilter(btn.closest('[data-filter]').dataset.filter, btn.dataset.value));
   });
 
@@ -607,6 +639,18 @@
       if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
     });
   });
+
+  const manageBtn = document.getElementById('labels-manage');
+  if (manageBtn) {
+    const labelList = document.querySelector('.rail-list[data-filter="label"]');
+    const setManaging = on => {
+      manageBtn.setAttribute('aria-pressed', String(on));
+      labelList.classList.toggle('managing', on);
+      sessionStorage.setItem('athenaeum-labels-edit', on ? '1' : '0');
+    };
+    manageBtn.addEventListener('click', () => setManaging(manageBtn.getAttribute('aria-pressed') !== 'true'));
+    if (sessionStorage.getItem('athenaeum-labels-edit') === '1') setManaging(true);
+  }
 
   document.querySelectorAll('.rail-list.sort a').forEach(a => {
     a.addEventListener('click', e => {

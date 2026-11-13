@@ -612,7 +612,8 @@ def test_label_management_rename_merge_delete(client):
     client.post("/books", data={"title": "B"}, follow_redirects=False)
     client.post("/books/1/labels", data={"labels": "fantasy, space"}, follow_redirects=False)
     client.post("/books/2/labels", data={"labels": "fantasy"}, follow_redirects=False)
-    assert client.get("/labels").status_code == 200
+    page = client.get("/").text
+    assert "/labels/" in page and "labels-manage" in page
 
     with sqlite3.connect("athenaeum.db") as c:
         ids = dict(c.execute("SELECT name, id FROM labels"))
@@ -622,7 +623,7 @@ def test_label_management_rename_merge_delete(client):
     r = client.post(f"/labels/{ids['fantasy']}/rename", data={"name": "sci-fi", "next": "//evil.com"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/"
 
-    page = client.get("/labels").text
+    page = client.get("/").text
     assert "sci-fi" in page and "fantasy" not in page
     with sqlite3.connect("athenaeum.db") as c:
         assert c.execute("SELECT COUNT(*) FROM labels").fetchone()[0] == 1

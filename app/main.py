@@ -794,16 +794,6 @@ def bulk_books(
     return RedirectResponse(target, 303)
 
 
-@app.get("/labels")
-def labels_page(request: Request):
-    with db() as con:
-        labels = con.execute(
-            "SELECT l.id, l.name, COUNT(bl.book_id) n FROM labels l "
-            "LEFT JOIN book_labels bl ON bl.label_id=l.id GROUP BY l.id ORDER BY l.name COLLATE NOCASE"
-        ).fetchall()
-    return templates.TemplateResponse(request, "labels.html", {"labels": labels})
-
-
 @app.post("/labels/{label_id}/rename")
 def rename_label(label_id: int, name: str = Form(""), next: str = Form("/")):
     name = clean_label(name)
