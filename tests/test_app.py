@@ -545,6 +545,12 @@ def test_empty_library_keeps_add_panel_working(client):
     assert "function panel(" in html, "add and import buttons are dead without books"
 
 
+def test_theme_toggle_reports_its_state(client):
+    html = client.get("/").text
+    assert 'role="switch"' in html and 'aria-label="Dark mode"' in html
+    assert "syncThemeBtn" in html, "initial aria-checked is only corrected by script"
+
+
 def test_library_filters_in_url(client):
     client.post("/books", data={"title": "Dune", "rating": 5}, follow_redirects=False)
     client.post("/books/1/labels", data={"labels": "space"}, follow_redirects=False)

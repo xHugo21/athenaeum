@@ -412,7 +412,7 @@
       </button>
     </form>
     {% endif %}
-    <button id="theme-toggle" class="iconbtn" type="button" title="Toggle theme" aria-label="Toggle colour theme">
+    <button id="theme-toggle" class="iconbtn" type="button" role="switch" aria-checked="false" aria-label="Dark mode">
       <svg class="icon theme-icon-sun" aria-hidden="true"><use href="#i-sun"/></svg>
       <svg class="icon theme-icon-moon" aria-hidden="true"><use href="#i-moon"/></svg>
     </button>
@@ -427,10 +427,14 @@
   const themeBtn = document.getElementById('theme-toggle');
   const currentTheme = () => document.documentElement.dataset.theme
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const syncThemeBtn = () => themeBtn.setAttribute('aria-checked', String(currentTheme() === 'dark'));
+  syncThemeBtn();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeBtn);
   themeBtn.addEventListener('click', () => {
     const next = currentTheme() === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     localStorage.setItem('athenaeum-theme', next);
+    syncThemeBtn();
   });
 
   for (const root of document.querySelectorAll('.stars-input')) {
