@@ -39,6 +39,7 @@ def drop_cover(book_id: int):
 
 PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
 SESSION_COOKIE = "athenaeum_session"
+DATE_FMT = "%-d %b %Y"
 templates = Jinja2Templates(
     directory=os.path.join(os.path.dirname(__file__), "templates"),
     context_processors=[lambda request: {"session": bool(PASSWORD and request.cookies.get(SESSION_COOKIE))}],
@@ -46,11 +47,11 @@ templates = Jinja2Templates(
 
 
 def ts_date(ts: int) -> str:
-    return time.strftime("%-d %b %Y", time.localtime(ts))
+    return time.strftime(DATE_FMT, time.localtime(ts))
 
 
 templates.env.filters["ts_date"] = ts_date
-templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime("%-d %b %Y")
+templates.env.filters["day_fmt"] = lambda d: date.fromisoformat(d).strftime(DATE_FMT)
 templates.env.filters["comma"] = lambda n: f"{int(n):,}"
 def read_hm(s: int) -> str:
     h, m = s // 3600, s % 3600 // 60
@@ -385,7 +386,7 @@ def stats(request: Request):
         for _ in range(7):
             hit = day_map.get(d.isoformat())
             alpha = round(max(0.25, hit[0] / max_secs), 2) if hit else 0
-            wk.append((d.strftime("%-d %b %Y"), hit[0], hit[1], alpha) if hit else None)
+            wk.append((d.strftime(DATE_FMT), hit[0], hit[1], alpha) if hit else None)
             d += timedelta(days=1)
         name = start.strftime("%b %Y") if start.month != cur_m and len(weeks) - last_lbl >= 3 else None
         if name:
