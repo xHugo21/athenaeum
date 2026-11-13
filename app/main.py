@@ -572,7 +572,10 @@ def book_detail(request: Request, book_id: int):
     time_left = left * secs_per_page if secs_per_page and left > 0 else None
     days_left = round(time_left / pace) if time_left and pace else None
     eta = date.today() + timedelta(days=days_left) if days_left and days_left <= 120 else None
-    cover_file = cover_path(book_id)
+    try:
+        cover_ts = int(os.path.getmtime(cover_path(book_id)))
+    except OSError:
+        cover_ts = 0
     return templates.TemplateResponse(
         request,
         "book.html",
@@ -591,8 +594,8 @@ def book_detail(request: Request, book_id: int):
             "pph": round(3600 / secs_per_page) if secs_per_page else None,
             "time_left": time_left,
             "eta": eta.strftime("%-d %b") if eta else None,
-            "custom_cover": os.path.exists(cover_file),
-            "cover_ts": int(os.path.getmtime(cover_file)) if os.path.exists(cover_file) else 0,
+            "custom_cover": bool(cover_ts),
+            "cover_ts": cover_ts,
         },
     )
 
