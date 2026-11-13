@@ -33,6 +33,17 @@
     background: var(--accent); margin-right: 8px; vertical-align: 2px;
   }
   .library-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
+  .sortbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .sortbar .label { flex: 0 0 auto; }
+  .sort-list { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
+  .sort-list a {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; padding: 0 9px; border-radius: 999px;
+    color: var(--text-2); font-size: 13px; white-space: nowrap;
+  }
+  .sort-list a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+  .sort-list a[aria-current] { background: var(--accent-soft); color: var(--accent-strong); font-weight: 500; }
+  .sort-list b { font-size: 11px; font-weight: 400; }
   .library-bar .summary { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
   .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex: 0 0 auto; min-width: 0; margin-left: auto; }
   .library-toolbar .search { flex: 0 1 210px; min-width: 0; }
@@ -242,7 +253,7 @@
 </div>
 
 <div class="layout">
-  <aside class="rail" aria-label="Filter and sort">
+  <aside class="rail" aria-label="Filters">
     <div class="rail-group">
       <div class="label">Progress</div>
       <div class="rail-list" data-filter="progress">
@@ -297,20 +308,17 @@
       </div>
     </div>
     {% endif %}
-    <div class="rail-group">
-      <div class="label">Sort</div>
-      <div class="rail-list sort">
-        {% for key, text, default in [('recent', 'Recently read', 'desc'), ('title', 'Title', 'asc'), ('author', 'Author', 'asc'), ('rating', 'Rating', 'desc'), ('time', 'Time read', 'desc'), ('pages', 'Pages read', 'desc'), ('added', 'Date added', 'desc')] %}
-        <a href="/?sort={{ key }}&dir={{ ('desc' if dir == 'asc' else 'asc') if sort == key else default }}" {% if sort == key %}aria-current="true"{% endif %}>
-          <span>{{ text }}</span>
-          {% if sort == key %}<b class="num">{{ '↓' if dir == 'desc' else '↑' }}</b>{% endif %}
-        </a>
-        {% endfor %}
-      </div>
-    </div>
   </aside>
 
   <div class="results">
+    <div class="sortbar">
+      <span class="label">Sort</span>
+      <div class="sort-list">
+        {% for key, text, default in [('recent', 'Recently read', 'desc'), ('title', 'Title', 'asc'), ('author', 'Author', 'asc'), ('rating', 'Rating', 'desc'), ('time', 'Time read', 'desc'), ('pages', 'Pages read', 'desc'), ('added', 'Date added', 'desc')] %}
+        <a href="/?sort={{ key }}&dir={{ ('desc' if dir == 'asc' else 'asc') if sort == key else default }}" data-sort="{{ key }}" data-default="{{ default }}" {% if sort == key %}aria-current="true"{% endif %}>{{ text }}{% if sort == key %} <b class="num">{{ '↓' if dir == 'desc' else '↑' }}</b>{% endif %}</a>
+        {% endfor %}
+      </div>
+    </div>
     {% if books %}
     <form id="bulk-bar" class="bulk-bar" method="post" action="/books/bulk" hidden>
       <span class="num" id="bulk-count">0 selected</span>
@@ -366,7 +374,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -629,16 +637,72 @@
     if (sessionStorage.getItem('athenaeum-labels-edit') === '1') setManaging(true);
   }
 
-  document.querySelectorAll('.rail-list.sort a').forEach(a => {
+  const SORT_VALUE = {
+    recent: b => b.last,
+    title: b => b.title.toLowerCase(),
+    author: b => b.author.toLowerCase(),
+    rating: b => b.rating,
+    time: b => b.secs,
+    pages: b => b.pdr,
+    added: b => b.added,
+  };
+  const sortParams = new URLSearchParams(location.search);
+  let curSort = SORT_VALUE[sortParams.get('sort')] ? sortParams.get('sort') : 'recent';
+  let curDir = sortParams.get('dir') === 'asc' ? 'asc' : 'desc';
+
+  function sortGrid() {
+    const val = SORT_VALUE[curSort];
+    const sign = curDir === 'asc' ? 1 : -1;
+    const missing = v => v === '' || !v;
+    booksData.sort((a, b) => {
+      const x = val(a), y = val(b);
+      const ax = missing(x), ay = missing(y);
+      if (ax || ay) return ax === ay ? 0 : (ax ? 1 : -1);
+      return (typeof x === 'number' ? x - y : x < y ? -1 : x > y ? 1 : 0) * sign;
+    });
+    const grid = document.getElementById('grid-view');
+    for (const b of booksData) {
+      const cell = grid.querySelector(`.book-cell[data-id="${b.id}"]`);
+      if (cell) grid.append(cell);
+    }
+  }
+
+  function paintSort() {
+    for (const a of document.querySelectorAll('.sort-list a')) {
+      const active = a.dataset.sort === curSort;
+      const url = new URL(location.href);
+      url.searchParams.set('sort', a.dataset.sort);
+      url.searchParams.set('dir', active ? (curDir === 'asc' ? 'desc' : 'asc') : a.dataset.default);
+      a.href = url.toString();
+      a.querySelector('b')?.remove();
+      if (active) {
+        a.setAttribute('aria-current', 'true');
+        const arrow = document.createElement('b');
+        arrow.className = 'num';
+        arrow.textContent = curDir === 'desc' ? '↓' : '↑';
+        a.append(arrow);
+      } else {
+        a.removeAttribute('aria-current');
+      }
+    }
+  }
+
+  for (const a of document.querySelectorAll('.sort-list a')) {
     a.addEventListener('click', e => {
       e.preventDefault();
-      const url = new URL(a.href);
-      new URLSearchParams(location.search).forEach((v, k) => {
-        if (k !== 'sort' && k !== 'dir') url.searchParams.set(k, v);
-      });
-      location.href = url;
+      const next = new URL(a.href).searchParams;
+      curSort = next.get('sort');
+      curDir = next.get('dir') === 'asc' ? 'asc' : 'desc';
+      const url = new URL(location.href);
+      url.searchParams.set('sort', curSort);
+      url.searchParams.set('dir', curDir);
+      history.replaceState(null, '', url);
+      sortGrid();
+      paintSort();
+      if (shelvesBuilt) buildShelves();
     });
-  });
+  }
+  paintSort();
 
   const selectToggle = document.getElementById('select-toggle');
   const bulkBar = document.getElementById('bulk-bar');
