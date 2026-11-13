@@ -14,7 +14,7 @@
   <div class="mark">athenaeum<b>.</b></div>
   <p class="sub">A private reading archive.</p>
   <div class="panel">
-    {% if error %}<p class="flash error" role="alert" onanimationend="this.remove()">{{ error }}</p>{% endif %}
+    {% if error %}<p class="flash error" role="alert">{{ error }}</p>{% endif %}
     <form method="post" action="/login">
       <label class="field"><span>Password</span>
         <input type="password" name="password" required autofocus autocomplete="current-password">

@@ -153,9 +153,9 @@
 {% endfor %}
 {% for b in rated %}{% set ns.stars = ns.stars + (b['rating'] or 0) %}{% endfor %}
 
-{% if error %}<p class="flash error" role="status" onanimationend="this.remove()">{{ error }}</p>{% endif %}
-{% if imported %}<p class="flash" role="status" onanimationend="this.remove()">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
-{% if added %}<p class="flash" role="status" onanimationend="this.remove()">Book added.</p>{% endif %}
+{% if error %}<p class="flash error" role="status">{{ error }}</p>{% endif %}
+{% if imported %}<p class="flash" role="status">Imported {{ imported }} new book(s), updated the rest.</p>{% endif %}
+{% if added %}<p class="flash" role="status">Book added.</p>{% endif %}
 {% if error or imported or added %}<script>history.replaceState(null, '', '/')</script>{% endif %}
 
 <div class="page-head">
