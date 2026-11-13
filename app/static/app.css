@@ -164,6 +164,8 @@
     color: var(--accent-strong); cursor: pointer;
   }
   .linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .linkbtn-quiet { color: var(--muted); }
+  .linkbtn-quiet:hover, .linkbtn-quiet:focus-visible { color: var(--accent-strong); }
 
   .seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
   .seg button {

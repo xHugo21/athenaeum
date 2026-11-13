@@ -67,6 +67,11 @@
   .bm-row:last-child { border-bottom: 0; }
   .bm-row .n { font-size: 12px; color: var(--muted); }
   .bm-row .t { font-size: 13px; color: var(--text-2); }
+  @media (hover: hover) and (pointer: fine) {
+    .hl-meta .linkbtn, .bm-row > .linkbtn { opacity: 0; transition: opacity .12s ease; }
+    .hl:hover .hl-meta .linkbtn, .hl:focus-within .hl-meta .linkbtn,
+    .bm-row:hover > .linkbtn, .bm-row:focus-within > .linkbtn { opacity: 1; }
+  }
   .danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
   .story-open { flex: 1 0 100%; }
   .story-overlay {
@@ -142,7 +147,7 @@
         {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a></span>{% endif %}
         <span class="sep">·</span>
         <span class="meta-actions">
-          <button class="linkbtn" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
+          <button class="linkbtn linkbtn-quiet" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()">Edit details</button>
           <span class="sep">·</span>
           <form class="inline-form status-form" method="post" action="/books/{{ b['id'] }}/status">
             <select name="status" aria-label="Reading status">
@@ -231,7 +236,7 @@
 <section class="section">
   <div class="section-head">
     <h2>Review</h2>
-    <button class="linkbtn" type="button" id="review-edit-btn" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true">
+    <button class="linkbtn{% if b['review'] %} linkbtn-quiet{% endif %}" type="button" id="review-edit-btn" onclick="document.getElementById('rvf').hidden=false;document.getElementById('rv').hidden=true;this.hidden=true">
       {{ 'Edit review' if b['review'] else 'Write a review' }}
     </button>
   </div>
@@ -275,7 +280,7 @@
       {% if a['note'] %}<p class="hl-note">{{ a['note'] }}</p>{% endif %}
       <div class="hl-meta">
         <span class="num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</span>
-        <a class="linkbtn" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
+        <a class="linkbtn linkbtn-quiet" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
       </div>
     </article>
     {% endfor %}
@@ -294,7 +299,7 @@
       <div class="n num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</div>
       {% if a['note'] %}<div class="t" style="margin-top:3px;white-space:pre-wrap">{{ a['note'] }}</div>{% endif %}
     </div>
-    <a class="linkbtn" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
+    <a class="linkbtn linkbtn-quiet" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
   </div>
   {% endfor %}
   {% else %}
@@ -386,6 +391,7 @@
     reviewForm.hidden = true;
     reviewBtn.hidden = false;
     reviewBtn.textContent = text ? 'Edit review' : 'Write a review';
+    reviewBtn.classList.toggle('linkbtn-quiet', !!text);
   });
 
   clearRating?.addEventListener('click', () => {
