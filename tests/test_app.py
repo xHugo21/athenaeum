@@ -1,11 +1,25 @@
+import json
 import os
+import re
 import sqlite3
 import threading
+from datetime import date, timedelta
 
 import pytest
+from app import main
 from app.koreader import parse_koreader
-from app.main import app  # ensures import works
+from app.main import app, db, migrate
 from fastapi.testclient import TestClient
+
+
+class FakeResp:
+    status_code = 200
+
+    def __init__(self, docs):
+        self.docs = docs
+
+    def json(self):
+        return {"docs": self.docs}
 
 
 @pytest.fixture
@@ -19,7 +33,15 @@ def client(workdir):
         yield c
 
 
-def koreader_bytes(with_duplicate=False) -> bytes:
+def koreader_bytes(
+    with_duplicate=False,
+    *,
+    title="  The   Hobbit ",
+    md5="a" * 32,
+    seconds=180,
+    pages_read=2,
+    last_open=1700086400,
+) -> bytes:
     con = sqlite3.connect(":memory:")
     con.executescript(
         """
@@ -28,15 +50,21 @@ def koreader_bytes(with_duplicate=False) -> bytes:
           total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER, md5 TEXT);
         CREATE TABLE page_stat (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER);
         CREATE TABLE page_stat_data (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER, total_pages INTEGER DEFAULT 0);
-        INSERT INTO book VALUES (1, '  The   Hobbit ', 'J.R.R. Tolkien', 300, 180, 2, 1700086400, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
         INSERT INTO page_stat VALUES (1, 1, 1700000000, 60);
         INSERT INTO page_stat VALUES (1, 2, 1700086400, 120);
         INSERT INTO page_stat_data VALUES (1, 1, 1700000000, 60, 300);
         INSERT INTO page_stat_data VALUES (1, 2, 1700086400, 120, 300);
         """
     )
+    con.execute(
+        "INSERT INTO book VALUES (1, ?, 'J.R.R. Tolkien', 300, ?, ?, ?, ?)",
+        (title, seconds, pages_read, last_open, md5),
+    )
     if with_duplicate:
-        con.execute("INSERT INTO book VALUES (2, 'The Hobbit', 'J. r. r. Tolkien', 300, 30, 1, 1700172800, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')")
+        con.execute(
+            "INSERT INTO book VALUES (2, 'The Hobbit', 'J. r. r. Tolkien', 300, 30, 1, 1700172800, ?)",
+            (md5,),
+        )
         con.execute("INSERT INTO page_stat VALUES (2, 1, 1700172800, 30)")
         con.execute("INSERT INTO page_stat_data VALUES (2, 1, 1700172800, 30, 300)")
     return bytes(con.serialize())
@@ -85,25 +113,13 @@ def test_import_and_reimport(client):
 
 
 def test_file_reimport_propagates_title_on_md5_match(client):
-    md5 = "a" * 32
+    first = koreader_bytes(title="  The  Hobbit  ")
+    second = koreader_bytes(title="The Hobbit, or There and Back Again")
 
-    def koreader_with(title: str) -> bytes:
-        con = sqlite3.connect(":memory:")
-        con.executescript(
-            f"""
-            CREATE TABLE book (id INTEGER PRIMARY KEY, title TEXT, authors TEXT, pages INTEGER,
-                total_read_time INTEGER, total_read_pages INTEGER, last_open INTEGER, md5 TEXT);
-            CREATE TABLE page_stat_data (id_book INTEGER, page INTEGER, start_time INTEGER, duration INTEGER, total_pages INTEGER DEFAULT 0);
-            INSERT INTO book VALUES (1, '{title}', 'J.R.R. Tolkien', 300, 180, 2, 1700086400, '{md5}');
-            INSERT INTO page_stat_data VALUES (1, 1, 1700000000, 60, 300);
-            """
-        )
-        return bytes(con.serialize())
-
-    r = client.post("/import", files={"file": ("statistics.sqlite3", koreader_with("  The  Hobbit  "), "application/octet-stream")}, follow_redirects=False)
+    r = client.post("/import", files={"file": ("statistics.sqlite3", first, "application/octet-stream")}, follow_redirects=False)
     assert r.status_code == 303
 
-    r = client.post("/import", files={"file": ("statistics.sqlite3", koreader_with("The Hobbit, or There and Back Again"), "application/octet-stream")}, follow_redirects=False)
+    r = client.post("/import", files={"file": ("statistics.sqlite3", second, "application/octet-stream")}, follow_redirects=False)
     assert r.status_code == 303
     assert "imported=0" in r.headers["location"], "same md5 = same book, no new row"
 
@@ -115,15 +131,11 @@ def test_file_reimport_propagates_title_on_md5_match(client):
 
 
 def test_manual_add_with_isbn(client, monkeypatch):
-    from app import main
-
-    class FakeResp:
-        status_code = 200
-
-        def json(self):
-            return {"docs": [{"title": "Matilda", "author_name": ["Roald Dahl"]}]}
-
-    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: FakeResp())
+    monkeypatch.setattr(
+        main.httpx,
+        "get",
+        lambda *a, **k: FakeResp([{"title": "Matilda", "author_name": ["Roald Dahl"]}]),
+    )
     r = client.post(
         "/books",
         data={"title": "whatever", "author": "", "isbn": "978-0-14-032872-1", "rating": 5, "review": "great"},
@@ -150,15 +162,13 @@ def test_manual_add_with_isbn(client, monkeypatch):
 
 
 def test_set_isbn_fills_pages_for_manual_add(client, monkeypatch):
-    from app import main
-
-    class FakeResp:
-        status_code = 200
-
-        def json(self):
-            return {"docs": [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]}
-
-    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: FakeResp())
+    monkeypatch.setattr(
+        main.httpx,
+        "get",
+        lambda *a, **k: FakeResp(
+            [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]
+        ),
+    )
     client.post("/books", data={"title": "Manual Book", "pages": ""}, follow_redirects=False)
     r = client.post("/books/1/edit", data={"title": "Manual Book", "isbn": "9780140328721"}, follow_redirects=False)
     assert r.status_code == 303
@@ -251,7 +261,6 @@ def test_plugin_sync_no_dupes(client):
 
 
 def test_stats_streaks(client):
-    from datetime import date, timedelta
 
     base = date.today()
     client.post("/books", data={"title": "T"}, follow_redirects=False)
@@ -264,7 +273,6 @@ def test_stats_streaks(client):
     r = client.get("/stats")
     assert r.status_code == 200
     assert "Monthly reading" in r.text
-    import re
     assert re.search(r'class="streak current">\s*<div class="n num">3<', r.text)
     assert re.search(r'class="streak best">\s*<div class="n num">3<', r.text)
 
@@ -332,7 +340,6 @@ def test_tbr_add_and_remove(client):
 
 
 def test_book_page_shows_sessions_and_days(client):
-    import re
 
     client.post("/books", data={"title": "T"}, follow_redirects=False)
     con = sqlite3.connect("athenaeum.db")
@@ -435,7 +442,6 @@ def test_imported_book_can_be_marked_read_short_of_last_page(client):
 
 
 def test_migrate_marks_manual_books_read(workdir):
-    from app.main import migrate
 
     con = sqlite3.connect("athenaeum.db")
     con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT NOT NULL, md5 TEXT)")
@@ -447,7 +453,6 @@ def test_migrate_marks_manual_books_read(workdir):
 
 
 def test_migrate_finished_column_to_status(workdir):
-    from app.main import migrate
 
     con = sqlite3.connect("athenaeum.db")
     con.execute(
@@ -465,7 +470,6 @@ def test_migrate_finished_column_to_status(workdir):
 
 
 def test_db_is_wal_and_survives_concurrent_writes(client):
-    from app.main import db
 
     with db() as con:
         assert con.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
@@ -493,8 +497,6 @@ def test_db_is_wal_and_survives_concurrent_writes(client):
 
 
 def test_book_labels_assign_and_filter(client):
-    import json
-    import re
 
     client.post("/books", data={"title": "Dune"}, follow_redirects=False)
     client.post("/books", data={"title": "Emma"}, follow_redirects=False)
@@ -594,7 +596,6 @@ def test_label_management_rename_merge_delete(client):
 
 
 def test_library_sorts(client):
-    import re
 
     client.post("/books", data={"title": "Zebra", "author": "Alice", "pages": 100}, follow_redirects=False)
     client.post("/books", data={"title": "Alpha", "author": "Bob", "pages": 200}, follow_redirects=False)
@@ -650,7 +651,6 @@ def test_calendar_lists_books_per_day(client):
 
 
 def test_static_assets_are_public_behind_password(client, monkeypatch):
-    import app.main as main
 
     monkeypatch.setattr(main, "PASSWORD", "secret")
     assert client.get("/static/manifest.webmanifest").status_code == 200
