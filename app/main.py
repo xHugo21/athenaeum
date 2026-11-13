@@ -864,6 +864,23 @@ def rebuild_aggregates(con):
     )
 
 
+def add_book_row(con, title, author, md5, total_seconds, pages_read, total_pages, last_read_at):
+    status = "finished" if total_pages and pages_read >= total_pages else "reading"
+    cur = con.execute(
+        "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, int(time.time())),
+    )
+    return cur.lastrowid
+
+
+def upsert_session(con, book_id, page, start_time, duration, total_pages):
+    con.execute(
+        "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
+        "ON CONFLICT(book_id, page, start_time) DO UPDATE SET duration=excluded.duration, total_pages=excluded.total_pages",
+        (book_id, page, start_time, duration, total_pages),
+    )
+
+
 @app.post("/api/plugin/device")
 def plugin_device():
     # ponytail: registry stub on purpose, the plugin only needs a non-404; no device list, dedupe, or revoke.
@@ -904,24 +921,19 @@ async def plugin_import(request: Request):
                 remember_book(index, bid, title, authors or row["author"], md5)
             else:
                 created += 1
-                pages = book.get("pages")
-                read = book.get("total_read_pages") or 0
-                status = "finished" if pages and read >= pages else "reading"
-                cur = con.execute(
-                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                    (title, authors, md5, book.get("total_read_time") or 0, read, pages, book.get("last_open"), status, int(time.time())),
+                bid = add_book_row(
+                    con, title, authors, md5, book.get("total_read_time") or 0,
+                    book.get("total_read_pages") or 0, book.get("pages"), book.get("last_open"),
                 )
-                bid = cur.lastrowid
                 remember_book(index, bid, title, authors, md5)
             for s_row in body.get("stats") or []:
                 if s_row.get("book_md5") != md5:
                     continue
                 if not s_row.get("start_time") or not s_row.get("duration"):
                     continue
-                con.execute(
-                    "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
-                    "ON CONFLICT(book_id, page, start_time) DO UPDATE SET duration=excluded.duration, total_pages=excluded.total_pages",
-                    (bid, s_row.get("page") or 0, s_row.get("start_time"), s_row.get("duration"), s_row.get("total_pages") or 0),
+                upsert_session(
+                    con, bid, s_row.get("page") or 0, s_row.get("start_time"),
+                    s_row.get("duration"), s_row.get("total_pages") or 0,
                 )
             for a in anns.get(md5, []):
                 insert_annotation(con, bid, a)
@@ -952,29 +964,13 @@ def import_koreader(file: UploadFile):
                 remember_book(index, bid, s.title, s.author or row["author"], s.md5)
             else:
                 created += 1
-                status = "finished" if s.total_pages and s.pages_read >= s.total_pages else "reading"
-                cur = con.execute(
-                    "INSERT INTO books (title, author, md5, total_seconds, pages_read, total_pages, last_read_at, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                    (
-                        s.title,
-                        s.author,
-                        s.md5,
-                        s.total_seconds,
-                        s.pages_read,
-                        s.total_pages,
-                        s.last_read_at,
-                        status,
-                        int(time.time()),
-                    ),
+                bid = add_book_row(
+                    con, s.title, s.author, s.md5, s.total_seconds,
+                    s.pages_read, s.total_pages, s.last_read_at,
                 )
-                bid = cur.lastrowid
                 remember_book(index, bid, s.title, s.author, s.md5)
             for page, start, dur, tp in s.sessions:
-                con.execute(
-                    "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
-                    "ON CONFLICT(book_id, page, start_time) DO UPDATE SET duration=excluded.duration, total_pages=excluded.total_pages",
-                    (bid, page, start, dur, tp),
-                )
+                upsert_session(con, bid, page, start, dur, tp)
         rebuild_aggregates(con)
     return RedirectResponse(f"/?imported={created}", 303)
 
