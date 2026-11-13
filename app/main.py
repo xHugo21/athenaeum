@@ -235,16 +235,32 @@ def snap_rating(rating: float) -> float:
     return round(rating * 2) / 2
 
 
-def find_book(con, title: str, author: str | None, md5: str | None = None):
-    if md5:
-        r = con.execute("SELECT id, title, author, md5 FROM books WHERE md5=?", (md5,)).fetchone()
-        if r:
-            return r
-    key = norm(title) + "|" + norm(author or "")
+def book_index(con):
+    by_md5, by_key = {}, {}
     for r in con.execute("SELECT id, title, author, md5 FROM books"):
-        if norm(r["title"]) + "|" + norm(r["author"] or "") == key:
-            return r
-    return None
+        entry = dict(r)
+        if entry["md5"]:
+            by_md5[entry["md5"]] = entry
+        by_key.setdefault((norm(entry["title"]), norm(entry["author"] or "")), entry)
+    return by_md5, by_key
+
+
+def find_book(index, title: str, author: str | None, md5: str | None = None):
+    by_md5, by_key = index
+    if md5 and md5 in by_md5:
+        return by_md5[md5]
+    return by_key.get((norm(title), norm(author or "")))
+
+
+def remember_book(index, book_id: int, title: str, author: str | None, md5: str | None):
+    by_md5, by_key = index
+    for key, entry in list(by_key.items()):
+        if entry["id"] == book_id:
+            del by_key[key]
+    entry = {"id": book_id, "title": title, "author": author, "md5": md5}
+    by_key[(norm(title), norm(author or ""))] = entry
+    if md5:
+        by_md5[md5] = entry
 
 
 @app.get("/")
@@ -867,13 +883,14 @@ async def plugin_import(request: Request):
     created = 0
     anns = body.get("annotations") or {}
     with db() as con:
+        index = book_index(con)
         for book in body.get("books") or []:
             md5 = book.get("md5")
             if not md5:
                 continue
             title = " ".join((book.get("title") or "").split()) or "Untitled"
             authors = " ".join((book.get("authors") or "").replace(";", ",").split()) or None
-            row = find_book(con, title, authors, md5)
+            row = find_book(index, title, authors, md5)
             if row:
                 bid = row["id"]
                 con.execute(
@@ -884,6 +901,7 @@ async def plugin_import(request: Request):
                     "last_read_at=max(coalesce(last_read_at,0),coalesce(?,0)) WHERE id=?",
                     (md5, title, authors, book.get("total_read_time"), book.get("total_read_pages"), book.get("pages"), book.get("last_open"), bid),
                 )
+                remember_book(index, bid, title, authors or row["author"], md5)
             else:
                 created += 1
                 pages = book.get("pages")
@@ -894,6 +912,7 @@ async def plugin_import(request: Request):
                     (title, authors, md5, book.get("total_read_time") or 0, read, pages, book.get("last_open"), status, int(time.time())),
                 )
                 bid = cur.lastrowid
+                remember_book(index, bid, title, authors, md5)
             for s_row in body.get("stats") or []:
                 if s_row.get("book_md5") != md5:
                     continue
@@ -921,14 +940,16 @@ def import_koreader(file: UploadFile):
         return RedirectResponse(f"/?error={e}", 303)
     created = 0
     with db() as con:
+        index = book_index(con)
         for s in stats:
-            row = find_book(con, s.title, s.author, s.md5)
+            row = find_book(index, s.title, s.author, s.md5)
             if row:
                 bid = row["id"]
                 con.execute(
                     "UPDATE books SET md5=?, title=?, author=coalesce(?,author), total_seconds=?, pages_read=?, total_pages=coalesce(?,total_pages), last_read_at=coalesce(?,last_read_at) WHERE id=?",
                     (s.md5, s.title, s.author, s.total_seconds, s.pages_read, s.total_pages, s.last_read_at, bid),
                 )
+                remember_book(index, bid, s.title, s.author or row["author"], s.md5)
             else:
                 created += 1
                 status = "finished" if s.total_pages and s.pages_read >= s.total_pages else "reading"
@@ -947,6 +968,7 @@ def import_koreader(file: UploadFile):
                     ),
                 )
                 bid = cur.lastrowid
+                remember_book(index, bid, s.title, s.author, s.md5)
             for page, start, dur, tp in s.sessions:
                 con.execute(
                     "INSERT INTO sessions (book_id, page, start_time, duration, total_pages) VALUES (?,?,?,?,?) "
