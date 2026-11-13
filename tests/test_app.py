@@ -644,10 +644,22 @@ def test_library_sorts(client):
 
 def test_placeholder_cover_uses_html_fallback(client):
     client.post("/books", data={"title": "No Cover", "author": "Nobody"}, follow_redirects=False)
-    assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 404
+    miss = client.get("/covers/1.jpg", follow_redirects=False)
+    assert miss.status_code == 404
+    assert "immutable" not in miss.headers.get("cache-control", ""), "a miss must not be cached for a year"
     assert 'class="cover-fallback"' in client.get("/").text
     assert 'class="cover-fallback"' in client.get("/books/1").text
     assert "A·001" not in client.get("/").text
+
+
+def test_cover_fetch_runs_after_the_response(client, monkeypatch):
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("UPDATE books SET isbn='9780140328721' WHERE id=1")
+    calls = []
+    monkeypatch.setattr(main, "fetch_cover", lambda *a: calls.append(a))
+    assert client.get("/covers/1.jpg").status_code == 404
+    assert calls == [(1, "9780140328721", 0)], "the miss schedules a fetch instead of waiting on it"
 
 
 def test_calendar_lists_books_per_day(client):

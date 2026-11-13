@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import date, timedelta
 
 import httpx
-from fastapi import FastAPI, Form, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, Form, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -1145,17 +1145,21 @@ def insert_annotation(con, book_id: int, a: dict):
     )
 
 
+COVER_PENDING: set[int] = set()
+
+
 def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
     path = cover_path(book_id)
     if os.path.exists(path):
         return path
-    if not isbn or failed:
+    if not isbn or failed or book_id in COVER_PENDING:
         return None
+    COVER_PENDING.add(book_id)
     try:
         r = httpx.get(
             f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg",
             follow_redirects=True,
-            timeout=15,
+            timeout=10,
         )
         if r.status_code == 200 and len(r.content) > 1000:
             with open(path, "wb") as f:
@@ -1163,24 +1167,24 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
             return path
     except httpx.HTTPError:
         pass
+    finally:
+        COVER_PENDING.discard(book_id)
     with db() as con:
         con.execute("UPDATE books SET cover_failed=1 WHERE id=?", (book_id,))
     return None
 
 
 @app.get("/covers/{book_id}.jpg")
-def cover_image(book_id: int, v: str = ""):
+def cover_image(book_id: int, background: BackgroundTasks, v: str = ""):
     path = cover_path(book_id)
-    cache = {"Cache-Control": "public, max-age=31536000, immutable"} if v else {"Cache-Control": "no-cache"}
     if os.path.exists(path):
+        cache = {"Cache-Control": "public, max-age=31536000, immutable"} if v else {"Cache-Control": "no-cache"}
         return FileResponse(path, media_type="image/jpeg", headers=cache)
     with db() as con:
         book = con.execute("SELECT isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
-    if not book:
-        return RedirectResponse("/", 303)
-    if fetch_cover(book_id, book["isbn"], book["cover_failed"]):
-        return FileResponse(path, media_type="image/jpeg", headers=cache)
-    return Response(status_code=404)
+    if book and book["isbn"] and not book["cover_failed"]:
+        background.add_task(fetch_cover, book_id, book["isbn"], 0)
+    return Response(status_code=404, headers={"Cache-Control": "public, max-age=300"})
 
 
 @app.post("/books/{book_id}/cover/remove")
