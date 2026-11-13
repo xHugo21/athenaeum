@@ -720,3 +720,20 @@ def test_db_backup_is_valid_sqlite(client):
     con = sqlite3.connect(":memory:")
     con.deserialize(r.content)
     assert con.execute("SELECT title FROM books").fetchone()[0] == "Backup Me"
+
+
+def test_db_closes_connection_after_block(workdir):
+    with db() as con:
+        assert con.execute("SELECT 1").fetchone()[0] == 1
+    with pytest.raises(sqlite3.ProgrammingError):
+        con.execute("SELECT 1")
+
+
+def test_db_rolls_back_on_error(client):
+    with pytest.raises(RuntimeError):
+        with db() as con:
+            con.execute("INSERT INTO tbr (title, added_at) VALUES ('ghost', 1)")
+            raise RuntimeError("boom")
+
+    with db() as con:
+        assert con.execute("SELECT COUNT(*) FROM tbr").fetchone()[0] == 0

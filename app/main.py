@@ -9,7 +9,7 @@ import sqlite3
 import tempfile
 import time
 import zlib
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import date, timedelta
 
 import httpx
@@ -65,14 +65,22 @@ templates.env.filters["read_hm"] = lambda s: read_hm(int(s))
 
 
 
-def db() -> sqlite3.Connection:
+@contextmanager
+def db():
     con = sqlite3.connect(DB_PATH, timeout=5)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA busy_timeout=5000")
     con.execute("PRAGMA synchronous=NORMAL")
     con.execute("PRAGMA foreign_keys=ON")
-    return con
+    try:
+        yield con
+        con.commit()
+    except BaseException:
+        con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 SCHEMA = """
@@ -839,7 +847,7 @@ def delete_tbr(book_id: int):
 @app.get("/db/download")
 def download_db():
     with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-        with sqlite3.connect(DB_PATH) as con:
+        with db() as con:
             con.execute(f"VACUUM INTO '{tmp.name}'")
         tmp.seek(0)
         data = tmp.read()
