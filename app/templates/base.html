@@ -309,13 +309,15 @@
   .rating { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text-2); }
   .rating .icon { color: var(--accent); }
   .stars-input { display: inline-flex; gap: 2px; }
-  .star { position: relative; width: 22px; height: 22px; }
-  .star .icon { position: absolute; inset: 0; width: 22px; height: 22px; }
+  .star { position: relative; width: 24px; height: 24px; }
+  .star .icon { position: absolute; inset: 0; width: 24px; height: 24px; }
   .star .base { color: var(--line-2); }
   .star .fill { color: var(--accent); fill: currentColor; opacity: 0; }
   .star.on .fill { opacity: 1; }
   .star.half .fill { opacity: 1; clip-path: inset(0 50% 0 0); }
   .star:hover .base, .star:focus-within .base { color: var(--accent); }
+  /* ponytail: each half is 12px wide, short of the 24px target rule; a compliant
+     split needs 48px stars and doubles the row. Keyboard covers exact halves. */
   .star button {
     position: absolute; top: 0; bottom: 0; width: 50%;
     border: 0; background: none; cursor: pointer; padding: 0;
@@ -350,8 +352,8 @@
     .seg button { height: 34px; }
     input[type="text"], input:not([type]), input[type="password"], input[type="number"],
     input[type="email"], input[type="search"], input[type="file"], textarea, select { height: 40px; font-size: 16px; }
-    .star { width: 30px; height: 30px; }
-    .star .icon { width: 30px; height: 30px; }
+    .star { width: 32px; height: 32px; }
+    .star .icon { width: 32px; height: 32px; }
     .topbar { height: 52px; gap: 16px; }
     .topnav { gap: 16px; font-size: 13px; }
     main { padding: 20px 14px 72px; }
