@@ -479,16 +479,15 @@
   });
 
   function buildShelves() {
-    const books = booksData;
     const box = document.getElementById('shelves');
-    if (!books.length || !box.clientWidth) return;
+    if (!booksData.length || !box.clientWidth) return;
     const GAP = 0, PAD = 6;
     const usable = box.clientWidth - PAD * 2;
     const rows = [];
     let row = [], width = 0;
 
     const logPages = b => Math.log(Math.max(1, b.pages || 0));
-    const sorted = books.map(logPages).sort((a, b) => a - b);
+    const sorted = booksData.map(logPages).sort((a, b) => a - b);
     const at = q => sorted[Math.min(sorted.length - 1, Math.round((sorted.length - 1) * q))];
     let lo = at(0.1), hi = at(0.9);
     if (hi - lo < 0.3) {
@@ -497,7 +496,7 @@
       hi = mid + 0.15;
     }
 
-    for (const b of books) {
+    for (const b of booksData) {
       const t = (logPages(b) - lo) / (hi - lo);
       b._w = Math.round(Math.min(92, 30 + Math.max(0, t) * 44 + Math.max(0, t - 1) * 16));
       b._h = 236 + Math.round((((b.id * 7 + b.pages * 3) % 60) - 30) * .8);
