@@ -694,11 +694,25 @@ def delete_book(book_id: int):
     return RedirectResponse("/", 303)
 
 
+def clean_label(name: str) -> str:
+    return " ".join(name.split())
+
+
+def attach_label(con, name: str, book_ids: list[int]):
+    con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
+    ph = ",".join("?" * len(book_ids))
+    con.execute(
+        f"INSERT OR IGNORE INTO book_labels (book_id, label_id) "
+        f"SELECT id, (SELECT id FROM labels WHERE name=?) FROM books WHERE id IN ({ph})",
+        (name, *book_ids),
+    )
+
+
 @app.post("/books/{book_id}/labels")
 def set_labels(book_id: int, labels: str = Form("")):
     names = {}
     for raw in labels.split(","):
-        name = " ".join(raw.split())
+        name = clean_label(raw)
         if name:
             names.setdefault(name.casefold(), name)
     with db() as con:
@@ -706,11 +720,7 @@ def set_labels(book_id: int, labels: str = Form("")):
             return RedirectResponse("/", 303)
         con.execute("DELETE FROM book_labels WHERE book_id=?", (book_id,))
         for name in names.values():
-            con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
-            con.execute(
-                "INSERT OR IGNORE INTO book_labels (book_id, label_id) SELECT ?, id FROM labels WHERE name=?",
-                (book_id, name),
-            )
+            attach_label(con, name, [book_id])
         con.execute("DELETE FROM labels WHERE id NOT IN (SELECT label_id FROM book_labels)")
     return RedirectResponse(f"/books/{book_id}", 303)
 
@@ -728,14 +738,9 @@ def bulk_books(
         ph = ",".join("?" * len(book_ids))
         with db() as con:
             if action == "label":
-                name = " ".join(label.split())
+                name = clean_label(label)
                 if name:
-                    con.execute("INSERT INTO labels (name) VALUES (?) ON CONFLICT(name) DO NOTHING", (name,))
-                    con.execute(
-                        f"INSERT OR IGNORE INTO book_labels (book_id, label_id) "
-                        f"SELECT id, (SELECT id FROM labels WHERE name=?) FROM books WHERE id IN ({ph})",
-                        (name, *book_ids),
-                    )
+                    attach_label(con, name, book_ids)
             elif action in ("reading", "finished", "abandoned"):
                 con.execute(
                     f"UPDATE books SET status=? WHERE id IN ({ph})",
@@ -762,7 +767,7 @@ def labels_page(request: Request):
 
 @app.post("/labels/{label_id}/rename")
 def rename_label(label_id: int, name: str = Form("")):
-    name = " ".join(name.split())
+    name = clean_label(name)
     if name:
         with db() as con:
             old = con.execute("SELECT id FROM labels WHERE id=?", (label_id,)).fetchone()
