@@ -437,9 +437,13 @@
   function resetFilters() {
     q.value = '';
     state.q = '';
-    setFilter('progress', 'all');
-    setFilter('rating', 'any');
-    setFilter('label', '');
+    for (const [group, value] of Object.entries({ progress: 'all', rating: 'any', label: '' })) {
+      state[group] = value;
+      document.querySelectorAll(`[data-filter="${group}"] button`).forEach(b => {
+        b.setAttribute('aria-pressed', String(b.dataset.value === value));
+      });
+    }
+    syncUrl();
     paintShelves();
     radial();
   }
