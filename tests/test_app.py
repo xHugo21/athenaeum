@@ -675,6 +675,24 @@ def test_cover_fetch_runs_after_the_response(client, monkeypatch):
     assert calls == [(1, "9780140328721", 0)], "the miss schedules a fetch instead of waiting on it"
 
 
+def test_cover_fetch_fills_the_file_for_the_next_render(client, monkeypatch):
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("UPDATE books SET isbn='9780140328721' WHERE id=1")
+
+    class Img:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"x" * 2000
+
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: Img())
+    assert client.get("/covers/1.jpg").status_code == 404
+    assert os.path.exists("covers/1.jpg"), "the background task wrote the cover"
+    version = re.search(r'/covers/1\.jpg\?v=(\d+)', client.get("/").text)
+    assert version and version.group(1) != "0", "the next render dates the new file"
+    r = client.get(f"/covers/1.jpg?v={version.group(1)}")
+    assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
+
+
 def test_calendar_day_panel_renders_alone(client):
     client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
     with sqlite3.connect("athenaeum.db") as c:

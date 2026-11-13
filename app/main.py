@@ -1178,6 +1178,7 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
             timeout=10,
         )
         if r.status_code == 200 and len(r.content) > 1000:
+            os.makedirs(COVERS_DIR, exist_ok=True)
             with open(path, "wb") as f:
                 f.write(r.content)
             return path
@@ -1218,6 +1219,7 @@ async def upload_cover(book_id: int, cover: UploadFile):
     data = await cover.read()
     if len(data) > 5_000_000 or not data.startswith((b"\xff\xd8\xff", b"\x89PNG", b"GIF8", b"RIFF", b"WEBP")):
         return RedirectResponse(f"/books/{book_id}?error=Invalid+image", 303)
+    os.makedirs(COVERS_DIR, exist_ok=True)
     with open(cover_path(book_id), "wb") as f:
         f.write(data)
     return RedirectResponse(f"/books/{book_id}", 303)
