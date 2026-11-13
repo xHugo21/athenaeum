@@ -185,6 +185,7 @@ def test_stats_page(client):
     assert "3m" in r.text
     assert "Monthly reading" in r.text and "Time of day" in r.text
     assert r.text.count('class="hit"') == 24, "every hour needs a hover target"
+    assert r.text.count('role="img"') == 2, "two charts only: the hour profile and the heatmap"
     assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
 
     client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)

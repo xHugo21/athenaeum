@@ -155,13 +155,12 @@
   </div>
   <div class="heat-scroll">
   <div class="heat-inner">
-  <div class="heat">
+  <div class="heat" role="img" aria-label="Reading activity: {{ hc.days }} days read in the last twelve months, darker means more time">
     {% for wk, name in weeks %}
     <div class="wk">
       {% for day in wk %}
         {% if day %}
-        <div class="d" role="img"
-             aria-label="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+        <div class="d"
              data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
              style="background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, var(--surface-2))"></div>
         {% else %}
