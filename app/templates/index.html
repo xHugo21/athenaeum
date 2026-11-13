@@ -32,14 +32,6 @@
     content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
     background: var(--accent); margin-right: 8px; vertical-align: 2px;
   }
-  .chip {
-    height: 26px; display: inline-flex; align-items: center; gap: 6px;
-    padding: 0 8px; margin-left: 2px;
-    border: 1px solid var(--line-2); border-radius: 999px;
-    background: var(--surface-2); color: var(--text-2);
-    font-size: 12px; cursor: pointer;
-  }
-  .chip:hover { color: var(--text); border-color: var(--muted); }
   .library-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
   .library-bar .summary { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
   .library-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex: 0 0 auto; min-width: 0; margin-left: auto; }
@@ -198,9 +190,6 @@
       <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg>
       <input type="search" id="q" placeholder="Search title or author" autocomplete="off" aria-label="Search library">
     </div>
-    <button class="chip" id="filter-chip" type="button" onclick="resetFilters()" hidden>
-      <span id="filter-chip-label"></span><span aria-hidden="true">×</span>
-    </button>
     <div class="view-tools">
       <div class="seg" role="group" aria-label="Library layout">
         <button type="button" id="view-grid" aria-pressed="true" onclick="setView(false)">
@@ -471,17 +460,6 @@
     if (count) count.textContent = filtering
       ? `${ids.size} of ${booksData.length} titles`
       : `${booksData.length} titles`;
-    const chip = document.getElementById('filter-chip');
-    const chipLabel = document.getElementById('filter-chip-label');
-    if (chip) {
-      const parts = [];
-      if (state.q) parts.push(`“${state.q}”`);
-      if (state.progress !== 'all') parts.push(state.progress);
-      if (state.rating !== 'any') parts.push(state.rating === 'none' ? 'unrated' : state.rating + ' stars');
-      if (state.label) parts.push(state.label);
-      chip.hidden = parts.length === 0;
-      chipLabel.textContent = parts.join(' · ');
-    }
   }
 
   function setFilter(group, value) {
