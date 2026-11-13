@@ -479,10 +479,14 @@
     btn.addEventListener('click', () => setFilter(btn.closest('[data-filter]').dataset.filter, btn.dataset.value));
   });
 
+  let searchTimer = 0;
   q.addEventListener('input', () => {
-    state.q = q.value.trim().toLowerCase();
-    syncUrl();
-    radial();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.q = q.value.trim().toLowerCase();
+      syncUrl();
+      radial();
+    }, 80);
   });
 
   document.addEventListener('keydown', e => {
@@ -568,9 +572,10 @@
       shelf.addEventListener('mouseleave', () => { caption.textContent = ''; });
       group.append(shelf, board, caption);
       box.appendChild(group);
-      shelf.querySelectorAll('.book-spine').forEach(a => {
-        a.classList.add(a.firstElementChild.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
-      });
+    }
+    const spines = box.querySelectorAll('.book-spine');
+    for (const a of spines) {
+      a.classList.add(a.firstElementChild.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
     }
   }
 
@@ -595,8 +600,12 @@
     }
   }
 
+  let resizeFrame = 0;
   window.addEventListener('resize', () => {
-    if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
+    });
   });
 
   document.querySelectorAll('.rail-list.sort a').forEach(a => {
