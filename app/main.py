@@ -226,6 +226,14 @@ def logout():
     return res
 
 
+def clean_isbn(isbn: str) -> str:
+    return re.sub(r"[^0-9Xx]", "", isbn)
+
+
+def snap_rating(rating: float) -> float:
+    return round(rating * 2) / 2
+
+
 def find_book(con, title: str, author: str | None, md5: str | None = None):
     if md5:
         r = con.execute("SELECT id, title, author, md5 FROM books WHERE md5=?", (md5,)).fetchone()
@@ -599,8 +607,8 @@ def add_book(
     rating: float = Form(0),
     review: str = Form(""),
 ):
-    rating = round(rating * 2) / 2
-    isbn = re.sub(r"[^0-9Xx]", "", isbn)
+    rating = snap_rating(rating)
+    isbn = clean_isbn(isbn)
     meta = fetch_metadata(isbn) if isbn else {}
     total_pages = pages or meta.get("pages")
     with db() as con:
@@ -623,7 +631,7 @@ def add_book(
 
 @app.post("/books/{book_id}/rate")
 def rate_book(book_id: int, rating: float = Form(0), review: str = Form("")):
-    rating = round(rating * 2) / 2
+    rating = snap_rating(rating)
     with db() as con:
         con.execute(
             "UPDATE books SET rating=?, review=? WHERE id=?",
@@ -641,7 +649,7 @@ def edit_book(
     pages_read: int = Form(0),
     total_pages: int = Form(0),
 ):
-    isbn = re.sub(r"[^0-9Xx]", "", isbn)
+    isbn = clean_isbn(isbn)
     with db() as con:
         row = con.execute("SELECT isbn, total_seconds FROM books WHERE id=?", (book_id,)).fetchone()
         if not row:
