@@ -115,9 +115,9 @@
     {% endwith %}
     <div class="cover-tools">
       <form method="post" action="/books/{{ b['id'] }}/cover" enctype="multipart/form-data" style="flex:1">
-        <label class="btn sm" style="width:100%;cursor:pointer">
+        <label class="btn sm file-btn" style="width:100%">
           Change cover
-          <input type="file" name="cover" accept="image/*" hidden onchange="this.form.submit()">
+          <input class="sr-only" type="file" name="cover" accept="image/*" onchange="this.form.submit()">
         </label>
       </form>
       {% if custom_cover %}

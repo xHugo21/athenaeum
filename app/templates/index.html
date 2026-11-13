@@ -210,9 +210,9 @@
 <div class="panel" id="import-card" hidden>
   <h2>Import KOReader statistics</h2>
   <form id="import-form" method="post" action="/import" enctype="multipart/form-data" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <label class="btn btn-primary" id="import-btn" style="cursor:pointer">
+    <label class="btn btn-primary file-btn" id="import-btn">
       <svg class="icon icon-sm" aria-hidden="true"><use href="#i-upload"/></svg>Choose file
-      <input type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="document.getElementById('import-btn').style.display='none';document.getElementById('import-spinner').hidden=false;this.form.submit()" style="display:none">
+      <input class="sr-only" type="file" name="file" accept=".sqlite3,.db,.sqlite" required onchange="document.getElementById('import-btn').style.display='none';document.getElementById('import-spinner').hidden=false;this.form.submit()">
     </label>
     <span id="import-spinner" hidden style="display:flex;align-items:center;gap:8px;color:var(--accent-strong);font-size:13px;font-weight:500">
       <svg class="icon" viewBox="0 0 24 24" style="animation:spin .8s linear infinite" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>

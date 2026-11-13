@@ -531,6 +531,14 @@ def test_book_labels_assign_and_filter(client):
     assert {r[0] for r in rows} == {"Sci-Fi", "favorite"}
 
 
+def test_file_inputs_are_keyboard_reachable(client):
+    client.post("/books", data={"title": "Dune"}, follow_redirects=False)
+    for path in ("/", "/books/1"):
+        tags = re.findall(r'<input[^>]*type="file"[^>]*>', client.get(path).text)
+        assert tags, path
+        assert all("sr-only" in t and "display:none" not in t and not re.search(r"\shidden", t) for t in tags), path
+
+
 def test_empty_library_keeps_add_panel_working(client):
     html = client.get("/").text
     assert 'id="add-card"' in html
