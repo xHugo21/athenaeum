@@ -182,7 +182,6 @@
   <div class="summary">
     <div><div class="label">Time read</div><div class="v num">{{ ns.secs | read_hm }}</div></div>
     <div><div class="label">Pages read</div><div class="v num">{{ ns.pages | comma }}</div></div>
-    <div><div class="label">Titles</div><div class="v num">{{ books | length }}</div></div>
     <div><div class="label">Average rating</div><div class="v num">{{ (ns.stars / (rated | length)) | round(1) if rated else '—' }}</div></div>
   </div>
   <div class="library-toolbar">
