@@ -41,9 +41,16 @@ def drop_cover(book_id: int):
 PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
 SESSION_COOKIE = "athenaeum_session"
 DATE_FMT = "%-d %b %Y"
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+STATIC_V = int(os.path.getmtime(os.path.join(STATIC_DIR, "app.css")))
 templates = Jinja2Templates(
     directory=os.path.join(os.path.dirname(__file__), "templates"),
-    context_processors=[lambda request: {"session": bool(PASSWORD and request.cookies.get(SESSION_COOKIE))}],
+    context_processors=[
+        lambda request: {
+            "session": bool(PASSWORD and request.cookies.get(SESSION_COOKIE)),
+            "static_v": STATIC_V,
+        }
+    ],
 )
 
 
@@ -184,7 +191,7 @@ async def lifespan(app):
 
 app = FastAPI(title="athenaeum", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=500)
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.middleware("http")

@@ -551,6 +551,14 @@ def test_empty_library_keeps_add_panel_working(client):
     assert "function panel(" in html, "add and import buttons are dead without books"
 
 
+def test_base_css_is_cacheable(client):
+    m = re.search(r'href="(/static/app\.css\?v=\d+)"', client.get("/").text)
+    assert m, "base styles must be a versioned static file"
+    r = client.get(m.group(1))
+    assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
+    assert "--accent" in r.text, "the file really is the stylesheet"
+
+
 def test_theme_toggle_reports_its_state(client):
     html = client.get("/").text
     assert 'role="switch"' in html and 'aria-label="Dark mode"' in html
