@@ -980,8 +980,8 @@ def download_highlights(book_id: int):
         out.append(f"> *— {meta}*")
         if a["note"]:
             out.append(">")
-            for line in a["note"].splitlines():
-                out.append(f"> **Note:** {line}" if line == a["note"].splitlines()[0] else f"> {line}")
+            for i, line in enumerate(a["note"].splitlines()):
+                out.append(f"> **Note:** {line}" if i == 0 else f"> {line}")
         out.append("")
     body = "\n".join(out).rstrip() + "\n"
     fname = re.sub(r"[^A-Za-z0-9._-]+", "_", book["title"]).strip("_") or "highlights"
