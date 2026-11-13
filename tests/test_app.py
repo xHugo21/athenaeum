@@ -677,3 +677,35 @@ def test_book_page_has_story_share(client):
     assert 'id="story-overlay"' in page and 'id="story-btn"' in page
     assert '"rating": 4.5' in page and '"title": "Dune"' in page
     assert '<option value="0">p. 59 · Fear is the mind-killer</option>' in page
+
+
+def test_plugin_resync_keeps_high_water_totals(client):
+    md5 = "e" * 32
+
+    def payload(seconds, pages_read, last_open):
+        return {
+            "version": "0.3.0",
+            "books": [{"title": "Moby Dick", "authors": "Herman Melville", "pages": 720,
+                       "total_read_time": seconds, "total_read_pages": pages_read,
+                       "last_open": last_open, "md5": md5}],
+            "stats": [],
+        }
+
+    client.post("/api/plugin/import", json=payload(5400, 120, 1700086400), follow_redirects=False)
+    client.post("/api/plugin/import", json=payload(100, 5, 1700172800), follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        row = c.execute("SELECT total_seconds, pages_read, total_pages, last_read_at FROM books").fetchone()
+    assert row == (5400, 120, 720, 1700172800), "plugin sync never lowers totals and keeps the latest read date"
+
+
+def test_file_reimport_replaces_totals(client):
+    first = koreader_bytes(seconds=500, pages_read=2, last_open=1700086400)
+    second = koreader_bytes(seconds=120, pages_read=1, last_open=1600000000)
+
+    client.post("/import", files={"file": ("statistics.sqlite3", first, "application/octet-stream")}, follow_redirects=False)
+    client.post("/import", files={"file": ("statistics.sqlite3", second, "application/octet-stream")}, follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        row = c.execute("SELECT total_seconds, pages_read, last_read_at FROM books").fetchone()
+    assert row == (120, 1, 1600000000), "file import replaces totals, even downwards"
