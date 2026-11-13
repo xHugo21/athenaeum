@@ -984,8 +984,8 @@ def import_koreader(file: UploadFile):
     return RedirectResponse(f"/?imported={created}", 303)
 
 
-@app.get("/books/{book_id}/highlights.md")
-def download_highlights(book_id: int):
+@app.get("/books/{book_id}/annotations.md")
+def download_annotations(book_id: int):
     with db() as con:
         book = con.execute("SELECT title, author FROM books WHERE id=?", (book_id,)).fetchone()
         if not book:
@@ -1020,12 +1020,12 @@ def download_highlights(book_id: int):
     return Response(
         body.encode(),
         media_type="text/markdown; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{fname}-highlights.md"'},
+        headers={"Content-Disposition": f'attachment; filename="{fname}-annotations.md"'},
     )
 
 
-@app.get("/books/{book_id}/highlights/edit")
-def highlight_form(request: Request, book_id: int, datetime: str = "", page_ref: str = ""):
+@app.get("/books/{book_id}/annotations/edit")
+def annotation_form(request: Request, book_id: int, datetime: str = "", page_ref: str = ""):
     with db() as con:
         book = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
         if not book:
@@ -1035,12 +1035,12 @@ def highlight_form(request: Request, book_id: int, datetime: str = "", page_ref:
             (book_id, datetime, page_ref),
         ).fetchone()
     return templates.TemplateResponse(
-        request, "highlight_edit.html", {"b": book, "a": dict(row) if row else {}}
+        request, "annotation_edit.html", {"b": book, "a": dict(row) if row else {}}
     )
 
 
-@app.post("/books/{book_id}/highlights/edit")
-def highlight_save(
+@app.post("/books/{book_id}/annotations/edit")
+def annotation_save(
     book_id: int,
     text: str = Form(""),
     note: str = Form(""),
@@ -1070,8 +1070,8 @@ def highlight_save(
     return RedirectResponse(f"/books/{book_id}#highlights", 303)
 
 
-@app.post("/books/{book_id}/highlights/delete")
-def highlight_delete(book_id: int, datetime: str = Form(...), page_ref: str = Form(...)):
+@app.post("/books/{book_id}/annotations/delete")
+def annotation_delete(book_id: int, datetime: str = Form(...), page_ref: str = Form(...)):
     with db() as con:
         con.execute(
             "DELETE FROM annotations WHERE book_id=? AND datetime=? AND page_ref=?",

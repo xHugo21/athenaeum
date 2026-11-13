@@ -295,10 +295,10 @@ def test_highlights_export(client):
     )
     con.commit()
     con.close()
-    r = client.get("/books/1/highlights.md")
+    r = client.get("/books/1/annotations.md")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/markdown")
-    assert 'filename="1984-highlights.md"' in r.headers["content-disposition"]
+    assert 'filename="1984-annotations.md"' in r.headers["content-disposition"]
     body = r.text
     assert "# 1984" in body and "*Orwell*" in body
     assert "> It was a bright cold day in April." in body
@@ -370,7 +370,7 @@ def test_md5_lookup_is_indexed(client):
 def test_manual_highlight_crud(client):
     client.post("/books", data={"title": "Kindle Book", "author": "Someone"}, follow_redirects=False)
     r = client.post(
-        "/books/1/highlights/edit",
+        "/books/1/annotations/edit",
         data={"text": "A passage", "pageno": "12", "chapter": "One"},
         follow_redirects=False,
     )
@@ -384,10 +384,10 @@ def test_manual_highlight_crud(client):
         ).fetchone()
     assert kind == "highlight" and page_ref.startswith("m:") and total_pages is None
 
-    form = client.get(f"/books/1/highlights/edit?datetime={datetime}&page_ref={page_ref}").text
+    form = client.get(f"/books/1/annotations/edit?datetime={datetime}&page_ref={page_ref}").text
     assert "A passage" in form and "Delete" in form
     r = client.post(
-        "/books/1/highlights/edit",
+        "/books/1/annotations/edit",
         data={"text": "A passage", "note": "My thought", "pageno": "12", "chapter": "One",
               "datetime": datetime, "page_ref": page_ref},
         follow_redirects=False,
@@ -402,7 +402,7 @@ def test_manual_highlight_crud(client):
 
     assert "My thought" in client.get("/books/1").text, "typed notes must show on the book page"
     r = client.post(
-        "/books/1/highlights/delete",
+        "/books/1/annotations/delete",
         data={"datetime": datetime, "page_ref": page_ref},
         follow_redirects=False,
     )
@@ -673,7 +673,7 @@ def test_book_reading_pace(client):
 def test_book_page_has_story_share(client):
     client.post("/books", data={"title": "Dune", "author": "Frank Herbert", "rating": "4.5"})
     assert 'id="story-quote"' not in client.get("/books/1").text, "no highlights, no picker"
-    client.post("/books/1/highlights/edit", data={"text": "Fear is the mind-killer", "pageno": "59"})
+    client.post("/books/1/annotations/edit", data={"text": "Fear is the mind-killer", "pageno": "59"})
     page = client.get("/books/1").text
     assert 'id="story-overlay"' in page and 'id="story-btn"' in page
     assert '"rating": 4.5' in page and '"title": "Dune"' in page
@@ -778,7 +778,7 @@ def test_manual_annotation_types_follow_content(client):
         ({"pageno": "4"}, "bookmark"),
     ]
     for data, _ in cases:
-        client.post("/books/1/highlights/edit", data=data, follow_redirects=False)
+        client.post("/books/1/annotations/edit", data=data, follow_redirects=False)
 
     with sqlite3.connect("athenaeum.db") as c:
         got = [r[0] for r in c.execute("SELECT type FROM annotations ORDER BY pageno")]

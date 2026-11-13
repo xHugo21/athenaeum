@@ -256,11 +256,11 @@
     <h2>Highlights <span class="count num">{{ hls | length }}</span></h2>
     <div class="actions">
       {% if hls %}
-      <a class="btn sm btn-ghost" href="/books/{{ b['id'] }}/highlights.md" download title="Download these highlights as Markdown">
+      <a class="btn sm btn-ghost" href="/books/{{ b['id'] }}/annotations.md" download title="Download these highlights as Markdown">
         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-download"/></svg>Export
       </a>
       {% endif %}
-      <a class="btn sm" href="/books/{{ b['id'] }}/highlights/edit">
+      <a class="btn sm" href="/books/{{ b['id'] }}/annotations/edit">
         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg>Add
       </a>
     </div>
@@ -277,13 +277,13 @@
       <div class="hl-meta num">
         {% if a['chapter'] %}<span>{{ a['chapter'] }}</span><span>·</span>{% endif %}
         <span>p. {{ a['pageno'] or '?' }}</span>
-        <a href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
+        <a href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}">Edit</a>
       </div>
     </article>
     {% endfor %}
   </div>
   {% else %}
-  <div class="empty">No highlights yet. They arrive with a KOReader sync, or you can <a href="/books/{{ b['id'] }}/highlights/edit">add one</a>.</div>
+  <div class="empty">No highlights yet. They arrive with a KOReader sync, or you can <a href="/books/{{ b['id'] }}/annotations/edit">add one</a>.</div>
   {% endif %}
 </section>
 
@@ -296,7 +296,7 @@
       <div class="n num">{% if a['chapter'] %}{{ a['chapter'] }} · {% endif %}p. {{ a['pageno'] or '?' }}</div>
       {% if a['note'] %}<div class="t" style="margin-top:3px;white-space:pre-wrap">{{ a['note'] }}</div>{% endif %}
     </div>
-    <a class="linkbtn" href="/books/{{ b['id'] }}/highlights/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
+    <a class="linkbtn" href="/books/{{ b['id'] }}/annotations/edit?datetime={{ a['datetime']|urlencode }}&page_ref={{ a['page_ref']|urlencode }}" style="font-size:12px">Edit</a>
   </div>
   {% endfor %}
 </section>
