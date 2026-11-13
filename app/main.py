@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import sqlite3
+import tempfile
 import time
 import zlib
 from contextlib import asynccontextmanager
@@ -837,11 +838,11 @@ def delete_tbr(book_id: int):
 
 @app.get("/db/download")
 def download_db():
-    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
         with sqlite3.connect(DB_PATH) as con:
             con.execute(f"VACUUM INTO '{tmp.name}'")
-        data = open(tmp.name, "rb").read()
+        tmp.seek(0)
+        data = tmp.read()
     return Response(
         data,
         media_type="application/octet-stream",

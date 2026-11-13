@@ -709,3 +709,14 @@ def test_file_reimport_replaces_totals(client):
     with sqlite3.connect("athenaeum.db") as c:
         row = c.execute("SELECT total_seconds, pages_read, last_read_at FROM books").fetchone()
     assert row == (120, 1, 1600000000), "file import replaces totals, even downwards"
+
+
+def test_db_backup_is_valid_sqlite(client):
+    client.post("/books", data={"title": "Backup Me"}, follow_redirects=False)
+
+    r = client.get("/db/download")
+    assert r.status_code == 200
+    assert r.headers["content-disposition"] == 'attachment; filename="athenaeum.db"'
+    con = sqlite3.connect(":memory:")
+    con.deserialize(r.content)
+    assert con.execute("SELECT title FROM books").fetchone()[0] == "Backup Me"
