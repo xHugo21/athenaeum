@@ -531,6 +531,12 @@ def test_book_labels_assign_and_filter(client):
     assert {r[0] for r in rows} == {"Sci-Fi", "favorite"}
 
 
+def test_empty_library_keeps_add_panel_working(client):
+    html = client.get("/").text
+    assert 'id="add-card"' in html
+    assert "function panel(" in html, "add and import buttons are dead without books"
+
+
 def test_library_filters_in_url(client):
     client.post("/books", data={"title": "Dune", "rating": 5}, follow_redirects=False)
     client.post("/books/1/labels", data={"labels": "space"}, follow_redirects=False)

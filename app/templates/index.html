@@ -357,6 +357,19 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  function panel(id, btn) {
+    const el = document.getElementById(id);
+    const open = !el.hidden;
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
+    document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    if (!open) {
+      el.hidden = false;
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+      el.querySelector('input, textarea')?.focus({ preventScroll: true });
+    }
+  }
+</script>
 {% if books %}
 <script>
   const booksData = JSON.parse(document.getElementById('book-data').textContent);
@@ -639,18 +652,6 @@
   if (localStorage.getItem('athenaeum-shelf') === '1') setView(true);
   radial();
   syncUrl();
-
-  function panel(id, btn) {
-    const el = document.getElementById(id);
-    const open = !el.hidden;
-    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
-    document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
-    if (!open) {
-      el.hidden = false;
-      if (btn) btn.setAttribute('aria-expanded', 'true');
-      el.querySelector('input, textarea')?.focus({ preventScroll: true });
-    }
-  }
 </script>
 {% endif %}
 {% endblock %}
