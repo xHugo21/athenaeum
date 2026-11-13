@@ -658,6 +658,8 @@ def test_calendar_lists_books_per_day(client):
     assert r.status_code == 200
     assert "November 2026" in r.text
     assert "1h 30min" in r.text and "170" in r.text
+    assert 'role="group" aria-label="Reading calendar for November 2026"' in r.text
+    assert 'aria-label="Dune, 9 Nov 2026 to 12 Nov 2026"' in r.text, "event names carry their date range"
     assert r.text.index("Dune") < r.text.index("Emma"), "books are ordered by time read"
     assert "grid-column: 1 / span 4" in r.text, "consecutive days share one book bar"
     assert 'aria-current="date"' in r.text

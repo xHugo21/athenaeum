@@ -77,7 +77,7 @@
 
 <div class="cal-layout">
   <div class="cal-scroll">
-  <div class="cal-grid" aria-label="Reading calendar">
+  <div class="cal-grid" role="group" aria-label="Reading calendar for {{ month_name }}">
     <div class="cal-dow-row">
       {% for d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
       <div class="cal-dow"><span class="full">{{ d }}</span><span class="short">{{ d[0] }}</span></div>
@@ -87,13 +87,13 @@
     <div class="cal-week" style="--extra: {{ week['extra'] }}">
       {% for c in week['cells'] %}
         {% if not c['in_month'] %}
-        <span class="cal-day out"></span>
+        <span class="cal-day out" aria-hidden="true"></span>
         {% else %}
         {% set iso = c['date'].isoformat() %}
         <a class="cal-day{% if iso == selected_day %} selected{% endif %}"
            href="/calendar?month={{ month_key }}&day={{ iso }}"
            {% if iso == selected_day %}aria-current="date"{% endif %}
-           aria-label="{{ iso }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} pages, {{ c['books'] | length }} books">
+           aria-label="{{ c['date'].isoformat() | day_fmt }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} pages, {{ c['books'] | length }} books">
           <span class="n num">{{ c['date'].day }}</span>
           {% if c['seconds'] %}<span class="mins num">{{ ((c['seconds'] + 59) // 60) }}m</span>{% endif %}
         </a>
@@ -102,10 +102,13 @@
       {% if week['events'] %}
       <div class="cal-events">
         {% for e in week['events'] %}
+        {% set from = week['cells'][e['start']]['date'] %}
+        {% set until = week['cells'][e['start'] + e['length'] - 1]['date'] %}
         <a class="cal-event{% if e['continues_left'] %} cont-l{% endif %}{% if e['continues_right'] %} cont-r{% endif %}"
            href="/books/{{ e['book_id'] }}"
            style="grid-column: {{ e['start'] + 1 }} / span {{ e['length'] }}; grid-row: {{ e['lane'] + 1 }};"
-           title="{{ e['title'] }}">{{ e['title'] }}</a>
+           title="{{ e['title'] }}"
+           aria-label="{{ e['title'] }}, {{ from.isoformat() | day_fmt }}{% if until != from %} to {{ until.isoformat() | day_fmt }}{% endif %}">{{ e['title'] }}</a>
         {% endfor %}
       </div>
       {% endif %}
