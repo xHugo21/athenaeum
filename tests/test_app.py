@@ -1063,3 +1063,17 @@ def test_migrate_gives_manual_books_their_print_pages(workdir):
     rows = con.execute("SELECT md5, print_pages, isbn_pages FROM books ORDER BY id").fetchall()
     assert rows == [(None, 200, None), ("abc", None, None)]
 
+
+def test_isbn_does_not_overwrite_custom_cover(client, monkeypatch):
+    client.post("/books", data={"title": "Book"}, follow_redirects=False)
+    custom = b"\xff\xd8\xff" + b"custom-cover" * 200
+    client.post(
+        "/books/1/cover",
+        files={"cover": ("c.jpg", custom, "image/jpeg")},
+        follow_redirects=False,
+    )
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    client.post("/books/1/edit", data={"title": "Book", "isbn": "9780140328721"}, follow_redirects=False)
+    main.fetch_cover(1, "9780140328721", 0)
+    with open("covers/1.jpg", "rb") as f:
+        assert f.read() == custom

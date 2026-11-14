@@ -1239,6 +1239,8 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
             timeout=10,
         )
         if r.status_code == 200 and len(r.content) > 1000:
+            if os.path.exists(path):
+                return path
             os.makedirs(COVERS_DIR, exist_ok=True)
             with open(path, "wb") as f:
                 f.write(r.content)
