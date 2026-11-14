@@ -381,3 +381,60 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   }
+
+  .palette { position: fixed; inset: 0; z-index: 90; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; }
+  .palette-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(6px); }
+  .palette-sheet {
+    position: relative; display: flex; flex-direction: column;
+    width: min(100%, 560px); max-height: min(68vh, 540px); overflow: hidden;
+    border: 1px solid var(--line-2); border-radius: var(--r-lg);
+    background: var(--surface); box-shadow: var(--shadow-2);
+  }
+  .palette-field { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  .palette-field .icon { color: var(--muted); pointer-events: none; }
+  .palette-field input, .palette-field input[type="text"] {
+    flex: 1; width: 100%; height: 52px; padding: 0; border: 0; border-radius: 0;
+    background: none; box-shadow: none; color: var(--text); font-size: 15px;
+  }
+  .palette-field input:focus, .palette-field input:focus-visible { outline: none; }
+  .palette-field:focus-within { background: color-mix(in srgb, var(--surface-2) 55%, var(--surface)); }
+  .palette-esc {
+    flex: none; padding: 2px 5px; border: 1px solid var(--line-2); border-radius: 4px;
+    color: var(--muted); font: 500 10px/1.4 "Geist Mono", ui-monospace, monospace;
+  }
+  .palette-list { overflow-y: auto; padding: 6px; overscroll-behavior: contain; }
+  .palette-group + .palette-group { margin-top: 4px; }
+  .palette-group-label {
+    padding: 8px 10px 4px; color: var(--muted); font-size: 11px; font-weight: 500;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .palette-option {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;
+    border: 0; border-radius: var(--r-sm); background: none; color: var(--text);
+    font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  }
+  .palette-option .icon { color: var(--muted); }
+  .palette-option .palette-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .palette-option .palette-hint {
+    flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; color: var(--muted); font-size: 12px;
+  }
+  .palette-option[aria-selected="true"] { background: var(--accent-soft); }
+  .palette-option[aria-selected="true"] .icon { color: var(--accent-strong); }
+  .palette-empty { padding: 20px 14px; color: var(--muted); font-size: 13px; }
+  .palette-foot {
+    display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+    border-top: 1px solid var(--line); color: var(--muted); font-size: 11px;
+  }
+  .palette-foot span { display: inline-flex; align-items: center; gap: 4px; }
+  .palette-foot kbd {
+    display: inline-block; min-width: 16px; padding: 1px 4px; border: 1px solid var(--line-2);
+    border-radius: 4px; font: 500 10px/1.5 "Geist Mono", ui-monospace, monospace; text-align: center;
+  }
+  body.palette-open { overflow: hidden; }
+  @media (max-width: 640px) {
+    .palette { padding: 8px; }
+    .palette-sheet { width: 100%; max-height: calc(100dvh - 16px); }
+    .palette-field input, .palette-field input[type="text"] { font-size: 16px; }
+    .topbar .end form { display: none; }
+  }

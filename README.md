@@ -19,6 +19,7 @@
 ## Features
 
 - **Library** — cover grid or shelf view with search, sorting (title, author, rating, time, pages, added) and filters by status, rating and label.
+- **Command palette** — `⌘K` / `Ctrl+K` from any page to jump to a book, a section or an action: add a book, toggle the theme, download the database, sign out.
 - **Books** — title, author, ISBN, pages, reading time, progress, rating, review and cover. Add books manually (metadata filled in from Open Library by ISBN), edit, rate or delete them, or select several at once for bulk labeling and status changes.
 - **Pace & time left** — reading speed in pages per hour, estimated time left in the current book and a projected finish date based on your last two weeks.
 - **KOReader import** — sync books, sessions, highlights, notes and bookmarks over Wi-Fi with koinsight.koplugin, or upload the device's SQLite file.

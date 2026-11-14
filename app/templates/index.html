@@ -418,6 +418,14 @@
     const open = document.querySelector('.panel:not([hidden])');
     if (e.key === 'Escape' && open?.contains(document.activeElement)) closePanels();
   });
+
+  const panelParam = new URLSearchParams(location.search).get('panel');
+  if (panelParam && document.getElementById(`${panelParam}-card`)) {
+    panel(`${panelParam}-card`, document.querySelector(`[aria-controls="${panelParam}-card"]`));
+    const url = new URL(location.href);
+    url.searchParams.delete('panel');
+    history.replaceState(null, '', url);
+  }
 </script>
 {% if books %}
 <script>

@@ -841,6 +841,26 @@ def test_static_assets_are_public_behind_password(client, monkeypatch):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
     assert client.get("/covers/1.jpg", follow_redirects=False).status_code == 303
+    assert client.get("/api/books.json", follow_redirects=False).status_code == 303
+
+
+def test_palette_api_lists_books_newest_first(client):
+    client.post("/books", data={"title": "Dune", "author": "Frank Herbert"})
+    client.post("/books", data={"title": "Emma", "author": "Jane Austen"})
+    r = client.get("/api/books.json")
+    assert r.status_code == 200
+    rows = r.json()
+    assert [b["title"] for b in rows] == ["Emma", "Dune"]
+    assert set(rows[0]) == {"id", "title", "author", "status"}
+    assert rows[0]["author"] == "Jane Austen"
+
+
+def test_palette_ships_on_every_page(client):
+    client.post("/books", data={"title": "Dune"})
+    for path in ("/", "/stats", "/calendar", "/tbr", "/books/1"):
+        page = client.get(path).text
+        assert 'id="palette"' in page and 'id="palette-input"' in page, path
+    assert 'id="palette-open"' in client.get("/stats").text
 
 
 def test_book_reading_pace(client):

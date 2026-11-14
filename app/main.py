@@ -384,6 +384,16 @@ def index(request: Request):
     )
 
 
+@app.get("/api/books.json")
+def books_json():
+    with db() as con:
+        rows = con.execute(
+            "SELECT id, title, author, status FROM books "
+            "ORDER BY COALESCE(last_read_at, added_at) DESC, id DESC"
+        ).fetchall()
+    return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/stats")
 def stats(request: Request):
     today = date.today()
