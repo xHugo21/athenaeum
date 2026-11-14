@@ -169,6 +169,9 @@
     const empty = document.getElementById('palette-empty');
     const status = document.getElementById('palette-status');
     const trigger = document.getElementById('palette-open');
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+    trigger.title = `Search or jump to (${mac ? '⌘K' : 'Ctrl K'})`;
+    trigger.setAttribute('aria-keyshortcuts', mac ? 'Meta+K' : 'Control+K');
     const topbar = document.querySelector('.topbar');
     const content = document.getElementById('content');
     let books = null, loading = null, options = [], active = -1, opener = null;

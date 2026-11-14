@@ -23,8 +23,9 @@
 - **Books** — title, author, ISBN, pages, reading time, progress, rating, review and cover. Add books manually (metadata filled in from Open Library by ISBN), edit, rate or delete them, or select several at once for bulk labeling and status changes.
 - **Pace & time left** — reading speed in pages per hour, estimated time left in the current book and a projected finish date based on your last two weeks.
 - **KOReader import** — sync books, sessions, highlights, notes and bookmarks over Wi-Fi with koinsight.koplugin, or upload the device's SQLite file.
-- **Annotations** — highlights, notes and bookmarks per book, editable and deletable, exportable as Markdown.
-- **Statistics** — totals, current and best streak, best and longest day, 12-month reading, average time per weekday, time-of-day profile and top books.
+- **Annotations** — highlights, notes and bookmarks per book, imported from KOReader or added by hand, editable and deletable, exportable as Markdown.
+- **Share story** — turn a book's cover, rating and a highlight you pick into a 1080×1920 image, shared from the phone or downloaded as a file. Rendered in the browser, nothing leaves the server.
+- **Statistics** — totals, current and best streak, best and longest day, 12-month reading, average time per weekday, time-of-day profile and top books, all time or any single year.
 - **Calendar** — per-day reading time and pages, broken down by book.
 - **To-read list** — wishlist kept separate from the library.
 - **Labels** — tag books and browse the library by tag.
