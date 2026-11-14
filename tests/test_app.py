@@ -214,6 +214,28 @@ def test_stats_page(client):
     assert stats_pages() == ("2", "2"), "manual books have no reading sessions and stay out of stats"
 
 
+def test_stats_year_selector(client):
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("INSERT INTO days VALUES ('2020-06-01', 3600, 40)")
+        c.execute("INSERT INTO days VALUES ('2020-06-02', 60, 10)")
+
+    def time_read(url):
+        html = client.get(url).text
+        return re.search(r'Time read</div><div class="v num">([^<]+)', html).group(1)
+
+    assert time_read("/stats") == "3min", "all time counts every session"
+    assert time_read("/stats?year=2020") == "1h 01min", "a year counts only its own days"
+    assert time_read("/stats?year=1999") == "3min", "a year without data falls back to all time"
+
+    html = client.get("/stats").text
+    assert "All time" in html and 'href="/stats?year=2020"' in html
+    year_html = client.get("/stats?year=2020").text
+    assert 'href="/stats?year=2020" aria-current="page"' in year_html
+    assert "2 days read in 2020" in year_html
+    assert "current streak" not in year_html and "streak at year end" in year_html
+
+
 def test_reject_garbage(client):
     r = client.post("/import", files={"file": ("x.sqlite3", b"not a db at all", "application/octet-stream")}, follow_redirects=False)
     assert r.status_code == 303

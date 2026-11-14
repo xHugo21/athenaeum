@@ -383,16 +383,25 @@ def index(request: Request):
 
 @app.get("/stats")
 def stats(request: Request):
+    today = date.today()
     with db() as con:
+        years = [int(r[0]) for r in con.execute("SELECT DISTINCT substr(day, 1, 4) FROM days ORDER BY 1 DESC")]
+        year = request.query_params.get("year", "")
+        year = int(year) if year.isdigit() and int(year) in years else None
+        prefix = f"{year}-%" if year else "%"
         totals = con.execute(
             "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, AVG(rating) avg_rating FROM books"
         ).fetchone()
         koreader_books = con.execute(
-            "SELECT pages_read, total_pages, print_pages, isbn_pages FROM books WHERE md5 IS NOT NULL"
+            "SELECT b.total_pages, COALESCE(b.print_pages, b.isbn_pages) print_pages, SUM(bd.pages) pages_read "
+            "FROM book_days bd JOIN books b ON b.id = bd.book_id WHERE bd.day LIKE ? GROUP BY b.id",
+            (prefix,),
+        ).fetchall() if year else con.execute(
+            "SELECT total_pages, COALESCE(print_pages, isbn_pages) print_pages, pages_read "
+            "FROM books WHERE md5 IS NOT NULL"
         ).fetchall()
         pages_total = sum(
-            pages_read_equiv(r["pages_read"], r["total_pages"], r["print_pages"] or r["isbn_pages"])
-            for r in koreader_books
+            pages_read_equiv(r["pages_read"], r["total_pages"], r["print_pages"]) for r in koreader_books
         )
         koreader_pages = sum(r["pages_read"] or 0 for r in koreader_books)
         missing = [
@@ -403,14 +412,25 @@ def stats(request: Request):
             )
         ]
         days = con.execute(
-            "SELECT day, seconds, pages FROM days ORDER BY day"
+            "SELECT day, seconds, pages FROM days WHERE day LIKE ? ORDER BY day", (prefix,)
         ).fetchall()
         top = con.execute(
+            "SELECT b.id, b.title, b.author, SUM(bd.seconds) total_seconds FROM book_days bd "
+            "JOIN books b ON b.id = bd.book_id WHERE bd.day LIKE ? GROUP BY b.id "
+            "ORDER BY total_seconds DESC LIMIT 5",
+            (prefix,),
+        ).fetchall() if year else con.execute(
             "SELECT id, title, author, total_seconds FROM books WHERE total_seconds > 0 ORDER BY total_seconds DESC LIMIT 5"
         ).fetchall()
+        hour_rows = con.execute(
+            "SELECT CAST(strftime('%H', start_time, 'unixepoch', 'localtime') AS INTEGER), SUM(duration) "
+            "FROM sessions WHERE date(start_time, 'unixepoch', 'localtime') LIKE ? GROUP BY 1",
+            (prefix,),
+        ) if year else con.execute("SELECT hour, seconds FROM hours")
         hour_secs = [0] * 24
-        for h, secs in con.execute("SELECT hour, seconds FROM hours"):
+        for h, secs in hour_rows:
             hour_secs[h] = secs
+    secs = totals["secs"] if year is None else sum(r["seconds"] for r in days)
     max_secs = max((d["seconds"] for d in days), default=0) or 1
     best = max(days, key=lambda r: r["pages"], default=None)
     longest = max(days, key=lambda r: r["seconds"], default=None)
@@ -420,11 +440,14 @@ def stats(request: Request):
         wd = date.fromisoformat(r["day"]).weekday()
         wd_secs[wd] += r["seconds"]
         wd_count[wd] += 1
-    m, months = date.today().replace(day=1), []
-    for _ in range(12):
-        months.append(m)
-        m = (m - timedelta(days=1)).replace(day=1)
-    months.reverse()
+    if year:
+        months = [date(year, mo, 1) for mo in range(1, 13)]
+    else:
+        m, months = today.replace(day=1), []
+        for _ in range(12):
+            months.append(m)
+            m = (m - timedelta(days=1)).replace(day=1)
+        months.reverse()
     month_bars = [(mo.strftime("%b"), month_secs.get(mo.isoformat()[:7], 0)) for mo in months]
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     wd_bars = [(lbl, int(wd_secs[i] // wd_count[i]) if wd_count[i] else 0) for i, lbl in enumerate(day_names)]
@@ -436,7 +459,8 @@ def stats(request: Request):
     profile = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
     profile_area = f"M{pts[0][0]:.2f},100 " + " ".join(f"L{x:.2f},{y:.2f}" for x, y in pts) + f" L{pts[-1][0]:.2f},100 Z"
     have = {r["day"] for r in days if r["seconds"] > 0}
-    cur_streak, d0 = 0, date.today()
+    anchor = min(today, date(year, 12, 31)) if year else today
+    cur_streak, d0 = 0, anchor
     if d0.isoformat() not in have:
         d0 -= timedelta(days=1)
     while d0.isoformat() in have:
@@ -453,9 +477,12 @@ def stats(request: Request):
     max_wd = max(s for _, s in wd_bars) or 1
     fmt = lambda day: f"{int(day[8:10])} {date.fromisoformat(day).strftime('%b %Y')}"
     day_map = {r["day"]: (r["seconds"], r["pages"]) for r in days}
-    d = date.today() - timedelta(days=364)
+    if year:
+        d, end = date(year, 1, 1), date(year, 12, 31)
+    else:
+        d = today - timedelta(days=364)
+        end = today + timedelta(days=(6 - today.weekday()) % 7)
     d -= timedelta(days=(d.weekday() + 1) % 7)
-    end = date.today() + timedelta(days=(6 - date.today().weekday()) % 7)
     weeks, cur_m, last_lbl = [], None, -9
     while d <= end:
         wk, start = [], d
@@ -464,7 +491,8 @@ def stats(request: Request):
             alpha = round(max(0.25, hit[0] / max_secs), 2) if hit else 0
             wk.append((d.strftime(DATE_FMT), hit[0], hit[1], alpha) if hit else None)
             d += timedelta(days=1)
-        name = start.strftime("%b %Y") if start.month != cur_m and len(weeks) - last_lbl >= 3 else None
+        changed = start.month != cur_m and start.year == (year or start.year)
+        name = start.strftime("%b" if year else "%b %Y") if changed and len(weeks) - last_lbl >= (1 if year else 3) else None
         if name:
             last_lbl = len(weeks)
         cur_m = start.month
@@ -474,6 +502,11 @@ def stats(request: Request):
         "stats.html",
         {
             "totals": totals,
+            "secs": secs,
+            "years": years,
+            "year": year,
+            "span": f"in {year}" if year else "in the last twelve months",
+            "streak_label": "current streak" if anchor == today else "streak at year end",
             "pages_total": pages_total,
             "koreader_pages": koreader_pages,
             "missing": missing,

@@ -69,14 +69,20 @@
 </style>
 
 <div class="page-head">
-  <div class="title"><h1>Stats (KOReader only)</h1><span class="count">all time</span></div>
+  <div class="title"><h1>Stats (KOReader only)</h1></div>
+  {% if years %}
+  <nav class="seg" aria-label="Period">
+    <a href="/stats" {% if not year %}aria-current="page"{% endif %}>All time</a>
+    {% for y in years %}<a href="/stats?year={{ y }}" {% if y == year %}aria-current="page"{% endif %}>{{ y }}</a>{% endfor %}
+  </nav>
+  {% endif %}
 </div>
 
 {% if not totals['n'] %}
 <div class="empty">No books yet. <a href="/">Import your KOReader statistics</a> first.</div>
 {% else %}
 <div class="summary" style="border-bottom:0;padding-bottom:0;margin-bottom:8px">
-  <div><div class="label">Time read</div><div class="v num">{{ totals['secs'] | read_hm }}</div></div>
+  <div><div class="label">Time read</div><div class="v num">{{ secs | read_hm }}</div></div>
   <div><div class="label" title="Equivalent print-edition pages, from reading progress and ISBN or print page counts.">Print pages read{% include "_missing_pages.html" %}</div><div class="v num">{{ pages_total | comma }}</div></div>
   <div><div class="label" title="Sum of the pages KOReader reports, in the reader's own pagination.">KOReader pages read</div><div class="v num">{{ koreader_pages | comma }}</div></div>
   <div><div class="label">Most pages in a day</div><div class="v num">{% if best %}{{ best[0] }}{% else %}—{% endif %}{% if best %}<small>{{ best[1] }}</small>{% endif %}</div></div>
@@ -87,7 +93,7 @@
   <div class="streaks">
     <div class="streak current">
       <div class="n num">{{ cur_streak }}</div>
-      <div class="c">{{ 'day' if cur_streak == 1 else 'days' }} · current streak</div>
+      <div class="c">{{ 'day' if cur_streak == 1 else 'days' }} · {{ streak_label }}</div>
     </div>
     <div class="streak best">
       <div class="n num">{{ best_streak }}</div>
@@ -100,7 +106,7 @@
   <div class="chart-grid">
     <div class="chart">
       <h2>Monthly reading</h2>
-      <div class="cap">Hours read per month, last twelve months</div>
+      <div class="cap">Hours read per month, {{ year or 'last twelve months' }}</div>
       <div class="bars">
         {% for label, secs in month_bars %}
         <div class="col{% if not secs %} zero{% endif %}">
@@ -130,7 +136,7 @@
 <section class="section">
   <div class="chart">
     <h2>Time of day</h2>
-    <div class="cap">Hours read at each hour of the day, all time · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
+    <div class="cap">Hours read at each hour of the day, {{ year or 'all time' }} · peak {{ '%02d' % peak_hour }}:00 with {{ (max_hour / 3600) | round(0) | int }}h</div>
     {% if max_hour > 1 %}
     <svg class="profile" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Hours read at each hour of the day">
       <path class="fill" d="{{ profile_area }}"/>
@@ -150,13 +156,13 @@
   <div class="section-head">
     <div>
       <h2>Reading activity</h2>
-      <div class="cap" style="font-size:12px;color:var(--muted);margin-top:2px">{{ hc.days }} days read in the last twelve months · darker means more time</div>
+      <div class="cap" style="font-size:12px;color:var(--muted);margin-top:2px">{{ hc.days }} days read {{ span }} · darker means more time</div>
     </div>
     <a class="btn sm" href="/calendar">Calendar</a>
   </div>
   <div class="heat-scroll">
   <div class="heat-inner">
-  <div class="heat" role="img" aria-label="Reading activity: {{ hc.days }} days read in the last twelve months, darker means more time">
+  <div class="heat" role="img" aria-label="Reading activity: {{ hc.days }} days read {{ span }}, darker means more time">
     {% for wk, name in weeks %}
     <div class="wk">
       {% for day in wk %}

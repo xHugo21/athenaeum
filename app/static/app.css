@@ -197,6 +197,12 @@
   }
   .seg button:hover { color: var(--text); }
   .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+  .seg a {
+    height: 26px; padding: 0 9px; display: inline-flex; align-items: center;
+    border-radius: 4px; color: var(--muted); font-size: 12px;
+  }
+  .seg a:hover { color: var(--text); text-decoration: none; }
+  .seg a[aria-current="page"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
 
   .field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
   .field > span, .field > label { font-size: 12px; font-weight: 500; color: var(--text-2); }
