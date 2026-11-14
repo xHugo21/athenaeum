@@ -721,6 +721,15 @@ def set_status(book_id: int, status: str = Form("reading")):
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
+@app.post("/books/{book_id}/clear-stats")
+def clear_stats(book_id: int):
+    with db() as con:
+        con.execute("DELETE FROM sessions WHERE book_id=?", (book_id,))
+        con.execute("UPDATE books SET total_seconds=0, last_read_at=NULL WHERE id=?", (book_id,))
+        rebuild_aggregates(con)
+    return RedirectResponse(f"/books/{book_id}", 303)
+
+
 @app.post("/books/{book_id}/delete")
 def delete_book(book_id: int):
     with db() as con:

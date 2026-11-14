@@ -338,6 +338,11 @@
 } | tojson }}</script>
 
 <div class="danger-zone">
+  {% if sessions_n %}
+  <form method="post" action="/books/{{ b['id'] }}/clear-stats" onsubmit="return confirm('Clear reading stats for this book? Title, cover, rating, review and labels stay.')">
+    <button class="btn btn-ghost" type="submit">Clear stats</button>
+  </form>
+  {% endif %}
   <form method="post" action="/books/{{ b['id'] }}/delete" onsubmit="return confirm('Delete this book and its reading history?')">
     <button class="btn btn-danger" type="submit"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg>Delete book</button>
   </form>

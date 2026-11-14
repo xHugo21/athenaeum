@@ -317,6 +317,29 @@ def test_annotations_export(client):
     assert "**Note:** Surreal." in body
 
 
+def test_clear_stats_keeps_book(client):
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
+    with sqlite3.connect("athenaeum.db") as c:
+        (book_id,) = c.execute("SELECT id FROM books").fetchone()
+        assert c.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] > 0
+    assert "Clear stats" in client.get(f"/books/{book_id}").text
+
+    r = client.post(f"/books/{book_id}/clear-stats", follow_redirects=False)
+    assert r.status_code == 303
+
+    with sqlite3.connect("athenaeum.db") as c:
+        row = c.execute(
+            "SELECT title, total_seconds, last_read_at, pages_read, total_pages, rating FROM books"
+        ).fetchone()
+        assert row[:3] == ("The Hobbit", 0, None), "stats go, book stays"
+        assert row[3:5] == (2, 300), "progress is not part of the stats reset"
+        for table in ("sessions", "days", "book_days", "hours"):
+            assert c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
+
+    assert client.get(f"/books/{book_id}").status_code == 200
+    assert "Clear stats" not in client.get(f"/books/{book_id}").text
+
+
 def test_delete_book_removes_cover_file(client):
     os.makedirs("covers", exist_ok=True)
     client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
