@@ -1,0 +1,16 @@
+{% if missing %}
+<details class="warn">
+  <summary title="{{ missing | length }} book{{ 's' if missing | length != 1 }} excluded: no print page or ISBN page count" aria-label="{{ missing | length }} books excluded from the total. Open for details.">
+    <svg class="icon icon-sm" aria-hidden="true"><use href="#i-warn"/></svg>
+  </summary>
+  <div class="warn-pop">
+    <strong>{{ missing | length }} book{{ 's' if missing | length != 1 }} not counted</strong>
+    <ul>
+      {% for m in missing %}
+      <li><a href="/books/{{ m.id }}">{{ m.title }}</a></li>
+      {% endfor %}
+    </ul>
+    <p class="fine">Only books with a print page or ISBN page count are included.</p>
+  </div>
+</details>
+{% endif %}

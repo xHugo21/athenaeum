@@ -166,10 +166,8 @@
   }
 </style>
 {% set rated = books | selectattr('rating') | list %}
-{% set ns = namespace(secs=0, pages=0, stars=0, reading=0, finished=0, abandoned=0) %}
+{% set ns = namespace(stars=0, reading=0, finished=0, abandoned=0) %}
 {% for b in books %}
-  {% set ns.secs = ns.secs + (b['total_seconds'] or 0) %}
-  {% set ns.pages = ns.pages + (b['pages_read'] or 0) %}
   {% if b['status'] == 'finished' %}{% set ns.finished = ns.finished + 1 %}
   {% elif b['status'] == 'abandoned' %}{% set ns.abandoned = ns.abandoned + 1 %}
   {% else %}{% set ns.reading = ns.reading + 1 %}{% endif %}
@@ -201,8 +199,7 @@
 
 <div class="library-bar">
   <div class="summary">
-    <div><div class="label">Time read</div><div class="v num">{{ ns.secs | read_hm }}</div></div>
-    <div><div class="label">Pages read</div><div class="v num">{{ ns.pages | comma }}</div></div>
+    <div><div class="label">Pages read{% include "_missing_pages.html" %}</div><div class="v num">{{ pages_total | comma }}</div></div>
     <div><div class="label">Average rating</div><div class="v num">{{ (ns.stars / (rated | length)) | round(1) if rated else '—' }}</div></div>
   </div>
   <div class="library-toolbar">
@@ -247,7 +244,7 @@
     <div class="form-grid">
       <label class="field span-6"><span>Title</span><input id="f-title" name="title" required></label>
       <label class="field span-4"><span>Author</span><input id="f-author" name="author"></label>
-      <label class="field span-2"><span>Pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
+      <label class="field span-2"><span>Print pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
       <label class="field span-4"><span>ISBN</span><input id="f-isbn" name="isbn" inputmode="numeric" placeholder="9780140328721"></label>
       <div class="field span-4"><span>Rating</span>
         <input type="hidden" name="rating" id="rate-val" value="0">

@@ -134,7 +134,9 @@ def test_manual_add_with_isbn(client, monkeypatch):
     monkeypatch.setattr(
         main.httpx,
         "get",
-        lambda *a, **k: FakeResp([{"title": "Matilda", "author_name": ["Roald Dahl"]}]),
+        lambda *a, **k: FakeResp(
+            [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]
+        ),
     )
     r = client.post(
         "/books",
@@ -155,10 +157,10 @@ def test_manual_add_with_isbn(client, monkeypatch):
         ("whatever", "Roald Dahl", "9780140328721", 5),
         ("My Book", "Me", "9780140328721", None),
     ]
-    (pages,) = sqlite3.connect("athenaeum.db").execute(
-        "SELECT total_pages FROM books WHERE title='My Book'"
+    (total, print_pages, isbn_pages) = sqlite3.connect("athenaeum.db").execute(
+        "SELECT total_pages, print_pages, isbn_pages FROM books WHERE title='My Book'"
     ).fetchone()
-    assert pages == 250
+    assert (total, print_pages, isbn_pages) == (250, 250, 96), "the pages typed on add are the print pages"
 
 
 def test_set_isbn_fills_pages_for_manual_add(client, monkeypatch):
@@ -173,8 +175,10 @@ def test_set_isbn_fills_pages_for_manual_add(client, monkeypatch):
     r = client.post("/books/1/edit", data={"title": "Manual Book", "isbn": "9780140328721"}, follow_redirects=False)
     assert r.status_code == 303
     with sqlite3.connect("athenaeum.db") as c:
-        (total, read) = c.execute("SELECT total_pages, pages_read FROM books WHERE id=1").fetchone()
-    assert (total, read) == (96, 96), "metadata pages must fill NULL total_pages even for manual adds"
+        (total, read, isbn_pages, manual) = c.execute(
+            "SELECT total_pages, pages_read, isbn_pages, print_pages FROM books WHERE id=1"
+        ).fetchone()
+    assert (total, read, isbn_pages, manual) == (96, 96, 96, None), "the ISBN page count must be stored"
 
 
 def test_stats_page(client):
@@ -191,11 +195,23 @@ def test_stats_page(client):
         total = c.execute("SELECT SUM(duration) FROM sessions").fetchone()[0]
     assert hours[1] == total, "the hour table is rebuilt from every session"
     assert 0 < hours[0] <= 24
-    assert "from KOReader" not in r.text, "all-tracked library needs no breakdown"
+    assert "Stats (KOReader only)" in r.text
+
+    def stats_pages():
+        html = client.get("/stats").text
+        return (
+            re.search(r'Print pages read.*?<div class="v num">([\d,]+)', html, re.S).group(1),
+            re.search(r'KOReader pages read.*?<div class="v num">([\d,]+)', html, re.S).group(1),
+        )
+
+    assert stats_pages() == ("0", "2"), "no print page count yet, but KOReader pages are still there"
+
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("UPDATE books SET isbn='9780261102217', isbn_pages=300 WHERE title='The Hobbit'")
+    assert stats_pages() == ("2", "2"), "2 of 300 KOReader pages against a 300-page edition"
 
     client.post("/books", data={"title": "Manual Book", "pages": 96}, follow_redirects=False)
-    r = client.get("/stats")
-    assert "2 from KOReader" in r.text, "untracked pages must not count as KOReader ones"
+    assert stats_pages() == ("2", "2"), "manual books have no reading sessions and stay out of stats"
 
 
 def test_reject_garbage(client):
@@ -951,3 +967,99 @@ def test_book_edit_controls_are_icons(client):
     page = client.get("/books/1").text
     review = re.search(r'<button[^>]*id="review-edit-btn"[^>]*>(.*?)</button>', page, re.S).group(1)
     assert "#i-pencil" in review and "Write a review" not in review
+
+
+def test_library_pages_only_count_isbn_editions(client):
+    with db() as con:
+        con.executemany(
+            "INSERT INTO books (title, isbn, md5, pages_read, total_pages, print_pages, isbn_pages, added_at, status) "
+            "VALUES (?,?,?,?,?,?,?,0,'reading')",
+            [
+                ("manual counted", "111", None, 100, 200, None, 240),
+                ("synced counted", "222", "a" * 32, 150, 300, None, 100),
+                ("missing isbn", None, None, 50, 100, None, None),
+                ("isbn without pages", "333", None, 30, 60, None, None),
+                ("manual no isbn", None, None, 20, 100, 50, None),
+            ],
+        )
+    r = client.get("/")
+    pages = re.search(r'Pages read.*?<div class="v num">([\d,]+)', r.text, re.S).group(1)
+    assert pages == "180", "120 + 50 ISBN pages plus 10 from the manual override"
+    assert "2 books not counted" in r.text
+    assert "missing isbn" in r.text and "isbn without pages" in r.text
+    assert "Only books with a print page or ISBN page count are included." in r.text
+    assert "· no ISBN" not in r.text and "· ISBN without pages" not in r.text
+
+
+def test_stats_pages_only_koreader_books_with_isbn(client):
+    with db() as con:
+        con.executemany(
+            "INSERT INTO books (title, isbn, md5, pages_read, total_pages, print_pages, isbn_pages, added_at, status) "
+            "VALUES (?,?,?,?,?,?,?,0,'reading')",
+            [
+                ("ZZ KO Counted", "111", "a" * 32, 150, 300, None, 100),
+                ("ZZ KO Missing", "222", "b" * 32, 100, 200, None, None),
+                ("ZZ KO Manual", "444", "c" * 32, 50, 100, 200, None),
+                ("ZZ Manual Only", "333", None, 100, 200, None, 240),
+            ],
+        )
+    r = client.get("/stats")
+    pages = re.search(r'Print pages read.*?<div class="v num">([\d,]+)', r.text, re.S).group(1)
+    koreader = re.search(r'KOReader pages read.*?<div class="v num">([\d,]+)', r.text, re.S).group(1)
+    assert pages == "150", "50 from the ISBN book plus 100 from the manual override"
+    assert koreader == "300", "KOReader pages include every imported book"
+    assert "ZZ KO Missing" in r.text and "ZZ Manual Only" not in r.text
+    assert "ZZ KO Manual" not in r.text, "a manual page count clears the warning"
+
+
+def test_manual_print_pages_overrides_isbn(client):
+    with db() as con:
+        con.execute(
+            "INSERT INTO books (title, isbn, md5, pages_read, total_pages, isbn_pages, added_at, status) "
+            "VALUES ('Book', '111', 'a' * 32, 50, 100, 200, 0, 'reading')"
+        )
+
+    def total():
+        html = client.get("/").text
+        return re.search(r'Pages read.*?<div class="v num">([\d,]+)', html, re.S).group(1)
+
+    assert total() == "100"
+    client.post(
+        "/books/1/edit",
+        data={"title": "Book", "isbn": "111", "pages_read": 50, "total_pages": 100, "print_pages": 300},
+        follow_redirects=False,
+    )
+    with sqlite3.connect("athenaeum.db") as c:
+        manual, isbn_pages = c.execute("SELECT print_pages, isbn_pages FROM books WHERE id=1").fetchone()
+    assert (manual, isbn_pages) == (300, 200), "the manual value sits beside the ISBN one"
+    assert total() == "150", "300 print pages now drive the fraction"
+    client.post(
+        "/books/1/edit",
+        data={"title": "Book", "isbn": "111", "pages_read": 50, "total_pages": 100, "print_pages": 0},
+        follow_redirects=False,
+    )
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT print_pages FROM books WHERE id=1").fetchone()[0] is None
+    assert total() == "100", "clearing the manual value falls back to the ISBN one"
+
+
+def test_manual_add_print_pages_count_without_isbn(client):
+    client.post("/books", data={"title": "Print Only", "pages": 200}, follow_redirects=False)
+    html = client.get("/").text
+    pages = re.search(r'Pages read.*?<div class="v num">([\d,]+)', html, re.S).group(1)
+    assert pages == "200"
+    assert "not counted" not in html
+
+
+def test_migrate_gives_manual_books_their_print_pages(workdir):
+    con = sqlite3.connect("athenaeum.db")
+    con.execute(
+        "CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, md5 TEXT, "
+        "total_pages INTEGER, pages_read INTEGER)"
+    )
+    con.execute("INSERT INTO books (title, md5, total_pages, pages_read) VALUES ('manual', NULL, 200, 100)")
+    con.execute("INSERT INTO books (title, md5, total_pages, pages_read) VALUES ('synced', 'abc', 300, 100)")
+    migrate(con)
+    rows = con.execute("SELECT md5, print_pages, isbn_pages FROM books ORDER BY id").fetchall()
+    assert rows == [(None, 200, None), ("abc", None, None)]
+

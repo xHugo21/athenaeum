@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS books (
     total_seconds INTEGER NOT NULL DEFAULT 0,
     pages_read INTEGER NOT NULL DEFAULT 0,
     total_pages INTEGER,
+    print_pages INTEGER,
+    isbn_pages INTEGER,
     last_read_at INTEGER,
     rating REAL,
     review TEXT,
@@ -178,6 +180,14 @@ def migrate(con):
     if "finished" in cols:
         con.execute("UPDATE books SET status='finished' WHERE finished=1")
         con.execute("ALTER TABLE books DROP COLUMN finished")
+    if "print_pages" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN print_pages INTEGER")
+    if "isbn_pages" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN isbn_pages INTEGER")
+        if "print_pages" in cols:
+            con.execute("UPDATE books SET isbn_pages=print_pages, print_pages=NULL")
+        if "total_pages" in cols:
+            con.execute("UPDATE books SET print_pages=total_pages WHERE md5 IS NULL AND total_pages>0")
 
 
 @asynccontextmanager
@@ -258,6 +268,13 @@ def snap_rating(rating: float) -> float:
     return round(rating * 2) / 2
 
 
+def pages_read_equiv(pages_read, total_pages, print_pages):
+    if not total_pages or not print_pages:
+        return 0
+    frac = min(1.0, max(0.0, (pages_read or 0) / total_pages))
+    return round(frac * print_pages)
+
+
 def book_index(con):
     by_md5, by_key = {}, {}
     for r in con.execute("SELECT id, title, author, md5 FROM books"):
@@ -328,6 +345,14 @@ def index(request: Request):
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
+    pages_total = sum(
+        pages_read_equiv(b["pages_read"], b["total_pages"], b["print_pages"] or b["isbn_pages"]) for b in books
+    )
+    missing = [
+        {"id": b["id"], "title": b["title"]}
+        for b in books
+        if not (b["print_pages"] or b["isbn_pages"])
+    ]
     active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
     if os.path.isdir(COVERS_DIR):
@@ -339,6 +364,8 @@ def index(request: Request):
         "index.html",
         {
             "books": books,
+            "pages_total": pages_total,
+            "missing": missing,
             "sort": sort,
             "dir": d,
             "search": search,
@@ -358,9 +385,23 @@ def index(request: Request):
 def stats(request: Request):
     with db() as con:
         totals = con.execute(
-            "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, COALESCE(SUM(pages_read),0) pages,"
-            " COALESCE(SUM(CASE WHEN md5 IS NOT NULL THEN pages_read END),0) tracked_pages, AVG(rating) avg_rating FROM books"
+            "SELECT COUNT(*) n, COALESCE(SUM(total_seconds),0) secs, AVG(rating) avg_rating FROM books"
         ).fetchone()
+        koreader_books = con.execute(
+            "SELECT pages_read, total_pages, print_pages, isbn_pages FROM books WHERE md5 IS NOT NULL"
+        ).fetchall()
+        pages_total = sum(
+            pages_read_equiv(r["pages_read"], r["total_pages"], r["print_pages"] or r["isbn_pages"])
+            for r in koreader_books
+        )
+        koreader_pages = sum(r["pages_read"] or 0 for r in koreader_books)
+        missing = [
+            {"id": r["id"], "title": r["title"]}
+            for r in con.execute(
+                "SELECT id, title FROM books WHERE md5 IS NOT NULL "
+                "AND COALESCE(print_pages, isbn_pages) IS NULL"
+            )
+        ]
         days = con.execute(
             "SELECT day, seconds, pages FROM days ORDER BY day"
         ).fetchall()
@@ -433,6 +474,9 @@ def stats(request: Request):
         "stats.html",
         {
             "totals": totals,
+            "pages_total": pages_total,
+            "koreader_pages": koreader_pages,
+            "missing": missing,
             "weeks": weeks,
             "top": top,
             "best": (best["pages"], fmt(best["day"])) if best else None,
@@ -647,16 +691,18 @@ def add_book(
     rating = snap_rating(rating)
     isbn = clean_isbn(isbn)
     meta = fetch_metadata(isbn) if isbn else {}
-    total_pages = pages or meta.get("pages")
+    book_pages = pages or meta.get("pages")
     with db() as con:
         con.execute(
-            "INSERT INTO books (title, author, isbn, pages_read, total_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO books (title, author, isbn, pages_read, total_pages, print_pages, isbn_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
                 isbn or None,
-                total_pages or 0,
-                total_pages,
+                book_pages or 0,
+                book_pages,
+                pages or None,
+                meta.get("pages"),
                 rating or None,
                 review or None,
                 "finished",
@@ -685,13 +731,23 @@ def edit_book(
     isbn: str = Form(""),
     pages_read: int = Form(0),
     total_pages: int = Form(0),
+    print_pages: int = Form(0),
 ):
     isbn = clean_isbn(isbn)
     with db() as con:
-        row = con.execute("SELECT isbn, total_seconds FROM books WHERE id=?", (book_id,)).fetchone()
+        row = con.execute(
+            "SELECT isbn, total_seconds, print_pages, isbn_pages FROM books WHERE id=?", (book_id,)
+        ).fetchone()
         if not row:
             return RedirectResponse("/", 303)
-        meta = fetch_metadata(isbn) if isbn and not row["isbn"] else {}
+        meta = fetch_metadata(isbn) if isbn and (isbn != row["isbn"] or not row["isbn_pages"]) else {}
+        isbn_pages = row["isbn_pages"] if isbn == row["isbn"] else None
+        if isbn and not isbn_pages:
+            isbn_pages = meta.get("pages")
+        manual = row["print_pages"]
+        effective = manual or row["isbn_pages"] or 0
+        if max(0, print_pages) != effective:
+            manual = max(0, print_pages) or None
         new_total = total_pages or meta.get("pages")
         new_read = pages_read
         if new_total and not row["total_seconds"] and not pages_read:
@@ -699,13 +755,15 @@ def edit_book(
         if isbn and isbn != row["isbn"]:
             con.execute("UPDATE books SET cover_failed=0 WHERE id=?", (book_id,))
         con.execute(
-            "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=? WHERE id=?",
+            "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=?, print_pages=?, isbn_pages=? WHERE id=?",
             (
                 title.strip() or None,
                 author.strip() or None,
                 isbn or None,
                 max(0, new_read),
                 new_total,
+                manual,
+                isbn_pages,
                 book_id,
             ),
         )

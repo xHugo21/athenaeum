@@ -69,7 +69,7 @@
 </style>
 
 <div class="page-head">
-  <div class="title"><h1>Stats</h1><span class="count">all time</span></div>
+  <div class="title"><h1>Stats (KOReader only)</h1><span class="count">all time</span></div>
 </div>
 
 {% if not totals['n'] %}
@@ -77,7 +77,8 @@
 {% else %}
 <div class="summary" style="border-bottom:0;padding-bottom:0;margin-bottom:8px">
   <div><div class="label">Time read</div><div class="v num">{{ totals['secs'] | read_hm }}</div></div>
-  <div><div class="label">Pages read</div><div class="v num">{{ totals['pages'] | comma }}{% if totals['tracked_pages'] != totals['pages'] %}<small>{{ totals['tracked_pages'] | comma }} from KOReader</small>{% endif %}</div></div>
+  <div><div class="label" title="Equivalent print-edition pages, from reading progress and ISBN or print page counts.">Print pages read{% include "_missing_pages.html" %}</div><div class="v num">{{ pages_total | comma }}</div></div>
+  <div><div class="label" title="Sum of the pages KOReader reports, in the reader's own pagination.">KOReader pages read</div><div class="v num">{{ koreader_pages | comma }}</div></div>
   <div><div class="label">Most pages in a day</div><div class="v num">{% if best %}{{ best[0] }}{% else %}—{% endif %}{% if best %}<small>{{ best[1] }}</small>{% endif %}</div></div>
   <div><div class="label">Longest daily reading</div><div class="v num">{% if longest %}{{ longest[0] | read_hm }}{% else %}—{% endif %}{% if longest %}<small>{{ longest[1] }}</small>{% endif %}</div></div>
 </div>

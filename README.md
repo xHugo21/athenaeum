@@ -40,6 +40,8 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port <port>
 
 Accessible through http://localhost:<port>
 
+Pages read only counts books with a print page or ISBN page count. Print page counts are fetched from Open Library when a book is added or its ISBN is edited. For books already in the database, set **Print pages** from the book's edit form; a manual value overrides the ISBN one, and clearing it falls back to the ISBN value when there is one.
+
 ## Docker
 
 ```sh

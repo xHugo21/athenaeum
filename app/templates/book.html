@@ -172,6 +172,7 @@
       <label class="field"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="9780140328721"></label>
       <label class="field"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
       <label class="field"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
+      <label class="field"><span>Print pages</span><input type="number" min="1" name="print_pages" value="{{ b['print_pages'] or b['isbn_pages'] or '' }}"><small class="hint">{% if b['print_pages'] %}manual override{% elif b['isbn_pages'] %}from ISBN{% else %}no ISBN page count{% endif %}</small></label>
       <div class="form-actions wide">
         <button class="btn btn-primary sm">Save</button>
         <button class="btn sm btn-ghost" type="button" onclick="document.getElementById('hdr-edit').hidden=true;document.getElementById('hdr-view').hidden=false">Cancel</button>
