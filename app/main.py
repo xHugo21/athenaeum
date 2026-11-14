@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS books (
     author TEXT,
     isbn TEXT,
     md5 TEXT,
+    koreader_ignored INTEGER NOT NULL DEFAULT 0,
     total_seconds INTEGER NOT NULL DEFAULT 0,
     pages_read INTEGER NOT NULL DEFAULT 0,
     total_pages INTEGER,
@@ -188,6 +189,8 @@ def migrate(con):
             con.execute("UPDATE books SET isbn_pages=print_pages, print_pages=NULL")
         if "total_pages" in cols:
             con.execute("UPDATE books SET print_pages=total_pages WHERE md5 IS NULL AND total_pages>0")
+    if "koreader_ignored" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN koreader_ignored INTEGER NOT NULL DEFAULT 0")
 
 
 @asynccontextmanager
@@ -277,7 +280,7 @@ def pages_read_equiv(pages_read, total_pages, print_pages):
 
 def book_index(con):
     by_md5, by_key = {}, {}
-    for r in con.execute("SELECT id, title, author, md5 FROM books"):
+    for r in con.execute("SELECT id, title, author, md5, koreader_ignored FROM books"):
         entry = dict(r)
         if entry["md5"]:
             by_md5[entry["md5"]] = entry
@@ -351,7 +354,7 @@ def index(request: Request):
     missing = [
         {"id": b["id"], "title": b["title"]}
         for b in books
-        if not (b["print_pages"] or b["isbn_pages"])
+        if b["pages_read"] and not (b["print_pages"] or b["isbn_pages"])
     ]
     active_label = next((name for name in label_counts if name.casefold() == label.casefold()), None)
     cover_ts = {}
@@ -398,7 +401,7 @@ def stats(request: Request):
             (prefix,),
         ).fetchall() if year else con.execute(
             "SELECT total_pages, COALESCE(print_pages, isbn_pages) print_pages, pages_read "
-            "FROM books WHERE md5 IS NOT NULL"
+            "FROM books WHERE md5 IS NOT NULL AND NOT koreader_ignored"
         ).fetchall()
         pages_total = sum(
             pages_read_equiv(r["pages_read"], r["total_pages"], r["print_pages"]) for r in koreader_books
@@ -407,7 +410,7 @@ def stats(request: Request):
         missing = [
             {"id": r["id"], "title": r["title"]}
             for r in con.execute(
-                "SELECT id, title FROM books WHERE md5 IS NOT NULL "
+                "SELECT id, title FROM books WHERE md5 IS NOT NULL AND NOT koreader_ignored "
                 "AND COALESCE(print_pages, isbn_pages) IS NULL"
             )
         ]
@@ -816,8 +819,18 @@ def set_status(book_id: int, status: str = Form("reading")):
 def clear_stats(book_id: int):
     with db() as con:
         con.execute("DELETE FROM sessions WHERE book_id=?", (book_id,))
-        con.execute("UPDATE books SET total_seconds=0, last_read_at=NULL WHERE id=?", (book_id,))
+        con.execute(
+            "UPDATE books SET koreader_ignored=1, total_seconds=0, pages_read=0, total_pages=NULL, last_read_at=NULL WHERE id=?",
+            (book_id,),
+        )
         rebuild_aggregates(con)
+    return RedirectResponse(f"/books/{book_id}", 303)
+
+
+@app.post("/books/{book_id}/count-koreader")
+def count_koreader(book_id: int):
+    with db() as con:
+        con.execute("UPDATE books SET koreader_ignored=0 WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -1027,6 +1040,8 @@ async def plugin_import(request: Request):
             title = " ".join((book.get("title") or "").split()) or "Untitled"
             authors = " ".join((book.get("authors") or "").replace(";", ",").split()) or None
             row = find_book(index, title, authors, md5)
+            if row and row["koreader_ignored"]:
+                continue
             if row:
                 bid = row["id"]
                 con.execute(
@@ -1074,6 +1089,8 @@ def import_koreader(file: UploadFile):
         index = book_index(con)
         for s in stats:
             row = find_book(index, s.title, s.author, s.md5)
+            if row and row["koreader_ignored"]:
+                continue
             if row:
                 bid = row["id"]
                 con.execute(

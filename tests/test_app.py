@@ -361,21 +361,58 @@ def test_clear_stats_keeps_book(client):
         (book_id,) = c.execute("SELECT id FROM books").fetchone()
         assert c.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] > 0
     assert "Clear stats" in client.get(f"/books/{book_id}").text
+    assert "not counted" in client.get("/stats").text
 
     r = client.post(f"/books/{book_id}/clear-stats", follow_redirects=False)
     assert r.status_code == 303
 
     with sqlite3.connect("athenaeum.db") as c:
         row = c.execute(
-            "SELECT title, total_seconds, last_read_at, pages_read, total_pages, rating FROM books"
+            "SELECT title, md5, koreader_ignored, total_seconds, last_read_at, pages_read, total_pages FROM books"
         ).fetchone()
-        assert row[:3] == ("The Hobbit", 0, None), "stats go, book stays"
-        assert row[3:5] == (2, 300), "progress is not part of the stats reset"
+        assert row[:2] == ("The Hobbit", "a" * 32), "the md5 stays for an exact match on re-import"
+        assert row[2:] == (1, 0, None, 0, None), "stats and progress go, book stays"
         for table in ("sessions", "days", "book_days", "hours"):
             assert c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
 
     assert client.get(f"/books/{book_id}").status_code == 200
     assert "Clear stats" not in client.get(f"/books/{book_id}").text
+    assert "Kept out of KOReader stats" in client.get(f"/books/{book_id}").text
+    assert "not counted" not in client.get("/stats").text, "an ignored book leaves the KOReader stats"
+    assert "not counted" not in client.get("/").text, "and it has no pages left to warn about"
+
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 1, "re-import must not clone the ignored book"
+        assert c.execute("SELECT total_seconds, pages_read FROM books").fetchone() == (0, 0), "nor resurrect its stats"
+        assert c.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert "not counted" not in client.get("/stats").text
+
+    client.post(f"/books/{book_id}/count-koreader", follow_redirects=False)
+    client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT total_seconds, pages_read FROM books").fetchone() == (180, 2), "counting again re-imports"
+    assert "not counted" in client.get("/stats").text
+
+
+def test_clear_stats_on_already_cleared_book(client):
+    with db() as con:
+        cur = con.execute(
+            "INSERT INTO books (title, md5, total_seconds, pages_read, total_pages, added_at, status) "
+            "VALUES ('Half Cleared', ?, 0, 120, 300, 0, 'reading')",
+            ("d" * 32,),
+        )
+        book_id = cur.lastrowid
+    assert "Clear stats" in client.get(f"/books/{book_id}").text, "a leftover KOReader link still needs clearing"
+
+    client.post(f"/books/{book_id}/clear-stats", follow_redirects=False)
+
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute(
+            "SELECT koreader_ignored, pages_read, total_pages FROM books WHERE id=?", (book_id,)
+        ).fetchone() == (1, 0, None)
+    assert "Clear stats" not in client.get(f"/books/{book_id}").text
+    assert "Kept out of KOReader stats" in client.get(f"/books/{book_id}").text
 
 
 def test_delete_book_removes_cover_file(client):
@@ -1082,8 +1119,8 @@ def test_migrate_gives_manual_books_their_print_pages(workdir):
     con.execute("INSERT INTO books (title, md5, total_pages, pages_read) VALUES ('manual', NULL, 200, 100)")
     con.execute("INSERT INTO books (title, md5, total_pages, pages_read) VALUES ('synced', 'abc', 300, 100)")
     migrate(con)
-    rows = con.execute("SELECT md5, print_pages, isbn_pages FROM books ORDER BY id").fetchall()
-    assert rows == [(None, 200, None), ("abc", None, None)]
+    rows = con.execute("SELECT md5, print_pages, isbn_pages, koreader_ignored FROM books ORDER BY id").fetchall()
+    assert rows == [(None, 200, None, 0), ("abc", None, None, 0)]
 
 
 def test_isbn_does_not_overwrite_custom_cover(client, monkeypatch):

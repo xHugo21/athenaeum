@@ -339,8 +339,14 @@
 } | tojson }}</script>
 
 <div class="danger-zone">
-  {% if sessions_n %}
-  <form method="post" action="/books/{{ b['id'] }}/clear-stats" onsubmit="return confirm('Clear reading stats for this book? Title, cover, rating, review and labels stay.')">
+  {% if b['koreader_ignored'] %}
+  <p class="hint">Kept out of KOReader stats. Counting it again brings its numbers back on the next import.</p>
+  <form method="post" action="/books/{{ b['id'] }}/count-koreader">
+    <button class="btn btn-ghost" type="submit">Count in stats again</button>
+  </form>
+  {% endif %}
+  {% if not b['koreader_ignored'] and (sessions_n or b['md5'] or b['pages_read'] or b['total_seconds']) %}
+  <form method="post" action="/books/{{ b['id'] }}/clear-stats" onsubmit="return confirm('Clear reading stats for this book? It stops counting as a KOReader book, so keep it only for books you opened without reading. Title, cover, rating, review and labels stay.')">
     <button class="btn btn-ghost" type="submit">Clear stats</button>
   </form>
   {% endif %}
