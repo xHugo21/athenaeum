@@ -71,7 +71,7 @@
 <div class="cal-totals">
   <span><b class="num">{{ days_read }}</b>days read</span>
   <span><b class="num">{{ month_seconds | read_hm }}</b>total</span>
-  <span><b class="num">{{ month_pages | comma }}</b>pages</span>
+  <span><b class="num">{{ month_pages | comma }}</b>KOReader pages</span>
   <span><b class="num">{{ books_read }}</b>books</span>
 </div>
 
@@ -93,7 +93,7 @@
         <a class="cal-day{% if iso == selected_day %} selected{% endif %}"
            href="/calendar?month={{ month_key }}&day={{ iso }}"
            {% if iso == selected_day %}aria-current="date"{% endif %}
-           aria-label="{{ c['date'].isoformat() | day_fmt }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} pages, {{ c['books'] | length }} books">
+           aria-label="{{ c['date'].isoformat() | day_fmt }}: {{ c['seconds'] | read_hm }}, {{ c['pages'] }} KOReader pages, {{ c['books'] | length }} books">
           <span class="n num">{{ c['date'].day }}</span>
           {% if c['seconds'] %}<span class="mins num">{{ ((c['seconds'] + 59) // 60) }}m</span>{% endif %}
         </a>

@@ -3,7 +3,7 @@
     <div class="label">Selected day</div>
     <h2 class="num">{{ selected_day | day_fmt }}</h2>
     {% if selected_seconds or selected_pages %}
-    <div class="meta num">{{ selected_seconds | read_hm }} · {{ selected_pages }} pages</div>
+    <div class="meta num">{{ selected_seconds | read_hm }} · {{ selected_pages }} KOReader pages</div>
     {% endif %}
     {% if selected_books %}
     <div class="cal-books">
@@ -11,7 +11,7 @@
       <a class="cal-book" href="/books/{{ b['book_id'] }}">
         <span class="t">{{ b['title'] }}</span>
         {% if b['author'] %}<span class="a">{{ b['author'] }}</span>{% endif %}
-        <span class="m num">{{ b['seconds'] | read_hm }} · {{ b['pages'] }} pages</span>
+        <span class="m num">{{ b['seconds'] | read_hm }} · {{ b['pages'] }} KOReader pages</span>
       </a>
       {% endfor %}
     </div>

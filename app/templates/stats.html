@@ -85,7 +85,7 @@
   <div><div class="label">Time read</div><div class="v num">{{ secs | read_hm }}</div></div>
   <div><div class="label" title="Equivalent print-edition pages, from reading progress and ISBN or print page counts.">Print pages read{% include "_missing_pages.html" %}</div><div class="v num">{{ pages_total | comma }}</div></div>
   <div><div class="label" title="Sum of the pages KOReader reports, in the reader's own pagination.">KOReader pages read</div><div class="v num">{{ koreader_pages | comma }}</div></div>
-  <div><div class="label">Most pages in a day</div><div class="v num">{% if best %}{{ best[0] }}{% else %}—{% endif %}{% if best %}<small>{{ best[1] }}</small>{% endif %}</div></div>
+  <div><div class="label" title="The day with the most distinct pages read, summed in the reader's own pagination.">Most KOReader pages in a day</div><div class="v num">{% if best %}{{ best[0] }}{% else %}—{% endif %}{% if best %}<small>{{ best[1] }}</small>{% endif %}</div></div>
   <div><div class="label">Longest daily reading</div><div class="v num">{% if longest %}{{ longest[0] | read_hm }}{% else %}—{% endif %}{% if longest %}<small>{{ longest[1] }}</small>{% endif %}</div></div>
 </div>
 
@@ -168,7 +168,7 @@
       {% for day in wk %}
         {% if day %}
         <div class="d"
-             data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} pages"
+             data-tip="{{ day[0] }} · {{ (day[1] / 60) | round(0) | int }} min, {{ day[2] }} KOReader pages"
              style="background:color-mix(in srgb, var(--accent) {{ day[3] * 100 }}%, var(--surface-2))"></div>
         {% else %}
         <div class="d off" aria-hidden="true"></div>
