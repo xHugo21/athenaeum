@@ -544,7 +544,7 @@
     const rows = [];
     let row = [], width = 0;
 
-    const logPages = b => Math.log(Math.max(1, b.pages || 0));
+    const logPages = b => Math.log(Math.max(1, b.pp || b.pages || 0));
     const sorted = booksData.map(logPages).sort((a, b) => a - b);
     const at = q => sorted[Math.min(sorted.length - 1, Math.round((sorted.length - 1) * q))];
     let lo = at(0.1), hi = at(0.9);
@@ -557,7 +557,7 @@
     for (const b of booksData) {
       const t = (logPages(b) - lo) / (hi - lo);
       b._w = Math.round(Math.min(92, 30 + Math.max(0, t) * 44 + Math.max(0, t - 1) * 16));
-      b._h = 236 + Math.round((((b.id * 7 + b.pages * 3) % 60) - 30) * .8);
+      b._h = 236 + Math.round((((b.id * 7 + (b.pp || b.pages) * 3) % 60) - 30) * .8);
       if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
       row.push(b);
       width += (row.length > 1 ? GAP : 0) + b._w;
