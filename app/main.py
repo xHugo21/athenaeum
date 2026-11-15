@@ -320,6 +320,9 @@ def index(request: Request):
     rating = request.query_params.get("rating", "any")
     if rating not in ("any", "none", "1", "2", "3", "4", "5"):
         rating = "any"
+    page_equiv = (
+        "COALESCE(print_pages, isbn_pages) * MIN(1.0, pages_read * 1.0 / NULLIF(total_pages, 0))"
+    )
     sort_sql = {
         ("recent", "asc"): "COALESCE(last_read_at, added_at) ASC",
         ("recent", "desc"): "COALESCE(last_read_at, added_at) DESC",
@@ -331,8 +334,8 @@ def index(request: Request):
         ("rating", "desc"): "rating DESC",
         ("time", "asc"): "total_seconds ASC",
         ("time", "desc"): "total_seconds DESC",
-        ("pages", "asc"): "pages_read ASC",
-        ("pages", "desc"): "pages_read DESC",
+        ("pages", "asc"): f"({page_equiv}) IS NULL, {page_equiv} ASC",
+        ("pages", "desc"): f"({page_equiv}) IS NULL, {page_equiv} DESC",
         ("added", "asc"): "added_at ASC",
         ("added", "desc"): "added_at DESC",
     }.get((sort, d), "COALESCE(last_read_at, added_at) DESC")

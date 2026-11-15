@@ -381,7 +381,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -658,7 +658,7 @@
     author: b => b.author.toLowerCase(),
     rating: b => b.rating,
     time: b => b.secs,
-    pages: b => b.pdr,
+    pages: b => b.pdr && b.pages && b.pp ? Math.round(Math.min(1, b.pdr / b.pages) * b.pp) : 0,
     added: b => b.added,
   };
   const sortParams = new URLSearchParams(location.search);
