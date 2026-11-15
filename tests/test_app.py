@@ -833,6 +833,24 @@ def test_calendar_lists_books_per_day(client):
     assert "No reading logged this month." in r.text
 
 
+def test_day_pages_add_up_when_books_share_page_numbers(workdir):
+    with TestClient(app):
+        pass
+    with sqlite3.connect("athenaeum.db") as c:
+        c.executemany(
+            "INSERT INTO books (title, md5, total_pages, added_at) VALUES (?,?,300,0)",
+            [("One", "a" * 32), ("Two", "b" * 32)],
+        )
+        c.executemany(
+            "INSERT INTO sessions VALUES (?,?,?,?,300)",
+            [(1, 10, 1700000000, 60), (2, 10, 1700000060, 60), (1, 11, 1700000120, 60)],
+        )
+    with TestClient(app):
+        pass
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT pages FROM days").fetchone()[0] == 3, "same page in two books counts twice"
+
+
 def test_static_assets_are_public_behind_password(client, monkeypatch):
 
     monkeypatch.setattr(main, "PASSWORD", "secret")

@@ -993,14 +993,13 @@ def rebuild_aggregates(con):
     con.execute("DELETE FROM book_days")
     con.execute("DELETE FROM hours")
     con.execute(
-        "INSERT INTO days (day, seconds, pages) "
-        "SELECT date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
-        "FROM sessions GROUP BY 1"
-    )
-    con.execute(
         "INSERT INTO book_days (book_id, day, seconds, pages) "
         "SELECT book_id, date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "
         "FROM sessions GROUP BY 1, 2"
+    )
+    con.execute(
+        "INSERT INTO days (day, seconds, pages) "
+        "SELECT day, SUM(seconds), SUM(pages) FROM book_days GROUP BY 1"
     )
     con.execute(
         "INSERT INTO hours (hour, seconds) "
