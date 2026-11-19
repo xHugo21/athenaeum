@@ -25,6 +25,7 @@ mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 DB_PATH = os.environ.get("ATHENAEUM_DB", "athenaeum.db")
 COVERS_DIR = os.path.join(os.path.dirname(DB_PATH), "covers")
+SKIM_PAGES = 20
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 
@@ -198,7 +199,7 @@ async def lifespan(app):
     with db() as con:
         con.executescript(SCHEMA)
         migrate(con)
-        if not con.execute("SELECT 1 FROM hours LIMIT 1").fetchone() and con.execute("SELECT 1 FROM sessions LIMIT 1").fetchone():
+        if con.execute("SELECT 1 FROM sessions LIMIT 1").fetchone():
             rebuild_aggregates(con)
     yield
 
@@ -271,24 +272,26 @@ def snap_rating(rating: float) -> float:
     return round(rating * 2) / 2
 
 
-def reading_position(session, page_count, fallback=0):
-    page = (session["page"] if session else 0) or fallback
-    if not page or not page_count:
-        return None
-    if session and session["total_pages"] and session["total_pages"] != page_count:
-        page = (page - 1) * page_count // session["total_pages"] + 1
-    return min(page, page_count)
+def read_pages(con, book_id, page_count):
+    # ponytail: gaps up to SKIM_PAGES are turns under KOReader's min_sec that got no stats row; bigger ones are jumps.
+    pages, prev = set(), 0
+    for page, session_pages in con.execute(
+        "SELECT page, total_pages FROM sessions WHERE book_id=? ORDER BY start_time, rowid", (book_id,)
+    ):
+        if session_pages and session_pages != page_count:
+            page = (page - 1) * page_count // session_pages + 1
+        page = min(page, page_count)
+        if page <= 0:
+            continue
+        if 0 < page - prev <= SKIM_PAGES:
+            pages.update(range(prev + 1, page))
+        pages.add(page)
+        prev = page
+    return min(len(pages), prev) if pages else 0
 
 
-def position_pct(position, page_count):
-    return int(position * 100 / page_count + 0.5) if position and page_count else None
-
-
-def last_position(con, book_id):
-    return con.execute(
-        "SELECT page, total_pages FROM sessions WHERE book_id=? ORDER BY start_time DESC, rowid DESC LIMIT 1",
-        (book_id,),
-    ).fetchone()
+def read_pct(pages_read, page_count):
+    return int((pages_read or 0) * 100 / page_count + 0.5) if page_count else None
 
 
 def pages_read_equiv(pages_read, total_pages, print_pages):
@@ -368,19 +371,10 @@ def index(request: Request):
         ):
             book_labels.setdefault(r["book_id"], []).append(r["name"])
             label_counts.setdefault(r["name"], {"id": r["id"], "name": r["name"], "n": 0})["n"] += 1
-        positions = {
-            r["book_id"]: r
-            for r in con.execute(
-                "SELECT book_id, page, total_pages FROM ("
-                "SELECT book_id, page, total_pages, ROW_NUMBER() OVER ("
-                "PARTITION BY book_id ORDER BY start_time DESC, rowid DESC) rn FROM sessions) WHERE rn=1"
-            )
-        }
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
-            b["position"] = reading_position(positions.get(b["id"]), b["total_pages"], b["pages_read"])
-            b["pct"] = position_pct(b["position"], b["total_pages"])
+            b["pct"] = read_pct(b["pages_read"], b["total_pages"])
     pages_total = sum(
         pages_read_equiv(b["pages_read"], b["total_pages"], b["print_pages"] or b["isbn_pages"]) for b in books
     )
@@ -705,7 +699,6 @@ def book_detail(request: Request, book_id: int):
         speed = con.execute(
             "SELECT SUM(duration) secs, COUNT(DISTINCT page) pages FROM sessions WHERE book_id=?", (book_id,)
         ).fetchone()
-        pos = last_position(con, book_id)
         pace = con.execute(
             "SELECT SUM(seconds)/14.0 FROM book_days WHERE book_id=? AND day>=date('now','-14 day')",
             (book_id,),
@@ -727,9 +720,8 @@ def book_detail(request: Request, book_id: int):
             )
         ]
     secs_per_page = speed["secs"] / speed["pages"] if speed["secs"] and speed["pages"] >= 2 else None
-    position = reading_position(pos, book["total_pages"], book["pages_read"])
-    pct = position_pct(position, book["total_pages"])
-    left = max(0, (book["total_pages"] or 0) - (position or 0)) if book["status"] == "reading" else 0
+    pct = read_pct(book["pages_read"], book["total_pages"])
+    left = max(0, (book["total_pages"] or 0) - book["pages_read"]) if book["status"] == "reading" else 0
     time_left = left * secs_per_page if secs_per_page and left > 0 else None
     days_left = round(time_left / pace) if time_left and pace else None
     eta = date.today() + timedelta(days=days_left) if days_left and days_left <= 120 else None
@@ -1026,6 +1018,11 @@ def rebuild_aggregates(con):
     con.execute("DELETE FROM days")
     con.execute("DELETE FROM book_days")
     con.execute("DELETE FROM hours")
+    for book_id, page_count in con.execute("SELECT id, total_pages FROM books WHERE total_pages").fetchall():
+        con.execute(
+            "UPDATE books SET pages_read=MAX(COALESCE(pages_read,0), ?) WHERE id=?",
+            (read_pages(con, book_id, page_count), book_id),
+        )
     con.execute(
         "INSERT INTO book_days (book_id, day, seconds, pages) "
         "SELECT book_id, date(start_time, 'unixepoch', 'localtime'), SUM(duration), COUNT(DISTINCT page) "

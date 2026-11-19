@@ -466,16 +466,25 @@ def test_book_page_shows_sessions_and_days(client):
     assert stat("Days read") == "1"
 
 
-def test_progress_follows_last_page_like_koreader(client):
-    client.post("/books", data={"title": "B", "pages": 100}, follow_redirects=False)
-    with sqlite3.connect("athenaeum.db") as c:
-        c.execute("UPDATE books SET pages_read=78 WHERE id=1")
-        c.execute("INSERT INTO sessions VALUES (1, 78, 1000, 60, 100)")
-        c.execute("INSERT INTO sessions VALUES (1, 170, 2000, 60, 200)")
+def test_pages_read_fills_skimmed_pages_but_not_jumps(client):
+    md5 = "b" * 32
+    stats = [
+        {"book_md5": md5, "page": page, "start_time": 1000 + page, "duration": 60, "total_pages": 100}
+        for page in range(1, 61)
+    ] + [
+        {"book_md5": md5, "page": 70, "start_time": 2000, "duration": 60, "total_pages": 100},
+        {"book_md5": md5, "page": 95, "start_time": 3000, "duration": 60, "total_pages": 100},
+    ]
+    payload = {
+        "version": "0.3.0",
+        "books": [{"id": 1, "title": "B", "pages": 100, "total_read_time": 1980,
+                   "total_read_pages": 62, "last_open": 3000, "md5": md5}],
+        "stats": stats,
+    }
+    client.post("/api/plugin/import", json=payload, follow_redirects=False)
     page = client.get("/books/1").text
-    assert "85% read" in page, "last page rescaled to the current pagination, not the distinct-pages count"
-    assert "78 / 100" in page
-    assert '<span style="width:85%">' in client.get("/").text
+    assert "71 / 100" in page, "a 10-page skim fills, a 25-page jump does not"
+    assert "71% read" in page
 
 
 def test_md5_lookup_is_indexed(client):
@@ -942,7 +951,7 @@ def test_file_reimport_replaces_totals(client):
 
     with sqlite3.connect("athenaeum.db") as c:
         row = c.execute("SELECT total_seconds, pages_read, last_read_at FROM books").fetchone()
-    assert row == (120, 1, 1600000000), "file import replaces totals, even downwards"
+    assert row == (120, 2, 1600000000), "time replaces downwards; pages read come from the sessions"
 
 
 def test_db_backup_is_valid_sqlite(client):
