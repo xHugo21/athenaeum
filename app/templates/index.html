@@ -341,7 +341,7 @@
     </form>
     <div id="grid-view" class="grid">
       {% for b in books %}
-      {% set pct = (b['pages_read'] / b['total_pages'] * 100) | round | int if b['total_pages'] else none %}
+      {% set pct = b['pct'] %}
       {% set state = b['status'] %}
       <div class="book-cell" data-id="{{ b['id'] }}">
         <button class="book-select" type="button" aria-label="Select {{ b['title'] }}" aria-pressed="false">

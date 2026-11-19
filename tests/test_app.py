@@ -466,6 +466,18 @@ def test_book_page_shows_sessions_and_days(client):
     assert stat("Days read") == "1"
 
 
+def test_progress_follows_last_page_like_koreader(client):
+    client.post("/books", data={"title": "B", "pages": 100}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        c.execute("UPDATE books SET pages_read=78 WHERE id=1")
+        c.execute("INSERT INTO sessions VALUES (1, 78, 1000, 60, 100)")
+        c.execute("INSERT INTO sessions VALUES (1, 170, 2000, 60, 200)")
+    page = client.get("/books/1").text
+    assert "85% read" in page, "last page rescaled to the current pagination, not the distinct-pages count"
+    assert "78 / 100" in page
+    assert '<span style="width:85%">' in client.get("/").text
+
+
 def test_md5_lookup_is_indexed(client):
     client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
     with sqlite3.connect("athenaeum.db") as c:

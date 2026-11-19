@@ -271,6 +271,26 @@ def snap_rating(rating: float) -> float:
     return round(rating * 2) / 2
 
 
+def reading_position(session, page_count, fallback=0):
+    page = (session["page"] if session else 0) or fallback
+    if not page or not page_count:
+        return None
+    if session and session["total_pages"] and session["total_pages"] != page_count:
+        page = (page - 1) * page_count // session["total_pages"] + 1
+    return min(page, page_count)
+
+
+def position_pct(position, page_count):
+    return int(position * 100 / page_count + 0.5) if position and page_count else None
+
+
+def last_position(con, book_id):
+    return con.execute(
+        "SELECT page, total_pages FROM sessions WHERE book_id=? ORDER BY start_time DESC, rowid DESC LIMIT 1",
+        (book_id,),
+    ).fetchone()
+
+
 def pages_read_equiv(pages_read, total_pages, print_pages):
     if not total_pages or not print_pages:
         return 0
@@ -348,9 +368,19 @@ def index(request: Request):
         ):
             book_labels.setdefault(r["book_id"], []).append(r["name"])
             label_counts.setdefault(r["name"], {"id": r["id"], "name": r["name"], "n": 0})["n"] += 1
+        positions = {
+            r["book_id"]: r
+            for r in con.execute(
+                "SELECT book_id, page, total_pages FROM ("
+                "SELECT book_id, page, total_pages, ROW_NUMBER() OVER ("
+                "PARTITION BY book_id ORDER BY start_time DESC, rowid DESC) rn FROM sessions) WHERE rn=1"
+            )
+        }
         for b in books:
             b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
+            b["position"] = reading_position(positions.get(b["id"]), b["total_pages"], b["pages_read"])
+            b["pct"] = position_pct(b["position"], b["total_pages"])
     pages_total = sum(
         pages_read_equiv(b["pages_read"], b["total_pages"], b["print_pages"] or b["isbn_pages"]) for b in books
     )
@@ -675,6 +705,7 @@ def book_detail(request: Request, book_id: int):
         speed = con.execute(
             "SELECT SUM(duration) secs, COUNT(DISTINCT page) pages FROM sessions WHERE book_id=?", (book_id,)
         ).fetchone()
+        pos = last_position(con, book_id)
         pace = con.execute(
             "SELECT SUM(seconds)/14.0 FROM book_days WHERE book_id=? AND day>=date('now','-14 day')",
             (book_id,),
@@ -696,7 +727,9 @@ def book_detail(request: Request, book_id: int):
             )
         ]
     secs_per_page = speed["secs"] / speed["pages"] if speed["secs"] and speed["pages"] >= 2 else None
-    left = ((book["total_pages"] or 0) - book["pages_read"]) if book["status"] == "reading" else 0
+    position = reading_position(pos, book["total_pages"], book["pages_read"])
+    pct = position_pct(position, book["total_pages"])
+    left = max(0, (book["total_pages"] or 0) - (position or 0)) if book["status"] == "reading" else 0
     time_left = left * secs_per_page if secs_per_page and left > 0 else None
     days_left = round(time_left / pace) if time_left and pace else None
     eta = date.today() + timedelta(days=days_left) if days_left and days_left <= 120 else None
@@ -709,6 +742,7 @@ def book_detail(request: Request, book_id: int):
         "book.html",
         {
             "b": book,
+            "pct": pct,
             "agg": agg,
             "sessions_n": sessions_n,
             "best": best,

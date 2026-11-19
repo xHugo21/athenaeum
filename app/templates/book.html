@@ -108,7 +108,6 @@
 </style>
 
 {% set cover_url = "/covers/" ~ b['id'] ~ ".jpg?v=" ~ (cover_ts or 0) %}
-{% set pct = ((b['pages_read'] / b['total_pages']) * 100) | round(0) | int if b['total_pages'] else none %}
 
 <div class="page-head">
   <a class="back" href="/"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>Library</a>
