@@ -15,11 +15,11 @@ from fastapi.testclient import TestClient
 class FakeResp:
     status_code = 200
 
-    def __init__(self, docs):
-        self.docs = docs
+    def __init__(self, payload):
+        self.payload = payload
 
     def json(self):
-        return {"docs": self.docs}
+        return self.payload
 
 
 @pytest.fixture
@@ -135,7 +135,15 @@ def test_manual_add_with_isbn(client, monkeypatch):
         main.httpx,
         "get",
         lambda *a, **k: FakeResp(
-            [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]
+            {
+                "ISBN:9780140328721": {
+                    "details": {
+                        "title": "Matilda",
+                        "authors": [{"name": "Roald Dahl"}],
+                        "number_of_pages": 96,
+                    }
+                }
+            }
         ),
     )
     r = client.post(
@@ -168,7 +176,15 @@ def test_set_isbn_fills_pages_for_manual_add(client, monkeypatch):
         main.httpx,
         "get",
         lambda *a, **k: FakeResp(
-            [{"title": "Matilda", "author_name": ["Roald Dahl"], "number_of_pages_median": 96}]
+            {
+                "ISBN:9780140328721": {
+                    "details": {
+                        "title": "Matilda",
+                        "authors": [{"name": "Roald Dahl"}],
+                        "number_of_pages": 96,
+                    }
+                }
+            }
         ),
     )
     client.post("/books", data={"title": "Manual Book", "pages": ""}, follow_redirects=False)
@@ -1203,3 +1219,41 @@ def test_isbn_does_not_overwrite_custom_cover(client, monkeypatch):
     main.fetch_cover(1, "9780140328721", 0)
     with open("covers/1.jpg", "rb") as f:
         assert f.read() == custom
+
+
+def test_isbn_pages_come_from_the_matching_edition(monkeypatch):
+    asked = {}
+
+    class Reply:
+        status_code = 200
+
+        def json(self):
+            return {
+                "ISBN:111": {
+                    "details": {
+                        "title": "Fantastic Mr. Fox",
+                        "authors": [{"name": "Roald Dahl"}],
+                        "number_of_pages": 96,
+                        "number_of_pages_median": 128,
+                    }
+                }
+            }
+
+    def fake_get(url, **kw):
+        asked.update(kw["params"])
+        return Reply()
+
+    monkeypatch.setattr(main.httpx, "get", fake_get)
+    assert main.fetch_metadata("111") == {"title": "Fantastic Mr. Fox", "author": "Roald Dahl", "pages": 96}
+    assert asked == {"bibkeys": "ISBN:111", "format": "json", "jscmd": "details"}
+
+
+def test_unknown_isbn_yields_no_metadata(monkeypatch):
+    class Reply:
+        status_code = 200
+
+        def json(self):
+            return {}
+
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **kw: Reply())
+    assert main.fetch_metadata("111") == {"title": None, "author": None, "pages": None}

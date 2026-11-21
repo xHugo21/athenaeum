@@ -1393,21 +1393,16 @@ async def upload_cover(book_id: int, cover: UploadFile):
 def fetch_metadata(isbn: str) -> dict:
     try:
         r = httpx.get(
-            "https://openlibrary.org/search.json",
-            params={
-                "q": f"isbn:{isbn}",
-                "fields": "title,author_name,number_of_pages_median",
-                "limit": 1,
-            },
+            "https://openlibrary.org/api/books",
+            params={"bibkeys": f"ISBN:{isbn}", "format": "json", "jscmd": "details"},
             timeout=10,
         )
-        docs = r.json().get("docs", []) if r.status_code == 200 else []
-        if not docs:
-            return {}
-        return {
-            "title": docs[0].get("title"),
-            "author": ", ".join(docs[0].get("author_name", [])) or None,
-            "pages": docs[0].get("number_of_pages_median") or None,
-        }
-    except httpx.HTTPError:
+        entry = r.json().get(f"ISBN:{isbn}", {}) if r.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
         return {}
+    details = entry.get("details") or {}
+    return {
+        "title": details.get("title"),
+        "author": ", ".join(a["name"] for a in details.get("authors") or [] if a.get("name")) or None,
+        "pages": details.get("number_of_pages") or None,
+    }
