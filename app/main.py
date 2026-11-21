@@ -754,6 +754,15 @@ def book_detail(request: Request, book_id: int):
     )
 
 
+@app.get("/books/{book_id}/edit")
+def edit_book_form(request: Request, book_id: int):
+    with db() as con:
+        book = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
+    if not book:
+        return RedirectResponse("/", 303)
+    return templates.TemplateResponse(request, "book_edit.html", {"b": book})
+
+
 @app.post("/books")
 def add_book(
     title: str = Form(...),

@@ -1076,6 +1076,7 @@ def test_book_edit_controls_are_icons(client):
     client.post("/books", data={"title": "B"}, follow_redirects=False)
     page = client.get("/books/1").text
     assert 'aria-label="Edit details"' in page and "#i-pencil" in page
+    assert 'href="/books/1/edit"' in page and "hdr-edit" not in page
     assert '<select name="status"' in page and 'id="status-tag"' not in page
 
     review = re.search(r'<button[^>]*id="review-edit-btn"[^>]*>(.*?)</button>', page, re.S).group(1)
@@ -1085,6 +1086,13 @@ def test_book_edit_controls_are_icons(client):
     page = client.get("/books/1").text
     review = re.search(r'<button[^>]*id="review-edit-btn"[^>]*>(.*?)</button>', page, re.S).group(1)
     assert "#i-pencil" in review and "Write a review" not in review
+
+
+def test_edit_details_page_holds_the_form(client):
+    client.post("/books", data={"title": "Dune", "author": "Herbert"}, follow_redirects=False)
+    page = client.get("/books/1/edit").text
+    assert "Edit details" in page and 'name="print_pages"' in page and 'name="isbn"' in page
+    assert client.get("/books/999/edit", follow_redirects=False).status_code == 303
 
 
 def test_library_pages_only_count_isbn_editions(client):

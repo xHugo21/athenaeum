@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit details · {{ b['title'] }}{% endblock %}
+{% block content %}
+<style>
+  .meta-form { max-width: 620px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+  .meta-form .wide { grid-column: span 2; }
+  .meta-form .hint { font-size: 12px; color: var(--muted); }
+  .meta-actions { grid-column: span 2; display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  @media (max-width: 560px) {
+    .meta-form { grid-template-columns: 1fr; }
+    .meta-form .wide, .meta-actions { grid-column: span 1; }
+  }
+</style>
+
+<div class="page-head">
+  <a class="back" href="/books/{{ b['id'] }}"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-arrow-left"/></svg>{{ b['title'] }}</a>
+</div>
+
+<div style="margin-bottom:22px">
+  <h1 style="font-size:20px">Edit details</h1>
+  <p class="muted" style="font-size:13px;margin-top:4px">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
+</div>
+
+<form class="meta-form" method="post" action="/books/{{ b['id'] }}/edit">
+  <label class="field wide"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
+  <label class="field"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
+  <label class="field"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" inputmode="numeric" placeholder="9780140328721"></label>
+  <label class="field"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
+  <label class="field"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
+  <label class="field"><span>Print pages</span><input type="number" min="1" name="print_pages" value="{{ b['print_pages'] or b['isbn_pages'] or '' }}"><small class="hint">{% if b['print_pages'] %}manual override{% elif b['isbn_pages'] %}from ISBN{% else %}no ISBN page count{% endif %}</small></label>
+  <div class="meta-actions">
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-ghost" href="/books/{{ b['id'] }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

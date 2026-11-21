@@ -52,8 +52,6 @@
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px 24px; margin-top: 22px; }
   .fact .v { font-size: 17px; font-weight: 500; letter-spacing: -.01em; margin-top: 2px; }
   .fact .s { font-size: 12px; color: var(--muted); margin-top: 1px; }
-  .edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 560px; }
-  .edit-form .wide { grid-column: span 2; }
   .hl-list { display: flex; flex-direction: column; }
   .hl { padding: 16px 0; border-bottom: 1px solid var(--line); }
   .hl:last-child { border-bottom: 0; }
@@ -101,8 +99,6 @@
     .cover-col { position: static; flex-direction: column; align-items: center; gap: 10px; }
     .cover-col .cover { width: min(100%, calc(60vh * 2 / 3)); aspect-ratio: 2 / 3; }
     .cover-col .cover-tools { flex-direction: row; width: min(100%, calc(60vh * 2 / 3)); }
-    .edit-form { grid-template-columns: 1fr; }
-    .edit-form .wide { grid-column: span 1; }
     .book-main h1 { font-size: 22px; }
   }
 </style>
@@ -140,16 +136,16 @@
   </div>
 
   <div class="book-main">
-    <div id="hdr-view">
+    <div>
       <h1>{{ b['title'] }}</h1>
       <div class="meta">
         <span>{{ b['author'] or 'Unknown author' }}</span>
         {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a></span>{% endif %}
         <span class="sep">·</span>
         <span class="meta-actions">
-          <button class="linkbtn linkbtn-quiet annotation-edit" type="button" onclick="document.getElementById('hdr-view').hidden=true;document.getElementById('hdr-edit').hidden=false;document.getElementById('hdr-edit').querySelector('input').focus()" title="Edit details" aria-label="Edit details">
+          <a class="linkbtn linkbtn-quiet annotation-edit" href="/books/{{ b['id'] }}/edit" title="Edit details" aria-label="Edit details">
             <svg class="icon icon-sm" aria-hidden="true"><use href="#i-pencil"/></svg>
-          </button>
+          </a>
         </span>
       </div>
       <div class="label-row" id="label-row" data-action="/books/{{ b['id'] }}/labels">
@@ -164,19 +160,6 @@
         </button>
       </div>
     </div>
-
-    <form id="hdr-edit" method="post" action="/books/{{ b['id'] }}/edit" hidden class="edit-form" style="margin-top:14px">
-      <label class="field wide"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
-      <label class="field"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
-      <label class="field"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" placeholder="9780140328721"></label>
-      <label class="field"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
-      <label class="field"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
-      <label class="field"><span>Print pages</span><input type="number" min="1" name="print_pages" value="{{ b['print_pages'] or b['isbn_pages'] or '' }}"><small class="hint">{% if b['print_pages'] %}manual override{% elif b['isbn_pages'] %}from ISBN{% else %}no ISBN page count{% endif %}</small></label>
-      <div class="form-actions wide">
-        <button class="btn btn-primary sm">Save</button>
-        <button class="btn sm btn-ghost" type="button" onclick="document.getElementById('hdr-edit').hidden=true;document.getElementById('hdr-view').hidden=false">Cancel</button>
-      </div>
-    </form>
 
     {% set value = b['rating'] or 0 %}
     {% set stars_submit = true %}
