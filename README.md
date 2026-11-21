@@ -65,6 +65,8 @@ services:
     restart: unless-stopped
     environment:
       - ATHENAEUM_PASSWORD=changeme
+      # Optional: raises the Google Books search rate limit (https://console.cloud.google.com/apis/library/books.googleapis.com)
+      - GOOGLE_BOOKS_API_KEY=
 ```
 
 ## KOReader plugin sync
