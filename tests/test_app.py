@@ -1244,7 +1244,13 @@ def test_isbn_pages_come_from_the_matching_edition(monkeypatch):
         return Reply()
 
     monkeypatch.setattr(main.httpx, "get", fake_get)
-    assert main.fetch_metadata("111") == {"title": "Fantastic Mr. Fox", "author": "Roald Dahl", "pages": 96}
+    assert main.fetch_metadata("111") == {
+        "title": "Fantastic Mr. Fox",
+        "author": "Roald Dahl",
+        "pages": 96,
+        "publisher": None,
+        "year": None,
+    }
     assert asked == {"bibkeys": "ISBN:111", "format": "json", "jscmd": "details"}
 
 
@@ -1256,4 +1262,4 @@ def test_unknown_isbn_yields_no_metadata(monkeypatch):
             return {}
 
     monkeypatch.setattr(main.httpx, "get", lambda *a, **kw: Reply())
-    assert main.fetch_metadata("111") == {"title": None, "author": None, "pages": None}
+    assert main.fetch_metadata("111") == {"title": None, "author": None, "pages": None, "publisher": None, "year": None}

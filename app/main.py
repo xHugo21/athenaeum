@@ -421,6 +421,20 @@ def books_json():
     return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "private, no-store"})
 
 
+@app.get("/api/search")
+def api_search(q: str = "", lang: str = "", source: str = ""):
+    q = q.strip()
+    if not q:
+        return JSONResponse([])
+    isbn = clean_isbn(q)
+    isbn_query = len(isbn) in (10, 13) and sum(c.isdigit() for c in q) == len(isbn)
+    if source == "gb":
+        results = google_books_search(f"isbn:{isbn}" if isbn_query else q, lang)
+    else:
+        results = openlibrary_isbn(isbn) if isbn_query else openlibrary_search(q, lang)
+    return JSONResponse(results[:15], headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/stats")
 def stats(request: Request):
     today = date.today()
@@ -1405,4 +1419,89 @@ def fetch_metadata(isbn: str) -> dict:
         "title": details.get("title"),
         "author": ", ".join(a["name"] for a in details.get("authors") or [] if a.get("name")) or None,
         "pages": details.get("number_of_pages") or None,
+        "publisher": ", ".join(details.get("publishers") or []) or None,
+        "year": next(iter(re.findall(r"\d{4}", details.get("publish_date") or "")), None),
     }
+
+
+def openlibrary_isbn(isbn: str) -> list[dict]:
+    meta = fetch_metadata(isbn)
+    if not meta.get("title"):
+        return []
+    return [{
+        "source": "Open Library",
+        "isbn": isbn,
+        "cover": f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false",
+        **meta,
+    }]
+
+
+def openlibrary_search(query: str, lang: str) -> list[dict]:
+    params = {
+        "q": query,
+        "limit": 15,
+        "fields": "title,author_name,first_publish_year,number_of_pages_median,isbn,cover_i",
+    }
+    if lang:
+        params["language"] = {"en": "eng", "es": "spa", "fr": "fre", "de": "ger", "it": "ita", "pt": "por", "ca": "cat"}.get(lang, lang)
+    try:
+        r = httpx.get("https://openlibrary.org/search.json", params=params, timeout=10)
+        docs = r.json().get("docs", []) if r.status_code == 200 else []
+    except (httpx.HTTPError, ValueError):
+        return []
+    out = []
+    for d in docs:
+        if not d.get("title"):
+            continue
+        isbn = next((i for i in d.get("isbn") or [] if len(clean_isbn(i)) in (10, 13)), "")
+        if d.get("cover_i"):
+            cover = f"https://covers.openlibrary.org/b/id/{d['cover_i']}-M.jpg?default=false"
+        elif isbn:
+            cover = f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg?default=false"
+        else:
+            cover = ""
+        out.append({
+            "source": "Open Library",
+            "title": d["title"],
+            "author": ", ".join(d.get("author_name") or []),
+            "isbn": isbn,
+            "pages": d.get("number_of_pages_median"),
+            "publisher": None,
+            "year": d.get("first_publish_year"),
+            "cover": cover,
+        })
+    return out
+
+
+GOOGLE_BOOKS_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY", "")
+
+
+def google_books_search(query: str, lang: str) -> list[dict]:
+    params = {"q": query, "maxResults": 15}
+    if GOOGLE_BOOKS_KEY:
+        params["key"] = GOOGLE_BOOKS_KEY
+    if lang:
+        params["langRestrict"] = lang
+    try:
+        r = httpx.get("https://www.googleapis.com/books/v1/volumes", params=params, timeout=10)
+        items = r.json().get("items", []) if r.status_code == 200 else []
+    except (httpx.HTTPError, ValueError):
+        return []
+    out = []
+    for it in items:
+        v = it.get("volumeInfo") or {}
+        if not v.get("title"):
+            continue
+        isbns = [i["identifier"] for i in v.get("industryIdentifiers") or [] if i.get("type") == "ISBN_13"]
+        cover = (v.get("imageLinks") or {}).get("thumbnail") or ""
+        out.append({
+            "source": "Google Books",
+            "title": v["title"],
+            "author": ", ".join(v.get("authors") or []),
+            "isbn": isbns[0] if isbns else "",
+            "pages": v.get("pageCount") or None,
+            "publisher": v.get("publisher") or None,
+            "year": (v.get("publishedDate") or "")[:4] or None,
+            "cover": cover.replace("http://", "https://"),
+        })
+    return out
