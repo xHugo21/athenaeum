@@ -21,6 +21,11 @@
   <p class="muted" style="font-size:13px;margin-top:4px">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
 </div>
 
+<details class="isbn-lookup">
+  <summary>Search by title, author or ISBN</summary>
+  {% include "_isbn_search.html" %}
+</details>
+
 <form class="meta-form" method="post" action="/books/{{ b['id'] }}/edit">
   <label class="field wide"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
   <label class="field"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
@@ -33,4 +38,20 @@
     <a class="btn btn-ghost" href="/books/{{ b['id'] }}">Cancel</a>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/isbn-search.js?v={{ static_v }}"></script>
+<script>
+  const editForm = document.querySelector('.meta-form');
+  const isbnLookup = document.querySelector('.isbn-lookup');
+  initIsbnSearch(isbnLookup, b => {
+    editForm.elements.title.value = b.title || '';
+    editForm.elements.author.value = b.author || '';
+    editForm.elements.isbn.value = b.isbn || '';
+    if (b.pages) editForm.elements.print_pages.value = b.pages;
+    isbnLookup.open = false;
+    editForm.elements.title.focus();
+  });
+</script>
 {% endblock %}

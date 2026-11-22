@@ -207,6 +207,19 @@
   .field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
   .field > span, .field > label { font-size: 12px; font-weight: 500; color: var(--text-2); }
   .field .hint { font-size: 11px; color: var(--muted); }
+  .isbn-lookup { margin-bottom: 22px; }
+  .isbn-lookup summary { margin-bottom: 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .isbn-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .isbn-form .field { flex: 1 1 200px; max-width: 340px; }
+  .isbn-results { margin-top: 6px; }
+  .isbn-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  .isbn-pager .num { font-size: 12px; color: var(--muted); }
+  .isbn-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .isbn-result:last-child { border-bottom: 0; }
+  .isbn-result .cover { flex: none; width: 38px; height: 56px; object-fit: cover; border-radius: 3px; background: var(--surface-2); }
+  .isbn-result .meta { flex: 1; min-width: 0; }
+  .isbn-result .t { font-weight: 500; font-size: 13px; }
+  .isbn-result .s { font-size: 12px; color: var(--muted); }
   input, textarea, select, button { font: inherit; }
   input[type="text"], input:not([type]), input[type="password"], input[type="number"],
   input[type="email"], input[type="search"], input[type="file"], textarea, select {

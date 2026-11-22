@@ -43,7 +43,10 @@ PASSWORD = os.environ.get("ATHENAEUM_PASSWORD")
 SESSION_COOKIE = "athenaeum_session"
 DATE_FMT = "%-d %b %Y"
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-STATIC_V = int(os.path.getmtime(os.path.join(STATIC_DIR, "app.css")))
+STATIC_V = int(max(
+    os.path.getmtime(os.path.join(STATIC_DIR, f))
+    for f in os.listdir(STATIC_DIR) if f.endswith((".css", ".js"))
+))
 templates = Jinja2Templates(
     directory=os.path.join(os.path.dirname(__file__), "templates"),
     context_processors=[

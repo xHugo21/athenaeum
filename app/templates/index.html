@@ -80,17 +80,6 @@
   .bm-readout { display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: var(--muted); }
   .shelf-group { margin-bottom: 18px; }
   .add-tabs { margin-bottom: 14px; }
-  .isbn-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-  .isbn-form .field { flex: 1 1 200px; max-width: 340px; }
-  .isbn-results { margin-top: 6px; }
-  .isbn-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
-  .isbn-pager .num { font-size: 12px; color: var(--muted); }
-  .isbn-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .isbn-result:last-child { border-bottom: 0; }
-  .isbn-result .cover { flex: none; width: 38px; height: 56px; object-fit: cover; border-radius: 3px; background: var(--surface-2); }
-  .isbn-result .meta { flex: 1; min-width: 0; }
-  .isbn-result .t { font-weight: 500; font-size: 13px; }
-  .isbn-result .s { font-size: 12px; color: var(--muted); }
   .shelf { display: flex; align-items: flex-end; gap: 0; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
     flex: 0 0 auto;
@@ -274,38 +263,7 @@
     </div>
   </form>
   <div id="add-isbn" hidden>
-    <form id="isbn-search" class="isbn-form">
-      <label class="field"><span>Title, author or ISBN</span><input id="isbn-q" placeholder="Cien años de soledad / 9780307474728"></label>
-      <label class="field"><span>Language</span>
-        <select id="isbn-lang">
-          <option value="">Any</option>
-          <option value="en">English</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-          <option value="it">Italiano</option>
-          <option value="pt">Português</option>
-          <option value="ca">Català</option>
-        </select>
-      </label>
-      <label class="field" style="max-width:160px"><span>Source</span>
-        <select id="isbn-source">
-          <option value="ol" selected>Open Library</option>
-          <option value="gb">Google Books</option>
-        </select>
-      </label>
-      <button class="btn btn-primary" type="submit">Search</button>
-    </form>
-    <div id="isbn-spinner" hidden style="display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--accent-strong);font-size:13px;font-weight:500">
-      <svg class="icon" viewBox="0 0 24 24" style="animation:spin .8s linear infinite" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
-      Searching…
-    </div>
-    <div id="isbn-results" class="isbn-results"></div>
-    <div class="isbn-pager" id="isbn-pager" hidden>
-      <button class="btn btn-ghost sm" type="button" id="isbn-prev">← Previous</button>
-      <span class="num" id="isbn-pagenum"></span>
-      <button class="btn btn-ghost sm" type="button" id="isbn-next">Next →</button>
-    </div>
+    {% include "_isbn_search.html" %}
   </div>
 </div>
 
@@ -442,6 +400,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/isbn-search.js?v={{ static_v }}"></script>
 <script>
   let panelTrigger = null;
 
@@ -488,86 +447,13 @@
     addIsbn.hidden = !isbn;
   }
 
-  let isbnItems = [];
-  let isbnPage = 0;
-  const ISBN_PER_PAGE = 5;
-
-  function isbnRow(b) {
-    const row = document.createElement('div');
-    row.className = 'isbn-result';
-    if (b.cover) {
-      const img = document.createElement('img');
-      img.className = 'cover';
-      img.alt = '';
-      img.loading = 'lazy';
-      img.src = b.cover;
-      img.addEventListener('error', () => img.remove());
-      row.append(img);
-    }
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    const title = document.createElement('div');
-    title.className = 't';
-    title.textContent = b.title;
-    const sub = document.createElement('div');
-    sub.className = 's';
-    sub.textContent = [b.author, b.publisher, b.year, b.pages ? `${b.pages} pages` : '', b.isbn].filter(Boolean).join(' · ');
-    meta.append(title, sub);
-    const use = document.createElement('button');
-    use.className = 'btn sm';
-    use.type = 'button';
-    use.textContent = 'Use';
-    use.addEventListener('click', () => {
-      document.getElementById('f-title').value = b.title;
-      document.getElementById('f-author').value = b.author || '';
-      document.getElementById('f-isbn').value = b.isbn || '';
-      document.getElementById('f-pages').value = b.pages || '';
-      addTab('manual');
-      document.getElementById('f-title').focus();
-    });
-    row.append(meta, use);
-    return row;
-  }
-
-  function renderIsbnPage() {
-    const pages = Math.max(1, Math.ceil(isbnItems.length / ISBN_PER_PAGE));
-    const results = document.getElementById('isbn-results');
-    results.replaceChildren(...isbnItems.slice(isbnPage * ISBN_PER_PAGE, (isbnPage + 1) * ISBN_PER_PAGE).map(isbnRow));
-    document.getElementById('isbn-pager').hidden = pages < 2;
-    document.getElementById('isbn-prev').disabled = isbnPage === 0;
-    document.getElementById('isbn-next').disabled = isbnPage >= pages - 1;
-    document.getElementById('isbn-pagenum').textContent = `${isbnPage + 1} / ${pages}`;
-  }
-
-  document.getElementById('isbn-prev').addEventListener('click', () => { isbnPage--; renderIsbnPage(); });
-  document.getElementById('isbn-next').addEventListener('click', () => { isbnPage++; renderIsbnPage(); });
-
-  document.getElementById('isbn-search').addEventListener('submit', async e => {
-    e.preventDefault();
-    const query = document.getElementById('isbn-q').value.trim();
-    if (!query) return;
-    const spinner = document.getElementById('isbn-spinner');
-    const results = document.getElementById('isbn-results');
-    results.replaceChildren();
-    spinner.hidden = false;
-    try {
-      const lang = document.getElementById('isbn-lang').value;
-      const source = document.getElementById('isbn-source').value;
-      const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&lang=${encodeURIComponent(lang)}&source=${encodeURIComponent(source)}`);
-      spinner.hidden = true;
-      isbnItems = await r.json();
-      isbnPage = 0;
-      if (!isbnItems.length) {
-        document.getElementById('isbn-pager').hidden = true;
-        results.innerHTML = '<p class="muted" style="font-size:13px;margin:12px 0 0">No results. Try fewer words or another language.</p>';
-        return;
-      }
-      renderIsbnPage();
-    } catch {
-      spinner.hidden = true;
-      document.getElementById('isbn-pager').hidden = true;
-      results.innerHTML = '<p class="muted" style="font-size:13px;margin:12px 0 0">Search failed. Try again.</p>';
-    }
+  initIsbnSearch(document.getElementById('add-isbn'), b => {
+    document.getElementById('f-title').value = b.title;
+    document.getElementById('f-author').value = b.author || '';
+    document.getElementById('f-isbn').value = b.isbn || '';
+    document.getElementById('f-pages').value = b.pages || '';
+    addTab('manual');
+    document.getElementById('f-title').focus();
   });
 </script>
 {% if books %}

@@ -1,0 +1,34 @@
+<div data-isbn-search>
+  <form class="isbn-form" data-isbn-form>
+    <label class="field"><span>Title, author or ISBN</span><input data-isbn-q placeholder="Cien años de soledad / 9780307474728"></label>
+    <label class="field"><span>Language</span>
+      <select data-isbn-lang>
+        <option value="">Any</option>
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="it">Italiano</option>
+        <option value="pt">Português</option>
+        <option value="ca">Català</option>
+      </select>
+    </label>
+    <label class="field" style="max-width:160px"><span>Source</span>
+      <select data-isbn-source>
+        <option value="ol" selected>Open Library</option>
+        <option value="gb">Google Books</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+  <div data-isbn-spinner hidden style="display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--accent-strong);font-size:13px;font-weight:500">
+    <svg class="icon" viewBox="0 0 24 24" style="animation:spin .8s linear infinite" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
+    Searching…
+  </div>
+  <div data-isbn-results class="isbn-results"></div>
+  <div class="isbn-pager" data-isbn-pager hidden>
+    <button class="btn btn-ghost sm" type="button" data-isbn-prev>← Previous</button>
+    <span class="num" data-isbn-pagenum></span>
+    <button class="btn btn-ghost sm" type="button" data-isbn-next>Next →</button>
+  </div>
+</div>
