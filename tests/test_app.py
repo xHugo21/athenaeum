@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 class FakeResp:
     status_code = 200
+    content = b""
 
     def __init__(self, payload):
         self.payload = payload
@@ -831,6 +832,45 @@ def test_cover_fetch_fills_the_file_for_the_next_render(client, monkeypatch):
     assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
 
 
+def test_add_book_fetches_its_cover_before_rendering(client, monkeypatch):
+    class Img:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"x" * 2000
+
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: Img())
+    client.post("/books", data={"title": "Matilda", "isbn": "9780140328721"}, follow_redirects=False)
+    assert os.path.exists("covers/1.jpg"), "an added book must already have its cover for the next render"
+
+
+def test_edit_book_fetches_its_cover_before_rendering(client, monkeypatch):
+    client.post("/books", data={"title": "Book"}, follow_redirects=False)
+
+    class Img:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"x" * 2000
+
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: Img())
+    client.post("/books/1/edit", data={"title": "Book", "isbn": "9780140328721"}, follow_redirects=False)
+    assert os.path.exists("covers/1.jpg"), "saving an ISBN must resolve the cover before the redirect"
+
+
+def test_search_section_can_force_text_lookup(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(main, "openlibrary_isbn", lambda isbn: calls.append(("isbn", isbn)) or [{"title": "By ISBN"}])
+    monkeypatch.setattr(main, "openlibrary_search", lambda q, lang: calls.append(("text", q)) or [{"title": "By text"}])
+
+    assert client.get("/api/search?q=9780140328721").json() == [{"title": "By ISBN"}]
+    assert client.get("/api/search?q=9780140328721&text=1").json() == [{"title": "By text"}]
+    assert client.get("/api/search?q=0-8044-2957-X").json() == [{"title": "By ISBN"}]
+    assert calls == [
+        ("isbn", "9780140328721"),
+        ("text", "9780140328721"),
+        ("isbn", "080442957X"),
+    ], "the search form forces text, the ISBN field still resolves ISBNs"
+
+
 def test_calendar_day_panel_renders_alone(client):
     client.post("/books", data={"title": "Dune", "author": "Frank Herbert"}, follow_redirects=False)
     with sqlite3.connect("athenaeum.db") as c:
@@ -1104,6 +1144,16 @@ def test_book_edit_controls_are_icons(client):
     assert "#i-pencil" in review and "Write a review" not in review
 
 
+def test_book_page_shows_isbn_without_prefix_and_copy_button(client):
+    client.post("/books", data={"title": "Dune", "author": "Herbert"}, follow_redirects=False)
+    with db() as con:
+        con.execute("UPDATE books SET isbn='9780441013593' WHERE id=1")
+    page = client.get("/books/1").text
+    assert ">ISBN 9780441013593<" not in page
+    assert "9780441013593</a>" in page
+    assert 'class="isbn-copy-btn"' in page and 'data-copy-isbn="9780441013593"' in page
+
+
 def test_edit_details_page_holds_the_form(client):
     client.post("/books", data={"title": "Dune", "author": "Herbert"}, follow_redirects=False)
     page = client.get("/books/1/edit").text
@@ -1154,7 +1204,8 @@ def test_stats_pages_only_koreader_books_with_isbn(client):
     assert "ZZ KO Manual" not in r.text, "a manual page count clears the warning"
 
 
-def test_manual_print_pages_overrides_isbn(client):
+def test_manual_print_pages_overrides_isbn(client, monkeypatch):
+    monkeypatch.setattr(main, "fetch_cover", lambda *a: None)
     with db() as con:
         con.execute(
             "INSERT INTO books (title, isbn, md5, pages_read, total_pages, isbn_pages, added_at, status) "
@@ -1206,6 +1257,21 @@ def test_migrate_gives_manual_books_their_print_pages(workdir):
     assert rows == [(None, 200, None, 0), ("abc", None, None, 0)]
 
 
+def test_migrate_keeps_existing_covers_safe(workdir):
+    os.makedirs("covers")
+    with open("covers/1.jpg", "wb") as f:
+        f.write(b"existing")
+    con = sqlite3.connect("athenaeum.db")
+    con.execute(
+        "CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, md5 TEXT, "
+        "total_pages INTEGER, pages_read INTEGER)"
+    )
+    con.execute("INSERT INTO books (title) VALUES ('Existing')")
+    migrate(con)
+    assert con.execute("SELECT cover_custom FROM books WHERE id=1").fetchone()[0] == 1, \
+        "a cover that predates the flag cannot be proven fetched, so keep it"
+
+
 def test_isbn_does_not_overwrite_custom_cover(client, monkeypatch):
     client.post("/books", data={"title": "Book"}, follow_redirects=False)
     custom = b"\xff\xd8\xff" + b"custom-cover" * 200
@@ -1219,6 +1285,51 @@ def test_isbn_does_not_overwrite_custom_cover(client, monkeypatch):
     main.fetch_cover(1, "9780140328721", 0)
     with open("covers/1.jpg", "rb") as f:
         assert f.read() == custom
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT cover_custom FROM books WHERE id=1").fetchone()[0] == 1
+
+
+def test_isbn_change_replaces_a_fetched_cover(client, monkeypatch):
+    class Old:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"old" * 2000
+
+    class New:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"new" * 2000
+
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: Old())
+    client.post("/books", data={"title": "Book", "isbn": "1111111111"}, follow_redirects=False)
+    assert open("covers/1.jpg", "rb").read() == Old.content
+
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: New())
+    client.post("/books/1/edit", data={"title": "Book", "isbn": "2222222222"}, follow_redirects=False)
+    with open("covers/1.jpg", "rb") as f:
+        assert f.read() == New.content, "the old ISBN cover must be replaced"
+
+
+def test_removing_a_custom_cover_lets_the_isbn_cover_return(client, monkeypatch):
+    class Old:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"old" * 2000
+
+    class New:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"new" * 2000
+
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: Old())
+    client.post("/books", data={"title": "Book", "isbn": "1111111111"}, follow_redirects=False)
+    client.post(
+        "/books/1/cover",
+        files={"cover": ("c.jpg", b"\xff\xd8\xff" + b"custom" * 200, "image/jpeg")},
+        follow_redirects=False,
+    )
+    client.post("/books/1/cover/remove", follow_redirects=False)
+    monkeypatch.setattr(main.httpx, "get", lambda *a, **k: New())
+    assert client.get("/covers/1.jpg").status_code == 404
+    assert open("covers/1.jpg", "rb").read() == New.content, "removing a custom cover restores the ISBN cover"
 
 
 def test_isbn_pages_come_from_the_matching_edition(monkeypatch):
