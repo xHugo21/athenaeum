@@ -1,0 +1,10 @@
+<div class="cover cover-preview" data-cover-preview data-cover-src="{{ preview_src or '' }}">
+  <div class="cover-fallback" aria-hidden="true">
+    <span class="body">
+      <span class="t" data-cover-title>{{ preview_title or 'Untitled' }}</span>
+      <span class="rule"></span>
+    </span>
+    <span class="a" data-cover-author>{{ preview_author or '' }}</span>
+  </div>
+  <img{% if preview_src %} src="{{ preview_src }}"{% else %} hidden{% endif %} alt="" decoding="async">
+</div>

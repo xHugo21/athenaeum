@@ -79,7 +79,14 @@
   .book .track { margin-top: 9px; }
   .bm-readout { display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: var(--muted); }
   .shelf-group { margin-bottom: 18px; }
-  .add-tabs { margin-bottom: 14px; }
+  .add-manual-body { display: flex; align-items: flex-start; gap: 20px; max-width: 820px; }
+  .add-manual-body .form-grid { flex: 1; min-width: 0; }
+  .add-cover { flex: 0 0 104px; display: flex; flex-direction: column; gap: 6px; }
+  .add-cover .label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+  @media (max-width: 720px) {
+    .add-manual-body { flex-direction: column-reverse; align-items: stretch; }
+    .add-cover { flex-basis: auto; width: 96px; }
+  }
   .shelf { display: flex; align-items: flex-end; gap: 0; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
     flex: 0 0 auto;
@@ -243,19 +250,25 @@
   <h2>Add a book</h2>
   <div class="seg add-tabs" role="group" aria-label="Add method">
     <button type="button" id="add-tab-manual" aria-pressed="true" onclick="addTab('manual')">Manual</button>
-    <button type="button" id="add-tab-isbn" aria-pressed="false" onclick="addTab('isbn')">ISBN</button>
+    <button type="button" id="add-tab-isbn" aria-pressed="false" onclick="addTab('isbn')">Search</button>
   </div>
   <form id="add-manual" method="post" action="/books">
-    <div class="form-grid">
-      <label class="field span-6"><span>Title</span><input id="f-title" name="title" required></label>
-      <label class="field span-4"><span>Author</span><input id="f-author" name="author"></label>
-      <label class="field span-2"><span>Print pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
-      <label class="field span-4"><span>ISBN</span><input id="f-isbn" name="isbn" inputmode="numeric" placeholder="9780140328721"></label>
-      <div class="field span-4"><span>Rating</span>
-        <input type="hidden" name="rating" id="rate-val" value="0">
-        {% include "_stars.html" %}
+    <div class="add-manual-body">
+      <div class="form-grid">
+        <label class="field span-8"><span>Title</span><input id="f-title" name="title" required></label>
+        <label class="field span-4"><span>Author</span><input id="f-author" name="author"></label>
+        <label class="field span-4"><span>Print pages</span><input id="f-pages" name="pages" type="number" min="1" inputmode="numeric"></label>
+        <label class="field span-4"><span>ISBN</span><input id="f-isbn" name="isbn" inputmode="numeric" placeholder="9780140328721"><small class="hint" id="f-isbn-status" aria-live="polite"></small></label>
+        <div class="field span-4"><span>Rating</span>
+          <input type="hidden" name="rating" id="rate-val" value="0">
+          {% include "_stars.html" %}
+        </div>
+        <label class="field span-12"><span>Review</span><textarea id="f-review" name="review" rows="3" placeholder="Optional. You can write this later."></textarea></label>
       </div>
-      <label class="field span-12"><span>Review</span><textarea id="f-review" name="review" rows="3" placeholder="Optional. You can write this later."></textarea></label>
+      <div class="add-cover">
+        <span class="label">Cover</span>
+        {% include "_cover_preview.html" %}
+      </div>
     </div>
     <div class="form-actions" style="margin-top:16px">
       <button class="btn btn-primary">Add book</button>
@@ -401,6 +414,7 @@
 
 {% block scripts %}
 <script src="/static/isbn-search.js?v={{ static_v }}"></script>
+<script src="/static/cover-preview.js?v={{ static_v }}"></script>
 <script>
   let panelTrigger = null;
 
@@ -447,11 +461,28 @@
     addIsbn.hidden = !isbn;
   }
 
+  const coverPreview = initCoverPreview(document.querySelector('#add-manual [data-cover-preview]'), {
+    isbnInput: document.getElementById('f-isbn'),
+    titleInput: document.getElementById('f-title'),
+    authorInput: document.getElementById('f-author'),
+  });
+
+  initIsbnAutofill(document.getElementById('f-isbn'), {
+    status: document.getElementById('f-isbn-status'),
+    onMeta(meta) {
+      if (meta.title) document.getElementById('f-title').value = meta.title;
+      if (meta.author) document.getElementById('f-author').value = meta.author;
+      if (meta.pages) document.getElementById('f-pages').value = meta.pages;
+      coverPreview.refresh();
+    },
+  });
+
   initIsbnSearch(document.getElementById('add-isbn'), b => {
     document.getElementById('f-title').value = b.title;
     document.getElementById('f-author').value = b.author || '';
     document.getElementById('f-isbn').value = b.isbn || '';
     document.getElementById('f-pages').value = b.pages || '';
+    coverPreview.refresh();
     addTab('manual');
     document.getElementById('f-title').focus();
   });

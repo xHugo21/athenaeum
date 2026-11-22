@@ -207,10 +207,18 @@
   .field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
   .field > span, .field > label { font-size: 12px; font-weight: 500; color: var(--text-2); }
   .field .hint { font-size: 11px; color: var(--muted); }
-  .isbn-lookup { margin-bottom: 22px; }
-  .isbn-lookup summary { margin-bottom: 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-2); }
-  .isbn-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-  .isbn-form .field { flex: 1 1 200px; max-width: 340px; }
+  .add-tabs { margin-bottom: 14px; }
+  .isbn-form {
+    display: grid; max-width: 780px; align-items: end; gap: 12px;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  @media (max-width: 720px) {
+    .isbn-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .isbn-form .isbn-q, .isbn-form button { grid-column: 1 / -1; }
+  }
+  @media (max-width: 420px) {
+    .isbn-form { grid-template-columns: 1fr; }
+  }
   .isbn-results { margin-top: 6px; }
   .isbn-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .isbn-pager .num { font-size: 12px; color: var(--muted); }
@@ -220,6 +228,7 @@
   .isbn-result .meta { flex: 1; min-width: 0; }
   .isbn-result .t { font-weight: 500; font-size: 13px; }
   .isbn-result .s { font-size: 12px; color: var(--muted); }
+  .isbn-result .t, .isbn-result .s { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   input, textarea, select, button { font: inherit; }
   input[type="text"], input:not([type]), input[type="password"], input[type="number"],
   input[type="email"], input[type="search"], input[type="file"], textarea, select {
@@ -267,6 +276,8 @@
   .panel h2 { margin-bottom: 14px; font-size: 14px; }
   .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
   .form-grid .span-12 { grid-column: span 12; }
+  .form-grid .span-9 { grid-column: span 9; }
+  .form-grid .span-8 { grid-column: span 8; }
   .form-grid .span-6 { grid-column: span 6; }
   .form-grid .span-4 { grid-column: span 4; }
   .form-grid .span-3 { grid-column: span 3; }
@@ -363,8 +374,8 @@
   .back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; }
   .back:hover { color: var(--text); text-decoration: none; }
 
-  @media (max-width: 900px) {
-    .form-grid .span-6, .form-grid .span-4, .form-grid .span-3 { grid-column: span 12; }
+  @media (max-width: 720px) {
+    .form-grid .span-9, .form-grid .span-8, .form-grid .span-6, .form-grid .span-4, .form-grid .span-3 { grid-column: span 12; }
     .summary { gap: 18px 0; }
     .summary > div { padding-right: 24px; margin-right: 24px; }
   }

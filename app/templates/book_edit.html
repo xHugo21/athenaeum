@@ -2,13 +2,15 @@
 {% block title %}Edit details · {{ b['title'] }}{% endblock %}
 {% block content %}
 <style>
-  .meta-form { max-width: 620px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
-  .meta-form .wide { grid-column: span 2; }
+  .meta-layout { display: flex; align-items: flex-start; gap: 24px; }
+  .meta-form { flex: 1; min-width: 0; max-width: 620px; gap: 16px 12px; }
+  .meta-cover { flex: 0 0 120px; display: flex; flex-direction: column; gap: 6px; }
+  .meta-cover .label { font-size: 12px; font-weight: 500; color: var(--text-2); }
   .meta-form .hint { font-size: 12px; color: var(--muted); }
-  .meta-actions { grid-column: span 2; display: flex; align-items: center; gap: 8px; padding-top: 4px; }
-  @media (max-width: 560px) {
-    .meta-form { grid-template-columns: 1fr; }
-    .meta-form .wide, .meta-actions { grid-column: span 1; }
+  .meta-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  @media (max-width: 720px) {
+    .meta-layout { flex-direction: column-reverse; align-items: stretch; }
+    .meta-cover { flex-basis: auto; width: 104px; }
   }
 </style>
 
@@ -21,36 +23,75 @@
   <p class="muted" style="font-size:13px;margin-top:4px">{{ b['title'] }}{% if b['author'] %} · {{ b['author'] }}{% endif %}</p>
 </div>
 
-<details class="isbn-lookup">
-  <summary>Search by title, author or ISBN</summary>
-  {% include "_isbn_search.html" %}
-</details>
+<div class="seg add-tabs" role="group" aria-label="Edit method">
+  <button type="button" id="edit-tab-manual" aria-pressed="true" onclick="editTab('manual')">Manual</button>
+  <button type="button" id="edit-tab-search" aria-pressed="false" onclick="editTab('search')">Search</button>
+</div>
 
-<form class="meta-form" method="post" action="/books/{{ b['id'] }}/edit">
-  <label class="field wide"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
-  <label class="field"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
-  <label class="field"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" inputmode="numeric" placeholder="9780140328721"></label>
-  <label class="field"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
-  <label class="field"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
-  <label class="field"><span>Print pages</span><input type="number" min="1" name="print_pages" value="{{ b['print_pages'] or b['isbn_pages'] or '' }}"><small class="hint">{% if b['print_pages'] %}manual override{% elif b['isbn_pages'] %}from ISBN{% else %}no ISBN page count{% endif %}</small></label>
-  <div class="meta-actions">
-    <button class="btn btn-primary" type="submit">Save</button>
-    <a class="btn btn-ghost" href="/books/{{ b['id'] }}">Cancel</a>
+<div id="edit-manual">
+  <div class="meta-layout">
+    <form class="meta-form form-grid" method="post" action="/books/{{ b['id'] }}/edit">
+      <label class="field span-12"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
+      <label class="field span-6"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
+      <label class="field span-6"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" inputmode="numeric" placeholder="9780140328721"><small class="hint" id="edit-isbn-status" aria-live="polite"></small></label>
+      <label class="field span-4"><span>Pages read</span><input type="number" min="0" name="pages_read" value="{{ b['pages_read'] or 0 }}"></label>
+      <label class="field span-4"><span>Total pages</span><input type="number" min="0" name="total_pages" value="{{ b['total_pages'] or '' }}"></label>
+      <label class="field span-4"><span>Print pages</span><input type="number" min="1" name="print_pages" value="{{ b['print_pages'] or b['isbn_pages'] or '' }}"><small class="hint">{% if b['print_pages'] %}manual override{% elif b['isbn_pages'] %}from ISBN{% else %}no ISBN page count{% endif %}</small></label>
+      <div class="meta-actions span-12">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-ghost" href="/books/{{ b['id'] }}">Cancel</a>
+      </div>
+    </form>
+    <div class="meta-cover">
+      <span class="label">Cover</span>
+      {% set fixed_cover = cover_ts and (b['cover_custom'] or not b['isbn']) %}
+      {% with preview_title=b['title'], preview_author=b['author'] or '', preview_src=('/covers/' ~ b['id'] ~ '.jpg?v=' ~ cover_ts) if fixed_cover else '' %}
+        {% include "_cover_preview.html" %}
+      {% endwith %}
+    </div>
   </div>
-</form>
+</div>
+
+<div id="edit-search" hidden>
+  {% include "_isbn_search.html" %}
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/isbn-search.js?v={{ static_v }}"></script>
+<script src="/static/cover-preview.js?v={{ static_v }}"></script>
 <script>
   const editForm = document.querySelector('.meta-form');
-  const isbnLookup = document.querySelector('.isbn-lookup');
-  initIsbnSearch(isbnLookup, b => {
+  const editManual = document.getElementById('edit-manual');
+  const editSearch = document.getElementById('edit-search');
+  function editTab(which) {
+    const search = which === 'search';
+    document.getElementById('edit-tab-manual').setAttribute('aria-pressed', String(!search));
+    document.getElementById('edit-tab-search').setAttribute('aria-pressed', String(search));
+    editManual.hidden = search;
+    editSearch.hidden = !search;
+  }
+  const coverPreview = initCoverPreview(document.querySelector('.meta-cover [data-cover-preview]'), {
+    isbnInput: editForm.elements.isbn,
+    titleInput: editForm.elements.title,
+    authorInput: editForm.elements.author,
+  });
+  initIsbnAutofill(editForm.elements.isbn, {
+    status: document.getElementById('edit-isbn-status'),
+    onMeta(meta) {
+      if (meta.title) editForm.elements.title.value = meta.title;
+      if (meta.author) editForm.elements.author.value = meta.author;
+      if (meta.pages) editForm.elements.print_pages.value = meta.pages;
+      coverPreview.refresh();
+    },
+  });
+  initIsbnSearch(editSearch, b => {
     editForm.elements.title.value = b.title || '';
     editForm.elements.author.value = b.author || '';
     editForm.elements.isbn.value = b.isbn || '';
     if (b.pages) editForm.elements.print_pages.value = b.pages;
-    isbnLookup.open = false;
+    coverPreview.refresh();
+    editTab('manual');
     editForm.elements.title.focus();
   });
 </script>

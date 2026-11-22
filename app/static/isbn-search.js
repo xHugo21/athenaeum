@@ -64,7 +64,7 @@
       results.replaceChildren();
       spinner.hidden = false;
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&lang=${encodeURIComponent(lang.value)}&source=${encodeURIComponent(source.value)}`);
+        const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&lang=${encodeURIComponent(lang.value)}&source=${encodeURIComponent(source.value)}&text=1`);
         spinner.hidden = true;
         items = await r.json();
         page = 0;
@@ -79,6 +79,55 @@
         pager.hidden = true;
         results.innerHTML = '<p class="muted" style="font-size:13px;margin:12px 0 0">Search failed. Try again.</p>';
       }
+    });
+  };
+
+  window.initIsbnAutofill = function (input, opts) {
+    opts = opts || {};
+    let timer = 0;
+    let seen = '';
+    let seq = 0;
+
+    const say = text => { if (opts.status) opts.status.textContent = text; };
+    const clean = () => input.value.replace(/[^0-9Xx]/g, '');
+
+    async function lookup() {
+      const isbn = clean();
+      if (isbn.length !== 10 && isbn.length !== 13) {
+        seen = '';
+        say('');
+        return;
+      }
+      if (isbn === seen) return;
+      seen = isbn;
+      const mine = ++seq;
+      say('Looking up…');
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(isbn)}&source=ol`);
+        const results = await r.json();
+        if (mine !== seq) return;
+        const meta = results[0];
+        if (!meta) {
+          seen = '';
+          say('No metadata found for this ISBN.');
+          return;
+        }
+        opts.onMeta(meta);
+        say('Fields filled from ISBN.');
+      } catch {
+        if (mine !== seq) return;
+        seen = '';
+        say('Could not look up this ISBN.');
+      }
+    }
+
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(lookup, 500);
+    });
+    input.addEventListener('change', () => {
+      clearTimeout(timer);
+      lookup();
     });
   };
 })();

@@ -432,12 +432,13 @@ def books_json():
 
 
 @app.get("/api/search")
-def api_search(q: str = "", lang: str = "", source: str = ""):
+def api_search(q: str = "", lang: str = "", source: str = "", text: str = ""):
     q = q.strip()
     if not q:
         return JSONResponse([])
     isbn = clean_isbn(q)
-    isbn_query = len(isbn) in (10, 13) and sum(c.isdigit() for c in q) == len(isbn)
+    stripped = re.sub(r"[\s-]", "", q)
+    isbn_query = not text and len(isbn) in (10, 13) and stripped.lower() == isbn.lower()
     if source == "gb":
         results = google_books_search(f"isbn:{isbn}" if isbn_query else q, lang)
     else:
@@ -784,7 +785,11 @@ def edit_book_form(request: Request, book_id: int):
         book = con.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
     if not book:
         return RedirectResponse("/", 303)
-    return templates.TemplateResponse(request, "book_edit.html", {"b": book})
+    try:
+        cover_ts = int(os.path.getmtime(cover_path(book_id)))
+    except OSError:
+        cover_ts = 0
+    return templates.TemplateResponse(request, "book_edit.html", {"b": book, "cover_ts": cover_ts})
 
 
 @app.post("/books")
