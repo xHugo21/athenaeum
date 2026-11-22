@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS books (
     rating REAL,
     review TEXT,
     cover_failed INTEGER NOT NULL DEFAULT 0,
+    cover_custom INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'reading',
     added_at INTEGER NOT NULL
 );
@@ -195,6 +196,12 @@ def migrate(con):
             con.execute("UPDATE books SET print_pages=total_pages WHERE md5 IS NULL AND total_pages>0")
     if "koreader_ignored" not in cols:
         con.execute("ALTER TABLE books ADD COLUMN koreader_ignored INTEGER NOT NULL DEFAULT 0")
+    if "cover_custom" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN cover_custom INTEGER NOT NULL DEFAULT 0")
+        # Existing covers have no provenance: keep them safe from ISBN replaces.
+        for (book_id,) in con.execute("SELECT id FROM books").fetchall():
+            if os.path.exists(cover_path(book_id)):
+                con.execute("UPDATE books SET cover_custom=1 WHERE id=?", (book_id,))
 
 
 @asynccontextmanager
@@ -765,7 +772,7 @@ def book_detail(request: Request, book_id: int):
             "pph": round(3600 / secs_per_page) if secs_per_page else None,
             "time_left": time_left,
             "eta": eta.strftime("%-d %b") if eta else None,
-            "custom_cover": bool(cover_ts),
+            "custom_cover": bool(book["cover_custom"]),
             "cover_ts": cover_ts,
         },
     )
@@ -794,7 +801,7 @@ def add_book(
     meta = fetch_metadata(isbn) if isbn else {}
     book_pages = pages or meta.get("pages")
     with db() as con:
-        con.execute(
+        cur = con.execute(
             "INSERT INTO books (title, author, isbn, pages_read, total_pages, print_pages, isbn_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
@@ -810,6 +817,13 @@ def add_book(
                 int(time.time()),
             ),
         )
+        book_id = cur.lastrowid
+    if isbn:
+        # Resolve the cover before redirecting so the next render has the file.
+        try:
+            fetch_cover(book_id, isbn, 0)
+        except OSError:
+            pass
     return RedirectResponse("/?added=1", 303)
 
 
@@ -837,7 +851,7 @@ def edit_book(
     isbn = clean_isbn(isbn)
     with db() as con:
         row = con.execute(
-            "SELECT isbn, total_seconds, print_pages, isbn_pages FROM books WHERE id=?", (book_id,)
+            "SELECT isbn, total_seconds, print_pages, isbn_pages, cover_custom FROM books WHERE id=?", (book_id,)
         ).fetchone()
         if not row:
             return RedirectResponse("/", 303)
@@ -853,7 +867,10 @@ def edit_book(
         new_read = pages_read
         if new_total and not row["total_seconds"] and not pages_read:
             new_read = new_total
+        keep_cover = bool(row["cover_custom"])
         if isbn and isbn != row["isbn"]:
+            if not keep_cover:
+                drop_cover(book_id)
             con.execute("UPDATE books SET cover_failed=0 WHERE id=?", (book_id,))
         con.execute(
             "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=?, print_pages=?, isbn_pages=? WHERE id=?",
@@ -868,6 +885,12 @@ def edit_book(
                 book_id,
             ),
         )
+    if isbn and not keep_cover:
+        # Resolve the cover before redirecting so the next render has the file.
+        try:
+            fetch_cover(book_id, isbn, 0)
+        except OSError:
+            pass
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -1363,6 +1386,8 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
             os.makedirs(COVERS_DIR, exist_ok=True)
             with open(path, "wb") as f:
                 f.write(r.content)
+            with db() as con:
+                con.execute("UPDATE books SET cover_custom=0 WHERE id=?", (book_id,))
             return path
     except httpx.HTTPError:
         pass
@@ -1380,8 +1405,8 @@ def cover_image(book_id: int, background: BackgroundTasks, v: str = ""):
         cache = {"Cache-Control": "public, max-age=31536000, immutable"} if v else {"Cache-Control": "no-cache"}
         return FileResponse(path, media_type="image/jpeg", headers=cache)
     with db() as con:
-        book = con.execute("SELECT isbn, cover_failed FROM books WHERE id=?", (book_id,)).fetchone()
-    if book and book["isbn"] and not book["cover_failed"]:
+        book = con.execute("SELECT isbn, cover_failed, cover_custom FROM books WHERE id=?", (book_id,)).fetchone()
+    if book and book["isbn"] and not book["cover_failed"] and not book["cover_custom"]:
         background.add_task(fetch_cover, book_id, book["isbn"], 0)
     return Response(status_code=404, headers={"Cache-Control": "public, max-age=300"})
 
@@ -1390,7 +1415,7 @@ def cover_image(book_id: int, background: BackgroundTasks, v: str = ""):
 def remove_cover(book_id: int):
     drop_cover(book_id)
     with db() as con:
-        con.execute("UPDATE books SET cover_failed=1 WHERE id=?", (book_id,))
+        con.execute("UPDATE books SET cover_failed=0, cover_custom=0 WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -1404,6 +1429,8 @@ async def upload_cover(book_id: int, cover: UploadFile):
     os.makedirs(COVERS_DIR, exist_ok=True)
     with open(cover_path(book_id), "wb") as f:
         f.write(data)
+    with db() as con:
+        con.execute("UPDATE books SET cover_custom=1, cover_failed=0 WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
