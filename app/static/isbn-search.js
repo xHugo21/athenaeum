@@ -103,8 +103,12 @@
       const mine = ++seq;
       say('Looking up…');
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(isbn)}&source=ol`);
-        const results = await r.json();
+        const search = async source => {
+          const r = await fetch(`/api/search?q=${encodeURIComponent(isbn)}&source=${source}`);
+          return r.json();
+        };
+        let results = await search('ol');
+        if (!results.length) results = await search('gb');
         if (mine !== seq) return;
         const meta = results[0];
         if (!meta) {
@@ -113,7 +117,7 @@
           return;
         }
         opts.onMeta(meta);
-        say('Fields filled from ISBN.');
+        say('ISBN metadata loaded.');
       } catch {
         if (mine !== seq) return;
         seen = '';

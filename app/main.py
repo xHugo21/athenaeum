@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS books (
     title TEXT NOT NULL,
     author TEXT,
     isbn TEXT,
+    source TEXT,
     md5 TEXT,
     koreader_ignored INTEGER NOT NULL DEFAULT 0,
     total_seconds INTEGER NOT NULL DEFAULT 0,
@@ -202,6 +203,8 @@ def migrate(con):
         for (book_id,) in con.execute("SELECT id FROM books").fetchall():
             if os.path.exists(cover_path(book_id)):
                 con.execute("UPDATE books SET cover_custom=1 WHERE id=?", (book_id,))
+    if "source" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN source TEXT")
 
 
 @asynccontextmanager
@@ -276,6 +279,13 @@ def logout():
 
 def clean_isbn(isbn: str) -> str:
     return re.sub(r"[^0-9Xx]", "", isbn)
+
+
+BOOK_SOURCES = ("Open Library", "Google Books")
+
+
+def clean_source(value: str, fallback: str | None = None) -> str | None:
+    return value if value in BOOK_SOURCES else fallback
 
 
 def snap_rating(rating: float) -> float:
@@ -797,21 +807,24 @@ def add_book(
     title: str = Form(...),
     author: str = Form(""),
     isbn: str = Form(""),
+    source: str = Form(""),
     pages: int = Form(0),
     rating: float = Form(0),
     review: str = Form(""),
 ):
     rating = snap_rating(rating)
     isbn = clean_isbn(isbn)
+    source = clean_source(source)
     meta = fetch_metadata(isbn) if isbn else {}
     book_pages = pages or meta.get("pages")
     with db() as con:
         cur = con.execute(
-            "INSERT INTO books (title, author, isbn, pages_read, total_pages, print_pages, isbn_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO books (title, author, isbn, source, pages_read, total_pages, print_pages, isbn_pages, rating, review, status, added_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 title or meta.get("title"),
                 author or meta.get("author") or None,
                 isbn or None,
+                source,
                 book_pages or 0,
                 book_pages,
                 pages or None,
@@ -849,6 +862,7 @@ def edit_book(
     title: str = Form(...),
     author: str = Form(""),
     isbn: str = Form(""),
+    source: str = Form(""),
     pages_read: int = Form(0),
     total_pages: int = Form(0),
     print_pages: int = Form(0),
@@ -856,11 +870,15 @@ def edit_book(
     isbn = clean_isbn(isbn)
     with db() as con:
         row = con.execute(
-            "SELECT isbn, total_seconds, print_pages, isbn_pages, cover_custom FROM books WHERE id=?", (book_id,)
+            "SELECT isbn, source, total_seconds, print_pages, isbn_pages, cover_custom FROM books WHERE id=?", (book_id,)
         ).fetchone()
         if not row:
             return RedirectResponse("/", 303)
-        meta = fetch_metadata(isbn) if isbn and (isbn != row["isbn"] or not row["isbn_pages"]) else {}
+        new_source = clean_source(source, row["source"])
+        isbn_changed = bool(isbn) and isbn != row["isbn"]
+        if isbn_changed:
+            new_source = clean_source(source)
+        meta = fetch_metadata(isbn) if isbn and (isbn_changed or not row["isbn_pages"]) else {}
         isbn_pages = row["isbn_pages"] if isbn == row["isbn"] else None
         if isbn and not isbn_pages:
             isbn_pages = meta.get("pages")
@@ -873,16 +891,17 @@ def edit_book(
         if new_total and not row["total_seconds"] and not pages_read:
             new_read = new_total
         keep_cover = bool(row["cover_custom"])
-        if isbn and isbn != row["isbn"]:
+        if isbn_changed:
             if not keep_cover:
                 drop_cover(book_id)
             con.execute("UPDATE books SET cover_failed=0 WHERE id=?", (book_id,))
         con.execute(
-            "UPDATE books SET title=?, author=?, isbn=?, pages_read=?, total_pages=?, print_pages=?, isbn_pages=? WHERE id=?",
+            "UPDATE books SET title=?, author=?, isbn=?, source=?, pages_read=?, total_pages=?, print_pages=?, isbn_pages=? WHERE id=?",
             (
                 title.strip() or None,
                 author.strip() or None,
                 isbn or None,
+                new_source,
                 max(0, new_read),
                 new_total,
                 manual,
@@ -1372,6 +1391,16 @@ def insert_annotation(con, book_id: int, a: dict):
 COVER_PENDING: set[int] = set()
 
 
+def write_fetched_cover(book_id: int, data: bytes) -> str:
+    path = cover_path(book_id)
+    os.makedirs(COVERS_DIR, exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+    with db() as con:
+        con.execute("UPDATE books SET cover_custom=0 WHERE id=?", (book_id,))
+    return path
+
+
 def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
     path = cover_path(book_id)
     if os.path.exists(path):
@@ -1380,22 +1409,31 @@ def fetch_cover(book_id: int, isbn: str | None, failed: int) -> str | None:
         return None
     COVER_PENDING.add(book_id)
     try:
-        r = httpx.get(
-            f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg",
-            follow_redirects=True,
-            timeout=10,
-        )
-        if r.status_code == 200 and len(r.content) > 1000:
+        try:
+            r = httpx.get(
+                f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg",
+                follow_redirects=True,
+                timeout=10,
+            )
+        except httpx.HTTPError:
+            r = None
+        if r is not None and r.status_code == 200 and len(r.content) > 1000:
             if os.path.exists(path):
                 return path
-            os.makedirs(COVERS_DIR, exist_ok=True)
-            with open(path, "wb") as f:
-                f.write(r.content)
-            with db() as con:
-                con.execute("UPDATE books SET cover_custom=0 WHERE id=?", (book_id,))
-            return path
-    except httpx.HTTPError:
-        pass
+            return write_fetched_cover(book_id, r.content)
+        # Google Books is the fallback for ISBNs that Open Library does not cover.
+        for result in google_books_search(f"isbn:{isbn}", ""):
+            cover = result.get("cover")
+            if not cover:
+                continue
+            try:
+                r = httpx.get(cover, follow_redirects=True, timeout=10)
+            except httpx.HTTPError:
+                continue
+            if r.status_code == 200 and len(r.content) > 1000:
+                if os.path.exists(path):
+                    return path
+                return write_fetched_cover(book_id, r.content)
     finally:
         COVER_PENDING.discard(book_id)
     with db() as con:

@@ -153,9 +153,15 @@
   <div class="book-main">
     <div>
       <h1>{{ b['title'] }}</h1>
+      {% set isbn_href = 'https://www.google.com/search?tbm=bks&q=isbn:' ~ b['isbn'] %}
+      {% if b['source'] == 'Open Library' %}
+        {% set isbn_href = 'https://openlibrary.org/isbn/' ~ b['isbn'] %}
+      {% elif b['source'] == 'Google Books' %}
+        {% set isbn_href = 'https://books.google.com/books?vid=ISBN' ~ b['isbn'] %}
+      {% endif %}
       <div class="meta">
         <span>{{ b['author'] or 'Unknown author' }}</span>
-        {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><span class="isbn-copy"><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">{{ b['isbn'] }}</a><button type="button" class="isbn-copy-btn" data-copy-isbn="{{ b['isbn'] }}" title="Copy ISBN" aria-label="Copy ISBN {{ b['isbn'] }}"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"/></svg></button></span></span>{% endif %}
+        {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><span class="isbn-copy"><a href="{{ isbn_href }}" target="_blank" rel="noopener">{{ b['isbn'] }}</a><button type="button" class="isbn-copy-btn" data-copy-isbn="{{ b['isbn'] }}" title="Copy ISBN" aria-label="Copy ISBN {{ b['isbn'] }}"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"/></svg></button></span></span>{% endif %}
         <span class="sep">·</span>
         <span class="meta-actions">
           <a class="linkbtn linkbtn-quiet annotation-edit" href="/books/{{ b['id'] }}/edit" title="Edit details" aria-label="Edit details">

@@ -8,13 +8,14 @@
     const isbnInput = opts.isbnInput;
     const titleInput = opts.titleInput;
     const authorInput = opts.authorInput;
+    let override = '';
 
     function paint() {
       titleEl.textContent = (titleInput?.value || '').trim() || 'Untitled';
       authorEl.textContent = (authorInput?.value || '').trim();
       const isbn = (isbnInput?.value || '').replace(/[^0-9Xx]/g, '');
       const hasIsbn = isbn.length === 10 || isbn.length === 13;
-      const src = fixed || (hasIsbn
+      const src = fixed || override || (hasIsbn
         ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`
         : '');
       if (!src) {
@@ -28,10 +29,16 @@
 
     img.addEventListener('error', () => { img.hidden = true; });
     img.addEventListener('load', () => { img.hidden = false; });
-    for (const el of [isbnInput, titleInput, authorInput]) {
-      el?.addEventListener('input', paint);
-    }
+    isbnInput?.addEventListener('input', () => { override = ''; paint(); });
+    titleInput?.addEventListener('input', paint);
+    authorInput?.addEventListener('input', paint);
     paint();
-    return { refresh: paint };
+    return {
+      refresh: paint,
+      setCover(url) {
+        override = url || '';
+        paint();
+      },
+    };
   };
 })();

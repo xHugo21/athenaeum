@@ -198,6 +198,31 @@ def test_set_isbn_fills_pages_for_manual_add(client, monkeypatch):
     assert (total, read, isbn_pages, manual) == (96, 96, 96, None), "the ISBN page count must be stored"
 
 
+def test_add_book_keeps_the_metadata_source(client, monkeypatch):
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main, "fetch_cover", lambda *a: None)
+    client.post(
+        "/books",
+        data={"title": "Dune", "isbn": "9780441013593", "source": "Google Books"},
+        follow_redirects=False,
+    )
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT source FROM books WHERE id=1").fetchone()[0] == "Google Books"
+
+
+def test_edit_book_updates_and_preserves_the_metadata_source(client, monkeypatch):
+    monkeypatch.setattr(main, "fetch_metadata", lambda isbn: {})
+    monkeypatch.setattr(main, "fetch_cover", lambda *a: None)
+    client.post("/books", data={"title": "Dune", "source": "Open Library"}, follow_redirects=False)
+    client.post("/books/1/edit", data={"title": "Dune", "source": "Google Books"}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT source FROM books WHERE id=1").fetchone()[0] == "Google Books"
+    client.post("/books/1/edit", data={"title": "Dune"}, follow_redirects=False)
+    with sqlite3.connect("athenaeum.db") as c:
+        assert c.execute("SELECT source FROM books WHERE id=1").fetchone()[0] == "Google Books", \
+            "an edit without source keeps the stored one"
+
+
 def test_stats_page(client):
     client.post("/import", files={"file": ("statistics.sqlite3", koreader_bytes(), "application/octet-stream")})
     r = client.get("/stats")
@@ -856,6 +881,32 @@ def test_edit_book_fetches_its_cover_before_rendering(client, monkeypatch):
     assert os.path.exists("covers/1.jpg"), "saving an ISBN must resolve the cover before the redirect"
 
 
+def test_cover_falls_back_to_google_books(client, monkeypatch):
+    client.post("/books", data={"title": "Book"}, follow_redirects=False)
+
+    class Miss:
+        status_code = 200
+        content = b""
+
+    class Img:
+        status_code = 200
+        content = b"\xff\xd8\xff" + b"gb" * 2000
+
+    calls = []
+
+    def fake_get(url, **kw):
+        calls.append(url)
+        return Img() if "google" in url else Miss()
+
+    monkeypatch.setattr(main.httpx, "get", fake_get)
+    monkeypatch.setattr(
+        main, "google_books_search", lambda q, lang: [{"cover": "https://books.google.com/cover.jpg"}]
+    )
+    main.fetch_cover(1, "9780441013593", 0)
+    assert os.path.exists("covers/1.jpg")
+    assert any("google" in url for url in calls), "Open Library missing the cover must not stop the fetch"
+
+
 def test_search_section_can_force_text_lookup(client, monkeypatch):
     calls = []
     monkeypatch.setattr(main, "openlibrary_isbn", lambda isbn: calls.append(("isbn", isbn)) or [{"title": "By ISBN"}])
@@ -1147,11 +1198,20 @@ def test_book_edit_controls_are_icons(client):
 def test_book_page_shows_isbn_without_prefix_and_copy_button(client):
     client.post("/books", data={"title": "Dune", "author": "Herbert"}, follow_redirects=False)
     with db() as con:
-        con.execute("UPDATE books SET isbn='9780441013593' WHERE id=1")
+        con.execute("UPDATE books SET isbn='9780441013593', source='Google Books' WHERE id=1")
     page = client.get("/books/1").text
     assert ">ISBN 9780441013593<" not in page
     assert "9780441013593</a>" in page
     assert 'class="isbn-copy-btn"' in page and 'data-copy-isbn="9780441013593"' in page
+    assert "books.google.com/books?vid=ISBN9780441013593" in page
+
+    with db() as con:
+        con.execute("UPDATE books SET source='Open Library' WHERE id=1")
+    assert "openlibrary.org/isbn/9780441013593" in client.get("/books/1").text
+
+    with db() as con:
+        con.execute("UPDATE books SET source=NULL WHERE id=1")
+    assert "google.com/search?tbm=bks&amp;q=isbn:9780441013593" in client.get("/books/1").text
 
 
 def test_edit_details_page_holds_the_form(client):

@@ -31,6 +31,7 @@
 <div id="edit-manual">
   <div class="meta-layout">
     <form class="meta-form form-grid" method="post" action="/books/{{ b['id'] }}/edit">
+      <input type="hidden" name="source" value="{{ b['source'] or '' }}">
       <label class="field span-12"><span>Title</span><input name="title" value="{{ b['title'] }}" required></label>
       <label class="field span-6"><span>Author</span><input name="author" value="{{ b['author'] or '' }}"></label>
       <label class="field span-6"><span>ISBN</span><input name="isbn" value="{{ b['isbn'] or '' }}" inputmode="numeric" placeholder="9780140328721"><small class="hint" id="edit-isbn-status" aria-live="polite"></small></label>
@@ -79,18 +80,24 @@
   initIsbnAutofill(editForm.elements.isbn, {
     status: document.getElementById('edit-isbn-status'),
     onMeta(meta) {
-      if (meta.title) editForm.elements.title.value = meta.title;
-      if (meta.author) editForm.elements.author.value = meta.author;
-      if (meta.pages) editForm.elements.print_pages.value = meta.pages;
-      coverPreview.refresh();
+      const fill = (el, value) => { if (!el.value.trim()) el.value = value; };
+      if (meta.title) fill(editForm.elements.title, meta.title);
+      if (meta.author) fill(editForm.elements.author, meta.author);
+      if (meta.pages) fill(editForm.elements.print_pages, meta.pages);
+      editForm.elements.source.value = meta.source || 'Open Library';
+      coverPreview.setCover(meta.cover);
     },
+  });
+  editForm.elements.isbn.addEventListener('input', () => {
+    editForm.elements.source.value = '';
   });
   initIsbnSearch(editSearch, b => {
     editForm.elements.title.value = b.title || '';
     editForm.elements.author.value = b.author || '';
     editForm.elements.isbn.value = b.isbn || '';
     if (b.pages) editForm.elements.print_pages.value = b.pages;
-    coverPreview.refresh();
+    editForm.elements.source.value = b.source || '';
+    coverPreview.setCover(b.cover);
     editTab('manual');
     editForm.elements.title.focus();
   });

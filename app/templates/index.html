@@ -253,6 +253,7 @@
     <button type="button" id="add-tab-isbn" aria-pressed="false" onclick="addTab('isbn')">Search</button>
   </div>
   <form id="add-manual" method="post" action="/books">
+    <input type="hidden" name="source" id="f-source" value="">
     <div class="add-manual-body">
       <div class="form-grid">
         <label class="field span-8"><span>Title</span><input id="f-title" name="title" required></label>
@@ -470,11 +471,20 @@
   initIsbnAutofill(document.getElementById('f-isbn'), {
     status: document.getElementById('f-isbn-status'),
     onMeta(meta) {
-      if (meta.title) document.getElementById('f-title').value = meta.title;
-      if (meta.author) document.getElementById('f-author').value = meta.author;
-      if (meta.pages) document.getElementById('f-pages').value = meta.pages;
-      coverPreview.refresh();
+      const fill = (id, value) => {
+        const el = document.getElementById(id);
+        if (!el.value.trim()) el.value = value;
+      };
+      if (meta.title) fill('f-title', meta.title);
+      if (meta.author) fill('f-author', meta.author);
+      if (meta.pages) fill('f-pages', meta.pages);
+      document.getElementById('f-source').value = meta.source || 'Open Library';
+      coverPreview.setCover(meta.cover);
     },
+  });
+
+  document.getElementById('f-isbn').addEventListener('input', () => {
+    document.getElementById('f-source').value = '';
   });
 
   initIsbnSearch(document.getElementById('add-isbn'), b => {
@@ -482,7 +492,8 @@
     document.getElementById('f-author').value = b.author || '';
     document.getElementById('f-isbn').value = b.isbn || '';
     document.getElementById('f-pages').value = b.pages || '';
-    coverPreview.refresh();
+    document.getElementById('f-source').value = b.source || '';
+    coverPreview.setCover(b.cover);
     addTab('manual');
     document.getElementById('f-title').focus();
   });
