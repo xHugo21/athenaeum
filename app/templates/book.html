@@ -15,6 +15,21 @@
   .meta .inline-form { display: inline-flex; margin: 0; }
   .meta .linkbtn { font-size: 13px; }
   .meta-actions { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .isbn-copy { display: inline-flex; align-items: center; gap: 4px; }
+  .isbn-copy-btn {
+    display: none; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: none; color: var(--muted); cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .isbn-copy-btn:hover { background: var(--surface-2); color: var(--text); }
+  .isbn-copy-btn.copied { color: var(--ok); }
+  @media (hover: none) {
+    .isbn-copy-btn { display: inline-flex; }
+  }
+  @media (hover: hover) {
+    .isbn-copy:hover .isbn-copy-btn, .isbn-copy:focus-within .isbn-copy-btn { display: inline-flex; }
+  }
   .rate-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
   .rate-row .of { font-size: 12px; color: var(--muted); }
   .progress-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -140,7 +155,7 @@
       <h1>{{ b['title'] }}</h1>
       <div class="meta">
         <span>{{ b['author'] or 'Unknown author' }}</span>
-        {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">ISBN {{ b['isbn'] }}</a></span>{% endif %}
+        {% if b['isbn'] %}<span class="isbn-part"><span class="sep">·</span><span class="isbn-copy"><a href="https://openlibrary.org/isbn/{{ b['isbn'] }}" target="_blank" rel="noopener">{{ b['isbn'] }}</a><button type="button" class="isbn-copy-btn" data-copy-isbn="{{ b['isbn'] }}" title="Copy ISBN" aria-label="Copy ISBN {{ b['isbn'] }}"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-copy"/></svg></button></span></span>{% endif %}
         <span class="sep">·</span>
         <span class="meta-actions">
           <a class="linkbtn linkbtn-quiet annotation-edit" href="/books/{{ b['id'] }}/edit" title="Edit details" aria-label="Edit details">
@@ -347,6 +362,33 @@
   const save = form => fetch(form.action, { method: 'POST', body: new FormData(form), redirect: 'manual' })
     .then(() => announce('Saved'))
     .catch(() => form.submit());
+
+  const copyText = async text => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }
+  };
+
+  document.querySelectorAll('.isbn-copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ok = await copyText(btn.dataset.copyIsbn);
+      btn.classList.toggle('copied', ok);
+      announce(ok ? 'ISBN copied' : 'Could not copy ISBN');
+      if (ok) setTimeout(() => btn.classList.remove('copied'), 1500);
+    });
+  });
 
   const statusForm = document.querySelector('.status-form');
   if (statusForm) {
