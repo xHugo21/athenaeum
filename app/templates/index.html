@@ -90,6 +90,18 @@
   .shelf { display: flex; align-items: flex-end; gap: 0; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
     flex: 0 0 auto;
+    display: block; text-decoration: none;
+    position: relative; cursor: pointer;
+  }
+  .book-3d {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transform: perspective(10000px);
+    transition: transform .8s cubic-bezier(.22,.8,.2,1);
+  }
+  .spine-face {
+    position: absolute; inset: 0;
+    display: flex; align-items: flex-start; justify-content: center;
     background:
       linear-gradient(to right,
         rgba(255, 255, 255, .13) 0,
@@ -98,22 +110,56 @@
         rgba(0, 0, 0, .3) 100%),
       var(--spine);
     border-radius: 2px 2px 0 0;
-    display: flex; align-items: flex-start; justify-content: center; overflow: hidden;
-    position: relative; cursor: pointer;
-    transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+    transform: translateZ(calc(var(--cw) / 2));
+    backface-visibility: hidden;
   }
-  .shelf:hover .book-spine { filter: saturate(.5) brightness(.84); }
-  .shelf .book-spine:hover {
-    filter: none; transform: translateY(-6px); z-index: 1;
-    box-shadow: 0 12px 20px -12px rgba(17, 17, 19, .5);
+  .spine-face::after { content: ""; position: absolute; inset: 0; background: #111318; opacity: 0; transition: opacity .16s; border-radius: inherit; }
+  .shelf:hover .spine-face::after { opacity: .24; }
+  .shelf .book-spine:hover .spine-face::after,
+  .shelf .book-spine:focus-visible .spine-face::after,
+  .shelf .book-spine.is-open .spine-face::after { opacity: 0; }
+  .spine-cover {
+    position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
+    display: flex; flex-direction: column; padding: 20px 16px 14px; overflow: hidden;
+    background-color: var(--spine); background-size: cover; background-position: center;
+    border-radius: 2px; color: rgba(255, 255, 255, .93);
+    transform: rotateY(90deg) translateZ(calc(var(--ws) / 2));
+    backface-visibility: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
   }
-  .shelf .book-spine:focus-visible { filter: none; outline-offset: -2px; }
-  .book-spine.centered { align-items: center; }
+  .spine-cover .sc-t { font-size: 15px; font-weight: 600; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .spine-cover .sc-a { margin-top: auto; padding-top: 10px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: rgba(255, 255, 255, .66); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .spine-cover.has-img .sc-t, .spine-cover.has-img .sc-a { display: none; }
+  .spine-back {
+    position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
+    background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.3)), var(--spine);
+    transform: rotateY(-90deg) translateZ(calc(var(--ws) / 2));
+    backface-visibility: hidden;
+  }
+.spine-pages {
+    position: absolute; top: 0; left: 0; width: var(--ws); height: var(--cw);
+    transform-origin: 50% 0;
+    transform: translateZ(calc(var(--cw) / 2)) rotateX(-90deg);
+    background: repeating-linear-gradient(90deg, #f4f1e8 0 1px, #e2dccb 1px 2px);
+    box-shadow: inset 3px 0 0 var(--spine), inset -3px 0 0 var(--spine);
+  }
+  .spine-hit { display: none; position: absolute; top: -32px; bottom: -12px; left: calc((var(--ws) - var(--cw)) / 2 - 12px); width: calc(var(--cw) + 24px); }
+  .shelf .book-spine:hover .spine-hit,
+  .shelf .book-spine:focus-visible .spine-hit,
+  .shelf .book-spine.is-open .spine-hit { display: block; }
+  .shelf .book-spine:hover,
+  .shelf .book-spine.is-open { z-index: 5; }
+  .shelf .book-spine:hover .book-3d,
+  .shelf .book-spine:focus-visible .book-3d,
+  .shelf .book-spine.is-open .book-3d {
+    transform: perspective(1200px) translate3d(0, -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
+  }
+  .shelf .book-spine:focus-visible { outline-offset: -2px; }
+  .book-spine.centered .spine-face { align-items: center; }
   .book-spine.clipped .spine-text {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
   }
-  .book-spine:hover { transform: translateY(-4px); z-index: 1; text-decoration: none; }
   .book-spine.hidden { display: none; }
   .spine-text {
     writing-mode: vertical-rl; text-orientation: mixed;
@@ -403,7 +449,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"cov":{{ 1 if cover_ts.get(b['id']) else 0 }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -649,7 +695,11 @@
         a.title = a.dataset.label;
         a.style.width = b._w + 'px';
         a.style.height = b._h + 'px';
+        a.style.setProperty('--ws', b._w + 'px');
+        a.style.setProperty('--cw', Math.round(b._h * .68) + 'px');
         a.style.setProperty('--spine', CLOTH[b.hue % CLOTH.length]);
+        const face = document.createElement('span');
+        face.className = 'spine-face';
         const text = document.createElement('span');
         text.className = 'spine-text';
         const title = document.createElement('span');
@@ -661,7 +711,36 @@
           author.textContent = b.author;
           text.appendChild(author);
         }
-        a.appendChild(text);
+        face.appendChild(text);
+        const cover = document.createElement('span');
+        cover.className = 'spine-cover';
+        const ct = document.createElement('span');
+        ct.className = 'sc-t';
+        ct.textContent = b.title;
+        const ca = document.createElement('span');
+        ca.className = 'sc-a';
+        ca.textContent = b.author || '';
+        cover.append(ct, ca);
+        const back = document.createElement('span');
+        back.className = 'spine-back';
+        const pages = document.createElement('span');
+        pages.className = 'spine-pages';
+        const box = document.createElement('span');
+        box.className = 'book-3d';
+        box.append(face, cover, back, pages);
+        const hit = document.createElement('span');
+        hit.className = 'spine-hit';
+        a.append(box, hit);
+        if (b.cov) a.addEventListener('mouseenter', () => {
+          if (cover.dataset.done) return;
+          cover.dataset.done = '1';
+          const img = new Image();
+          img.onload = () => {
+            cover.classList.add('has-img');
+            cover.style.backgroundImage = `url(/covers/${b.id}.jpg)`;
+          };
+          img.src = `/covers/${b.id}.jpg`;
+        });
         shelf.appendChild(a);
       }
       const board = document.createElement('div');
@@ -676,9 +755,9 @@
       group.append(shelf, board, caption);
       box.appendChild(group);
     }
-    const spines = box.querySelectorAll('.book-spine');
-    for (const a of spines) {
-      a.classList.add(a.firstElementChild.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
+    for (const a of box.querySelectorAll('.book-spine')) {
+      const text = a.querySelector('.spine-text');
+      a.classList.add(text.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
     }
   }
 
@@ -710,6 +789,22 @@
       if (!document.getElementById('shelf-view').hidden) { buildShelves(); radial(); }
     });
   });
+
+  if (matchMedia('(hover: none) and (pointer: coarse)').matches) {
+    const shelves = document.getElementById('shelves');
+    shelves.addEventListener('click', e => {
+      const a = e.target.closest('.book-spine');
+      if (!a || a.classList.contains('is-open')) return;
+      e.preventDefault();
+      shelves.querySelectorAll('.book-spine.is-open').forEach(el => el.classList.remove('is-open'));
+      a.classList.add('is-open');
+      a.dispatchEvent(new MouseEvent('mouseenter'));
+    });
+    document.addEventListener('click', e => {
+      const open = shelves.querySelector('.book-spine.is-open');
+      if (open && !e.target.closest('.book-spine')) open.classList.remove('is-open');
+    });
+  }
 
   const manageBtn = document.getElementById('labels-manage');
   if (manageBtn) {
