@@ -449,7 +449,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"bg":{{ (b['spine_bg'] or '') | tojson }},"fg":{{ (b['spine_fg'] or '') | tojson }},"cov":{{ 1 if cover_ts.get(b['id']) else 0 }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"bg":{{ (b['spine_bg'] or '') | tojson }},"fg":{{ (b['spine_fg'] or '') | tojson }},"ts":{{ cover_ts.get(b['id'], 0) }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -732,15 +732,15 @@
         const hit = document.createElement('span');
         hit.className = 'spine-hit';
         a.append(box, hit);
-        if (b.cov) a.addEventListener('mouseenter', () => {
+        a.addEventListener('mouseenter', () => {
           if (cover.dataset.done) return;
           cover.dataset.done = '1';
           const img = new Image();
           img.onload = () => {
             cover.classList.add('has-img');
-            cover.style.backgroundImage = `url(/covers/${b.id}.jpg)`;
+            cover.style.backgroundImage = `url(/covers/${b.id}.jpg?v=${b.ts})`;
           };
-          img.src = `/covers/${b.id}.jpg`;
+          img.src = `/covers/${b.id}.jpg?v=${b.ts}`;
         });
         shelf.appendChild(a);
       }
