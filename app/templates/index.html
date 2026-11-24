@@ -120,16 +120,19 @@
   .shelf .book-spine.is-open .spine-face::after { opacity: 0; }
   .spine-cover {
     position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
-    display: flex; flex-direction: column; padding: 20px 16px 14px; overflow: hidden;
-    background-color: var(--spine); background-size: cover; background-position: center;
-    border-radius: 2px; color: var(--spine-fg, rgba(255, 255, 255, .93));
+    display: flex; flex-direction: column; padding: clamp(10px, 9cqw, 18px); overflow: hidden;
+    background-color: var(--surface-2); background-size: cover; background-position: center;
+    border-radius: 2px;
     transform: rotateY(90deg) translateZ(calc(var(--ws) / 2));
     backface-visibility: hidden;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+    box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .1);
+    container-type: inline-size;
   }
-  .spine-cover .sc-t { font-size: 15px; font-weight: 600; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-  .spine-cover .sc-a { margin-top: auto; padding-top: 10px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--spine-fg, rgba(255, 255, 255, .93)); opacity: .7; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .spine-cover.has-img .sc-t, .spine-cover.has-img .sc-a { display: none; }
+  .spine-cover .sc-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(8px, 6cqw, 14px); }
+  .spine-cover .sc-t { font-size: clamp(11px, 8cqw, 17px); font-weight: 600; color: var(--text); line-height: 1.28; letter-spacing: -.012em; text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .spine-cover .sc-rule { width: clamp(14px, 12cqw, 24px); height: 1px; background: var(--line-2); flex: 0 0 1px; }
+  .spine-cover .sc-a { margin-top: 8px; font-size: clamp(9px, 6.5cqw, 13px); color: var(--muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .spine-cover.has-img > span { display: none; }
   .spine-back {
     position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
     background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.3)), var(--spine);
@@ -715,13 +718,18 @@
         face.appendChild(text);
         const cover = document.createElement('span');
         cover.className = 'spine-cover';
+        const body = document.createElement('span');
+        body.className = 'sc-body';
         const ct = document.createElement('span');
         ct.className = 'sc-t';
         ct.textContent = b.title;
+        const rule = document.createElement('span');
+        rule.className = 'sc-rule';
+        body.append(ct, rule);
         const ca = document.createElement('span');
         ca.className = 'sc-a';
         ca.textContent = b.author || '';
-        cover.append(ct, ca);
+        cover.append(body, ca);
         const back = document.createElement('span');
         back.className = 'spine-back';
         const pages = document.createElement('span');
