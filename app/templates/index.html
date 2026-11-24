@@ -122,13 +122,13 @@
     position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
     display: flex; flex-direction: column; padding: 20px 16px 14px; overflow: hidden;
     background-color: var(--spine); background-size: cover; background-position: center;
-    border-radius: 2px; color: rgba(255, 255, 255, .93);
+    border-radius: 2px; color: var(--spine-fg, rgba(255, 255, 255, .93));
     transform: rotateY(90deg) translateZ(calc(var(--ws) / 2));
     backface-visibility: hidden;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
   }
   .spine-cover .sc-t { font-size: 15px; font-weight: 600; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-  .spine-cover .sc-a { margin-top: auto; padding-top: 10px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: rgba(255, 255, 255, .66); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .spine-cover .sc-a { margin-top: auto; padding-top: 10px; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--spine-fg, rgba(255, 255, 255, .93)); opacity: .7; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .spine-cover.has-img .sc-t, .spine-cover.has-img .sc-a { display: none; }
   .spine-back {
     position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
@@ -165,13 +165,13 @@
     writing-mode: vertical-rl; text-orientation: mixed;
     box-sizing: border-box; max-height: 100%; padding: 18px 0 22px;
     font-size: 11.5px; font-weight: 500; line-height: 1.2; letter-spacing: 0;
-    color: rgba(255, 255, 255, .93);
+    color: var(--spine-fg, rgba(255, 255, 255, .93));
     white-space: nowrap; overflow: hidden;
   }
   .spine-text .sa {
     margin-inline-start: 10px;
     font-size: 9.5px; font-weight: 400; letter-spacing: .13em; text-transform: uppercase;
-    color: rgba(255, 255, 255, .66);
+    color: var(--spine-fg, rgba(255, 255, 255, .93)); opacity: .7;
   }
   .shelf-board {
     height: 3px; border-radius: 0 0 2px 2px;
@@ -449,7 +449,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"cov":{{ 1 if cover_ts.get(b['id']) else 0 }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"bg":{{ (b['spine_bg'] or '') | tojson }},"fg":{{ (b['spine_fg'] or '') | tojson }},"cov":{{ 1 if cover_ts.get(b['id']) else 0 }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -697,7 +697,8 @@
         a.style.height = b._h + 'px';
         a.style.setProperty('--ws', b._w + 'px');
         a.style.setProperty('--cw', Math.round(b._h * .68) + 'px');
-        a.style.setProperty('--spine', CLOTH[b.hue % CLOTH.length]);
+        a.style.setProperty('--spine', b.bg || CLOTH[b.hue % CLOTH.length]);
+        if (b.fg) a.style.setProperty('--spine-fg', b.fg);
         const face = document.createElement('span');
         face.className = 'spine-face';
         const text = document.createElement('span');

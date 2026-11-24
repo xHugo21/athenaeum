@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import date, timedelta
 
 import httpx
+from PIL import Image
 from fastapi import BackgroundTasks, FastAPI, Form, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -113,6 +114,8 @@ CREATE TABLE IF NOT EXISTS books (
     review TEXT,
     cover_failed INTEGER NOT NULL DEFAULT 0,
     cover_custom INTEGER NOT NULL DEFAULT 0,
+    spine_bg TEXT,
+    spine_fg TEXT,
     status TEXT NOT NULL DEFAULT 'reading',
     added_at INTEGER NOT NULL
 );
@@ -205,6 +208,9 @@ def migrate(con):
                 con.execute("UPDATE books SET cover_custom=1 WHERE id=?", (book_id,))
     if "source" not in cols:
         con.execute("ALTER TABLE books ADD COLUMN source TEXT")
+    if "spine_bg" not in cols:
+        con.execute("ALTER TABLE books ADD COLUMN spine_bg TEXT")
+        con.execute("ALTER TABLE books ADD COLUMN spine_fg TEXT")
 
 
 @asynccontextmanager
@@ -212,6 +218,12 @@ async def lifespan(app):
     with db() as con:
         con.executescript(SCHEMA)
         migrate(con)
+        for (book_id,) in con.execute("SELECT id FROM books WHERE spine_bg IS NULL").fetchall():
+            path = cover_path(book_id)
+            if os.path.exists(path):
+                bg, fg = spine_colors(path)
+                if bg:
+                    con.execute("UPDATE books SET spine_bg=?, spine_fg=? WHERE id=?", (bg, fg, book_id))
         if con.execute("SELECT 1 FROM sessions LIMIT 1").fetchone():
             rebuild_aggregates(con)
     yield
@@ -1391,13 +1403,36 @@ def insert_annotation(con, book_id: int, a: dict):
 COVER_PENDING: set[int] = set()
 
 
+def spine_colors(path: str) -> tuple[str, str]:
+    try:
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            im.thumbnail((64, 96))
+            q = im.quantize(colors=8)
+            palette = q.getpalette()
+            best, best_score = (0, 0, 0), -1.0
+            for n, idx in q.getcolors() or []:
+                r, g, b = palette[idx * 3 : idx * 3 + 3]
+                luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                sat = (max(r, g, b) - min(r, g, b)) / 255
+                score = n * (sat + 0.25) * (1.0 - abs(luma - 0.42))
+                if score > best_score:
+                    best, best_score = (r, g, b), score
+    except Exception:
+        return "", ""
+    r, g, b = best
+    fg = "#1c1c1e" if 0.299 * r + 0.587 * g + 0.114 * b > 158 else "#f4f2ed"
+    return f"#{r:02x}{g:02x}{b:02x}", fg
+
+
 def write_fetched_cover(book_id: int, data: bytes) -> str:
     path = cover_path(book_id)
     os.makedirs(COVERS_DIR, exist_ok=True)
     with open(path, "wb") as f:
         f.write(data)
+    bg, fg = spine_colors(path)
     with db() as con:
-        con.execute("UPDATE books SET cover_custom=0 WHERE id=?", (book_id,))
+        con.execute("UPDATE books SET cover_custom=0, spine_bg=?, spine_fg=? WHERE id=?", (bg, fg, book_id))
     return path
 
 
@@ -1458,7 +1493,7 @@ def cover_image(book_id: int, background: BackgroundTasks, v: str = ""):
 def remove_cover(book_id: int):
     drop_cover(book_id)
     with db() as con:
-        con.execute("UPDATE books SET cover_failed=0, cover_custom=0 WHERE id=?", (book_id,))
+        con.execute("UPDATE books SET cover_failed=0, cover_custom=0, spine_bg=NULL, spine_fg=NULL WHERE id=?", (book_id,))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 
@@ -1470,10 +1505,12 @@ async def upload_cover(book_id: int, cover: UploadFile):
     if len(data) > 5_000_000 or not data.startswith((b"\xff\xd8\xff", b"\x89PNG", b"GIF8", b"RIFF", b"WEBP")):
         return RedirectResponse(f"/books/{book_id}?error=Invalid+image", 303)
     os.makedirs(COVERS_DIR, exist_ok=True)
-    with open(cover_path(book_id), "wb") as f:
+    path = cover_path(book_id)
+    with open(path, "wb") as f:
         f.write(data)
+    bg, fg = spine_colors(path)
     with db() as con:
-        con.execute("UPDATE books SET cover_custom=1, cover_failed=0 WHERE id=?", (book_id,))
+        con.execute("UPDATE books SET cover_custom=1, cover_failed=0, spine_bg=?, spine_fg=? WHERE id=?", (bg, fg, book_id))
     return RedirectResponse(f"/books/{book_id}", 303)
 
 

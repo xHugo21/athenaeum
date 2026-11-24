@@ -1434,3 +1434,18 @@ def test_unknown_isbn_yields_no_metadata(monkeypatch):
 
     monkeypatch.setattr(main.httpx, "get", lambda *a, **kw: Reply())
     assert main.fetch_metadata("111") == {"title": None, "author": None, "pages": None, "publisher": None, "year": None}
+
+
+def test_spine_colors(tmp_path):
+    from PIL import Image
+
+    dark = tmp_path / "dark.png"
+    Image.new("RGB", (60, 90), (0x9B, 0x1C, 0x2A)).save(dark)
+    assert main.spine_colors(str(dark)) == ("#9b1c2a", "#f4f2ed")
+
+    light = tmp_path / "light.png"
+    Image.new("RGB", (60, 90), (0xEF, 0xEC, 0xE4)).save(light)
+    bg, fg = main.spine_colors(str(light))
+    assert bg == "#efece4" and fg == "#1c1c1e"
+
+    assert main.spine_colors(str(tmp_path / "missing.png")) == ("", "")
