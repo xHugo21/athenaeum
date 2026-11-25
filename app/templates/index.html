@@ -100,7 +100,7 @@
     transition: transform .8s cubic-bezier(.22,.8,.2,1);
   }
   .spine-face {
-    position: absolute; inset: 0;
+    position: absolute; inset: 0; overflow: hidden;
     display: flex; align-items: flex-start; justify-content: center;
     background:
       linear-gradient(to right,
@@ -177,7 +177,7 @@
   }
   .spine-text .sa {
     margin-inline-start: 10px;
-    font-size: 9.5px; font-weight: 400; letter-spacing: .13em; text-transform: uppercase;
+    font-size: .82em; font-weight: 400; letter-spacing: .13em; text-transform: uppercase;
     color: var(--spine-fg, rgba(255, 255, 255, .93)); opacity: .7;
   }
   .shelf-board {
@@ -768,7 +768,9 @@
     }
     for (const a of box.querySelectorAll('.book-spine')) {
       const text = a.querySelector('.spine-text');
-      a.classList.add(text.scrollHeight <= a.clientHeight - 4 ? 'centered' : 'clipped');
+      const avail = a.clientHeight - 4;
+      if (text.scrollHeight > avail) text.style.fontSize = Math.max(8, 11.5 * avail / text.scrollHeight).toFixed(1) + 'px';
+      a.classList.add(text.scrollHeight <= avail ? 'centered' : 'clipped');
     }
   }
 
