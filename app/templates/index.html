@@ -114,6 +114,10 @@
     backface-visibility: hidden;
   }
   .spine-face::after { content: ""; position: absolute; inset: 0; background: #111318; opacity: 0; transition: opacity .16s; border-radius: inherit; }
+  .book-spine.no-art .spine-face { background: var(--surface-2); box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .1); }
+  .book-spine.no-art .spine-face::after { display: none; }
+  .book-spine.no-art .spine-text { color: var(--text); }
+  .book-spine.no-art .spine-text .sa { color: var(--muted); opacity: 1; }
   .shelf:hover .spine-face::after { opacity: .24; }
   .shelf .book-spine:hover .spine-face::after,
   .shelf .book-spine:focus-visible .spine-face::after,
@@ -452,7 +456,7 @@
       Nothing matches these filters. <button class="linkbtn" type="button" onclick="resetFilters()">Clear filters</button>
     </div>
 
-    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"hue":{{ b['hue'] }},"bg":{{ (b['spine_bg'] or '') | tojson }},"fg":{{ (b['spine_fg'] or '') | tojson }},"ts":{{ cover_ts.get(b['id'], 0) }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+    <script id="book-data" type="application/json">[{% for b in books %}{"id":{{ b['id'] }},"title":{{ b['title'] | tojson }},"author":{{ (b['author'] or '') | tojson }},"pages":{{ b['total_pages'] or 0 }},"rating":{{ b['rating'] if b['rating'] is not none else 0 }},"state":{{ b['status'] | tojson }},"bg":{{ (b['spine_bg'] or '') | tojson }},"fg":{{ (b['spine_fg'] or '') | tojson }},"ts":{{ cover_ts.get(b['id'], 0) }},"labels":{{ b['labels'] | tojson }},"secs":{{ b['total_seconds'] or 0 }},"pdr":{{ b['pages_read'] or 0 }},"pp":{{ (b['print_pages'] or b['isbn_pages']) or 0 }},"last":{{ b['last_read_at'] or b['added_at'] or 0 }},"added":{{ b['added_at'] or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}]</script>
     {% else %}
     <div class="empty">
       No books yet. <button class="linkbtn" type="button" onclick="panel('add-card')">Add the first one</button> or import your KOReader statistics.
@@ -570,8 +574,6 @@
     }
     history.replaceState(null, '', url);
   }
-
-  const CLOTH = ['#5d2a2f', '#24463a', '#26364f', '#7d5f27', '#4a3050', '#37414d', '#4a5138', '#63392f'];
 
   function matches(b) {
     if (state.q && !(b.title.toLowerCase().includes(state.q) || (b.author || '').toLowerCase().includes(state.q))) return false;
@@ -700,7 +702,8 @@
         a.style.height = b._h + 'px';
         a.style.setProperty('--ws', b._w + 'px');
         a.style.setProperty('--cw', Math.round(b._h * .68) + 'px');
-        a.style.setProperty('--spine', b.bg || CLOTH[b.hue % CLOTH.length]);
+        a.style.setProperty('--spine', b.bg || 'var(--surface-2)');
+        if (!b.bg) a.classList.add('no-art');
         if (b.fg) a.style.setProperty('--spine-fg', b.fg);
         const face = document.createElement('span');
         face.className = 'spine-face';

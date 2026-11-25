@@ -8,7 +8,6 @@ import secrets
 import sqlite3
 import tempfile
 import time
-import zlib
 from contextlib import asynccontextmanager, contextmanager
 from datetime import date, timedelta
 
@@ -404,7 +403,6 @@ def index(request: Request):
             book_labels.setdefault(r["book_id"], []).append(r["name"])
             label_counts.setdefault(r["name"], {"id": r["id"], "name": r["name"], "n": 0})["n"] += 1
         for b in books:
-            b["hue"] = zlib.crc32(b["title"].encode()) % 360
             b["labels"] = book_labels.get(b["id"], [])
             b["pct"] = read_pct(b["pages_read"], b["total_pages"])
     pages_total = sum(
