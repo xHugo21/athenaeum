@@ -159,7 +159,7 @@
   .shelf .book-spine:hover .book-3d,
   .shelf .book-spine:focus-visible .book-3d,
   .shelf .book-spine.is-open .book-3d {
-    transform: perspective(1200px) translate3d(0, -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
+    transform: perspective(1200px) translate3d(var(--shift, 0px), -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
   }
   .shelf .book-spine:focus-visible { outline-offset: -2px; }
   .book-spine.centered .spine-face { align-items: center; }
@@ -597,6 +597,7 @@
     document.querySelectorAll('#shelves .shelf-group').forEach(g => {
       g.hidden = !g.querySelector('.book-spine:not(.hidden)');
     });
+    if (shelvesBuilt) fitShelves();
     const none = document.getElementById('no-results');
     if (none) none.hidden = ids.size > 0;
     const count = document.getElementById('book-count');
@@ -657,6 +658,29 @@
       radial();
     }
   });
+
+  const COVER_PERSPECTIVE = 1200, COVER_DEPTH = .8, COVER_TILT = 3;
+
+  function fitSpine(a, bounds, pad = 2) {
+    const r = a.getBoundingClientRect();
+    if (!r.width) return;
+    const cw = parseFloat(a.style.getPropertyValue('--cw'));
+    const scale = 1 / (1 - (r.width / 2 + cw * COVER_DEPTH) / COVER_PERSPECTIVE);
+    const rad = COVER_TILT * Math.PI / 180;
+    const reach = ((cw / 2) * Math.cos(rad) + (r.height / 2) * Math.sin(rad)) * scale;
+    const cx = r.left + r.width / 2, left = bounds.left + pad, right = bounds.right - pad;
+    let shift = 0;
+    if (cx - reach < left) shift = left - (cx - reach);
+    else if (cx + reach > right) shift = right - (cx + reach);
+    if (shift) a.style.setProperty('--shift', (shift / scale).toFixed(1) + 'px');
+    else a.style.removeProperty('--shift');
+  }
+
+  function fitShelves() {
+    const box = document.getElementById('shelves');
+    const bounds = box.getBoundingClientRect();
+    box.querySelectorAll('.book-spine').forEach(a => fitSpine(a, bounds));
+  }
 
   function buildShelves() {
     const box = document.getElementById('shelves');
@@ -772,6 +796,7 @@
       if (text.scrollHeight > avail) text.style.fontSize = Math.max(8, 11.5 * avail / text.scrollHeight).toFixed(1) + 'px';
       a.classList.add(text.scrollHeight <= avail ? 'centered' : 'clipped');
     }
+    fitShelves();
   }
 
   function paintShelves() {
