@@ -87,9 +87,11 @@
     .add-manual-body { flex-direction: column-reverse; align-items: stretch; }
     .add-cover { flex-basis: auto; width: 96px; }
   }
+  @property --ws { syntax: '<length>'; inherits: true; initial-value: 40px; }
   .shelf { display: flex; align-items: flex-end; gap: 0; padding: 18px 4px 0; min-height: 220px; }
   .book-spine {
-    flex: 0 0 auto;
+    flex: 0 0 auto; width: var(--ws); --ws: var(--sw);
+    transition: --ws .8s cubic-bezier(.22,.8,.2,1);
     display: block; text-decoration: none;
     position: relative; cursor: pointer;
   }
@@ -100,7 +102,8 @@
     transition: transform .8s cubic-bezier(.22,.8,.2,1);
   }
   .spine-face {
-    position: absolute; inset: 0; overflow: hidden;
+    position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--sw)) / 2); width: var(--sw);
+    overflow: hidden;
     display: flex; align-items: flex-start; justify-content: center;
     background:
       linear-gradient(to right,
@@ -127,7 +130,7 @@
     display: flex; flex-direction: column; padding: clamp(10px, 9cqw, 18px); overflow: hidden;
     background-color: var(--surface-2); background-size: cover; background-position: center;
     border-radius: 2px;
-    transform: rotateY(90deg) translateZ(calc(var(--ws) / 2));
+    transform: rotateY(90deg) translateZ(calc(var(--sw) / 2));
     backface-visibility: hidden;
     box-shadow: inset 0 0 0 1px rgba(17, 17, 19, .1);
     container-type: inline-size;
@@ -140,11 +143,11 @@
   .spine-back {
     position: absolute; top: 0; bottom: 0; left: calc((var(--ws) - var(--cw)) / 2); width: var(--cw);
     background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.3)), var(--spine);
-    transform: rotateY(-90deg) translateZ(calc(var(--ws) / 2));
+    transform: rotateY(-90deg) translateZ(calc(var(--sw) / 2));
     backface-visibility: hidden;
   }
 .spine-pages {
-    position: absolute; top: 0; left: 0; width: var(--ws); height: var(--cw);
+    position: absolute; top: 0; left: calc((var(--ws) - var(--sw)) / 2); width: var(--sw); height: var(--cw);
     transform-origin: 50% 0;
     transform: translateZ(calc(var(--cw) / 2)) rotateX(-90deg);
     background: repeating-linear-gradient(90deg, #f4f1e8 0 1px, #e2dccb 1px 2px);
@@ -160,6 +163,9 @@
   .shelf .book-spine:focus-visible .book-3d,
   .shelf .book-spine.is-open .book-3d {
     transform: perspective(1200px) translate3d(var(--shift, 0px), -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
+  }
+  @media (hover: hover) {
+    .shelf .book-spine:hover, .shelf .book-spine:focus-visible { --ws: var(--ws-open); }
   }
   .shelf .book-spine:focus-visible { outline-offset: -2px; }
   .book-spine.centered .spine-face { align-items: center; }
@@ -660,14 +666,20 @@
   });
 
   const COVER_PERSPECTIVE = 1200, COVER_DEPTH = .8, COVER_TILT = 3;
+  const canHover = matchMedia('(hover: hover)').matches;
+
+  function openHalfWidth(cw, h, sw) {
+    const rad = COVER_TILT * Math.PI / 180;
+    const plane = (cw / 2) * Math.cos(rad) + (h / 2) * Math.sin(rad);
+    return plane / (1 - (sw / 2 + cw * COVER_DEPTH) / COVER_PERSPECTIVE);
+  }
 
   function fitSpine(a, bounds, pad = 2) {
     const r = a.getBoundingClientRect();
     if (!r.width) return;
     const cw = parseFloat(a.style.getPropertyValue('--cw'));
     const scale = 1 / (1 - (r.width / 2 + cw * COVER_DEPTH) / COVER_PERSPECTIVE);
-    const rad = COVER_TILT * Math.PI / 180;
-    const reach = ((cw / 2) * Math.cos(rad) + (r.height / 2) * Math.sin(rad)) * scale;
+    const reach = openHalfWidth(cw, r.height, r.width);
     const cx = r.left + r.width / 2, left = bounds.left + pad, right = bounds.right - pad;
     let shift = 0;
     if (cx - reach < left) shift = left - (cx - reach);
@@ -677,6 +689,7 @@
   }
 
   function fitShelves() {
+    if (canHover) return;
     const box = document.getElementById('shelves');
     const bounds = box.getBoundingClientRect();
     box.querySelectorAll('.book-spine').forEach(a => fitSpine(a, bounds));
@@ -686,7 +699,6 @@
     const box = document.getElementById('shelves');
     if (!booksData.length || !box.clientWidth) return;
     const GAP = 0, PAD = 6;
-    const usable = box.clientWidth - PAD * 2;
     const rows = [];
     let row = [], width = 0;
 
@@ -704,6 +716,13 @@
       const t = (logPages(b) - lo) / (hi - lo);
       b._w = Math.round(Math.min(92, 30 + Math.max(0, t) * 44 + Math.max(0, t - 1) * 16));
       b._h = 236 + Math.round((((b.id * 7 + (b.pp || b.pages) * 3) % 60) - 30) * .8);
+      b._cw = Math.round(b._h * .68);
+      b._open = 2 * openHalfWidth(b._cw, b._h, b._w);
+    }
+    const reserve = canHover ? Math.max(...booksData.map(b => b._open - b._w)) : 0;
+    const usable = box.clientWidth - PAD * 2 - reserve;
+
+    for (const b of booksData) {
       if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
       row.push(b);
       width += (row.length > 1 ? GAP : 0) + b._w;
@@ -721,10 +740,10 @@
         a.className = 'book-spine';
         a.dataset.id = String(b.id);
         a.dataset.label = b.title + (b.author ? ' — ' + b.author : '');
-        a.style.width = b._w + 'px';
         a.style.height = b._h + 'px';
-        a.style.setProperty('--ws', b._w + 'px');
-        a.style.setProperty('--cw', Math.round(b._h * .68) + 'px');
+        a.style.setProperty('--sw', b._w + 'px');
+        a.style.setProperty('--cw', b._cw + 'px');
+        a.style.setProperty('--ws-open', b._open.toFixed(1) + 'px');
         a.style.setProperty('--spine', b.bg || 'var(--surface-2)');
         if (!b.bg) a.classList.add('no-art');
         if (b.fg) a.style.setProperty('--spine-fg', b.fg);
