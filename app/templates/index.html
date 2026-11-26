@@ -162,11 +162,23 @@
   .shelf .book-spine:hover .book-3d,
   .shelf .book-spine:focus-visible .book-3d,
   .shelf .book-spine.is-open .book-3d {
-    transform: perspective(1200px) translate3d(var(--shift, 0px), -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
+    transform: perspective(1200px) translate3d(0, -8px, calc(var(--cw) * .8)) rotateZ(-3deg) rotateY(-90deg);
   }
   @media (hover: hover) {
     .shelf .book-spine:hover, .shelf .book-spine:focus-visible { --ws: var(--ws-open); }
   }
+  .shelf-track {
+    display: block;
+    overflow-x: auto; overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-top: 22px;
+  }
+  .shelf-track::-webkit-scrollbar { display: none; }
+  .shelf-track .shelf { position: relative; width: max-content; padding-inline: calc(50% - 46px); padding-bottom: 20px; }
+  .shelf-track .shelf-board { position: absolute; left: 0; right: 0; bottom: 20px; }
+  .shelf-track .book-spine { scroll-snap-align: center; }
   .shelf .book-spine:focus-visible { outline-offset: -2px; }
   .book-spine.centered .spine-face { align-items: center; }
   .book-spine.clipped .spine-text {
@@ -603,7 +615,7 @@
     document.querySelectorAll('#shelves .shelf-group').forEach(g => {
       g.hidden = !g.querySelector('.book-spine:not(.hidden)');
     });
-    if (shelvesBuilt) fitShelves();
+    if (!canHover) centerShelf();
     const none = document.getElementById('no-results');
     if (none) none.hidden = ids.size > 0;
     const count = document.getElementById('book-count');
@@ -674,27 +686,6 @@
     return plane / (1 - (sw / 2 + cw * COVER_DEPTH) / COVER_PERSPECTIVE);
   }
 
-  function fitSpine(a, bounds, pad = 2) {
-    const r = a.getBoundingClientRect();
-    if (!r.width) return;
-    const cw = parseFloat(a.style.getPropertyValue('--cw'));
-    const scale = 1 / (1 - (r.width / 2 + cw * COVER_DEPTH) / COVER_PERSPECTIVE);
-    const reach = openHalfWidth(cw, r.height, r.width);
-    const cx = r.left + r.width / 2, left = bounds.left + pad, right = bounds.right - pad;
-    let shift = 0;
-    if (cx - reach < left) shift = left - (cx - reach);
-    else if (cx + reach > right) shift = right - (cx + reach);
-    if (shift) a.style.setProperty('--shift', (shift / scale).toFixed(1) + 'px');
-    else a.style.removeProperty('--shift');
-  }
-
-  function fitShelves() {
-    if (canHover) return;
-    const box = document.getElementById('shelves');
-    const bounds = box.getBoundingClientRect();
-    box.querySelectorAll('.book-spine').forEach(a => fitSpine(a, bounds));
-  }
-
   function buildShelves() {
     const box = document.getElementById('shelves');
     if (!booksData.length || !box.clientWidth) return;
@@ -722,12 +713,15 @@
     const reserve = canHover ? Math.max(...booksData.map(b => b._open - b._w)) : 0;
     const usable = box.clientWidth - PAD * 2 - reserve;
 
-    for (const b of booksData) {
-      if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
-      row.push(b);
-      width += (row.length > 1 ? GAP : 0) + b._w;
+    if (!canHover) rows.push(booksData);
+    else {
+      for (const b of booksData) {
+        if (row.length && width + GAP + b._w > usable) { rows.push(row); row = []; width = 0; }
+        row.push(b);
+        width += (row.length > 1 ? GAP : 0) + b._w;
+      }
+      if (row.length) rows.push(row);
     }
-    if (row.length) rows.push(row);
     box.innerHTML = '';
     for (const r of rows) {
       const group = document.createElement('div');
@@ -806,7 +800,18 @@
         if (s) caption.textContent = s.dataset.label;
       });
       shelf.addEventListener('mouseleave', () => { caption.textContent = ''; });
-      group.append(shelf, board, caption);
+      if (canHover) group.append(shelf, board, caption);
+      else {
+        const track = document.createElement('div');
+        track.className = 'shelf-track';
+        track.append(shelf);
+        shelf.append(board);
+        track.addEventListener('scroll', () => {
+          cancelAnimationFrame(scrollFrame);
+          scrollFrame = requestAnimationFrame(centerShelf);
+        }, { passive: true });
+        group.append(track, caption);
+      }
       box.appendChild(group);
     }
     for (const a of box.querySelectorAll('.book-spine')) {
@@ -815,7 +820,26 @@
       if (text.scrollHeight > avail) text.style.fontSize = Math.max(8, 11.5 * avail / text.scrollHeight).toFixed(1) + 'px';
       a.classList.add(text.scrollHeight <= avail ? 'centered' : 'clipped');
     }
-    fitShelves();
+    if (!canHover) centerShelf();
+  }
+
+  let scrollFrame = 0;
+
+  function centerShelf() {
+    const track = document.querySelector('#shelves .shelf-track');
+    if (!track) return;
+    const mid = track.getBoundingClientRect().left + track.clientWidth / 2;
+    let best = null, dist = Infinity;
+    for (const a of track.querySelectorAll('.book-spine:not(.hidden)')) {
+      const r = a.getBoundingClientRect();
+      const d = Math.abs(r.left + r.width / 2 - mid);
+      if (d < dist) { dist = d; best = a; }
+    }
+    for (const a of track.querySelectorAll('.book-spine.is-open')) if (a !== best) a.classList.remove('is-open');
+    if (!best || best.classList.contains('is-open')) return;
+    best.classList.add('is-open');
+    best.dispatchEvent(new MouseEvent('mouseenter'));
+    track.closest('.shelf-group').querySelector('.shelf-caption').textContent = best.dataset.label;
   }
 
   function paintShelves() {
@@ -847,19 +871,13 @@
     });
   });
 
-  if (matchMedia('(hover: none) and (pointer: coarse)').matches) {
+  if (!canHover) {
     const shelves = document.getElementById('shelves');
     shelves.addEventListener('click', e => {
       const a = e.target.closest('.book-spine');
       if (!a || a.classList.contains('is-open')) return;
       e.preventDefault();
-      shelves.querySelectorAll('.book-spine.is-open').forEach(el => el.classList.remove('is-open'));
-      a.classList.add('is-open');
-      a.dispatchEvent(new MouseEvent('mouseenter'));
-    });
-    document.addEventListener('click', e => {
-      const open = shelves.querySelector('.book-spine.is-open');
-      if (open && !e.target.closest('.book-spine')) open.classList.remove('is-open');
+      a.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     });
   }
 
